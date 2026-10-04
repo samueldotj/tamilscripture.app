@@ -50,6 +50,9 @@ jobs:
         run: ./gradlew lintDebug
       - name: Debug APKs
         run: ./gradlew assembleDebug
+      # Release-only problems (R8, dependencies that debug builds get for free) show up here.
+      - name: Release build
+        run: ./gradlew assembleRelease
       - uses: actions/upload-artifact@v4
         with:
           name: apks-${{ github.sha }}

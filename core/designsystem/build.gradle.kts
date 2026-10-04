@@ -19,6 +19,7 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
+    implementation(libs.androidx.core.ktx)
     api(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.foundation)

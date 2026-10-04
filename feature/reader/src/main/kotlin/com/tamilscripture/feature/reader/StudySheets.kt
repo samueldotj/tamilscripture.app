@@ -156,7 +156,12 @@ fun PeoplePlacesContent(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 people.forEach { id ->
                     val p = m.people[id] ?: return@forEach
-                    TsChip(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, false, { onPerson(id) }, contentPadding = pad)
+                    val name = if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn
+                    // Two people of one name (John the Baptist, Peter's father John) are told apart
+                    // by the start of their description.
+                    val twin = m.people.values.count { (if (tamil) it.nameTa.ifBlank { it.nameEn } else it.nameEn) == name } > 1
+                    val hint = p.brief.substringBefore(',').removePrefix("The ").take(28).trim()
+                    TsChip(if (twin && hint.isNotEmpty()) "$name · $hint" else name, false, { onPerson(id) }, contentPadding = pad)
                 }
                 places.forEach { id ->
                     val p = m.places[id] ?: return@forEach

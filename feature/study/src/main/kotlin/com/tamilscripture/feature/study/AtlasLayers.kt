@@ -30,7 +30,7 @@ internal const val LAST_YEAR = 800
 /**
  * The timeline's data, as the website's `loadTimeline`: every polity row, and the years at
  * which the map changes. Outlines are thinned to points at least [MIN_STEP] degrees apart,
- * which the atlas cannot show anyway, so a year redraws quickly (ADR-12's open question).
+ * about what the atlas can show at its regional zoom, so a year redraws quickly (ADR-12's open question).
  */
 internal suspend fun loadKingdoms(file: suspend (String) -> String?): Kingdoms? {
     val features = file("geo/polities/polities.geojson")?.let { runCatching { GeoJson.parse(it) }.getOrNull() } ?: return null
@@ -59,7 +59,7 @@ internal suspend fun loadChurch(file: suspend (String) -> String?): List<ChurchP
         ChurchPoint(f.props["id"].orEmpty(), f.props["name_en"].orEmpty(), f.props["name_ta"].orEmpty(), f.props["type"].orEmpty(), p[0].toFloat(), wy(p[1]))
     }
 
-private const val MIN_STEP = 0.05
+private const val MIN_STEP = 0.1
 
 private fun Path.addThinned(ring: DoubleArray) {
     if (ring.size < 6) return

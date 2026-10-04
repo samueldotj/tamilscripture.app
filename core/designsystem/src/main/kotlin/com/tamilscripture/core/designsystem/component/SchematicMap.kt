@@ -28,9 +28,11 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.MapDrawing
 import com.tamilscripture.core.model.MapLabel
+import kotlin.math.max
 
 /**
  * A static map from the website (chapter, place or journey; roadmap M8-4) drawn natively,
@@ -100,11 +102,14 @@ fun SchematicMap(
             }
         }
         // Labels after every dot, so no place's dot covers another's name.
+        // Labels keep the website's size relative to the map, but never under 11 sp on screen:
+        // large maps (800 units wide) would otherwise shrink them below reading size on a phone.
+        val labelPx = max((if (tamil) 12.5f else 12f) * k, 11.sp.toPx())
         drawing.places.forEach { p ->
             val on = p.id == selected
             if (!p.crowded || on) {
                 (if (tamil) p.ta ?: p.en else p.en ?: p.ta)?.let { label ->
-                    drawLabel(measurer, label, k, TextStyle(fontFamily = labelFamily, fontSize = ((if (tamil) 12.5f else 12f) * k).toSp(), fontWeight = FontWeight.SemiBold), if (on) c.amber else c.ink, c.mapLand)
+                    drawLabel(measurer, label, k, TextStyle(fontFamily = labelFamily, fontSize = labelPx.toSp(), fontWeight = FontWeight.SemiBold), if (on) c.amber else c.ink, c.mapLand)
                 }
             }
         }

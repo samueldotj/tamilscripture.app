@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
@@ -72,10 +73,10 @@ import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
-import kotlinx.serialization.json.Json
 import kotlin.math.max
-import kotlin.math.roundToInt
 import kotlin.math.min
+import kotlin.math.roundToInt
+import kotlinx.serialization.json.Json
 
 /** Everything the atlas draws, read once (base map, places, journeys). */
 internal class AtlasData(
@@ -174,9 +175,11 @@ fun AtlasScreen(focus: String?, links: StudyLinks) {
                         CircularProgressIndicator(color = c.accent)
                     } else {
                         Text(yearLabel(year, tamil), style = Ts.type.cardTitle, color = c.ink)
+                        // Continuous, rounded to the nearest year at which the map changes: a step per
+                        // year would draw a tick for each of the timeline's ~200 changes.
                         Slider(
                             value = yearIndex.toFloat(), onValueChange = { yearIndex = it.roundToInt() },
-                            valueRange = 0f..(k.years.size - 1).toFloat(), steps = (k.years.size - 2).coerceAtLeast(0),
+                            valueRange = 0f..(k.years.size - 1).toFloat(),
                             colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.line2),
                         )
                         Text("Cliopatria (CC BY 4.0)", style = Ts.type.captionSmall, color = c.muted)
@@ -189,7 +192,7 @@ fun AtlasScreen(focus: String?, links: StudyLinks) {
                 InfoCard(Modifier.align(Alignment.BottomCenter)) {
                     Text(if (tamil) place.nameTa.ifBlank { place.nameEn } else place.nameEn, style = Ts.type.cardTitle, color = c.ink)
                     Text(
-                        listOf(if (tamil) place.nameEn else place.nameTa, place.type, tr("${place.mentions} இடங்களில்", "${place.mentions} mentions"))
+                        listOf(if (tamil) place.nameEn else place.nameTa, place.type, tr("${place.mentions} இடங்களில்", if (place.mentions == 1) "1 mention" else "${place.mentions} mentions"))
                             .filter { it.isNotBlank() }.joinToString(" · "),
                         style = Ts.type.caption, color = c.muted,
                     )
@@ -296,7 +299,8 @@ internal fun AtlasCanvas(
         }
 
         Canvas(
-            Modifier.fillMaxSize()
+            // Clipped: a Canvas draws outside its bounds, over the header and chips.
+            Modifier.fillMaxSize().clipToBounds()
                 .semantics { contentDescription = if (tamil) "வேதாகம வரைபடம்" else "Bible atlas" }
                 .pointerInput(Unit) {
                     detectTransformGestures { centroid, pan, zoom, _ ->
