@@ -68,14 +68,15 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
                         height = 36.dp, textStyle = Ts.type.labelSmall)
                 })
                 HDivider()
-                TsListRow(tr("தோற்றம்", "Appearance"), subtitle = tr("தானியங்கி: தொலைபேசியின் அமைப்பைப் பின்பற்றும்", "Auto follows the phone's setting"), trailing = {
-                    TsSegmented(
-                        listOf(tr("இருள்", "Dark"), tr("ஒளி", "Light"), tr("தானியங்கி", "Auto")),
-                        when (settings.appearance) { Appearance.Dark -> 0; Appearance.Light -> 1; Appearance.System -> 2 },
-                        { i -> scope.launch { graph.settings.update { it.copy(appearance = listOf(Appearance.Dark, Appearance.Light, Appearance.System)[i]) } } },
-                        height = 36.dp, textStyle = Ts.type.labelSmall,
-                    )
-                })
+                // The three-way control sits under its title: beside it, Tamil titles had no room.
+                TsListRow(tr("தோற்றம்", "Appearance"), subtitle = tr("தானியங்கி: தொலைபேசியின் அமைப்பைப் பின்பற்றும்", "Auto follows the phone's setting"))
+                TsSegmented(
+                    listOf(tr("இருள்", "Dark"), tr("ஒளி", "Light"), tr("தானியங்கி", "Auto")),
+                    when (settings.appearance) { Appearance.Dark -> 0; Appearance.Light -> 1; Appearance.System -> 2 },
+                    { i -> scope.launch { graph.settings.update { it.copy(appearance = listOf(Appearance.Dark, Appearance.Light, Appearance.System)[i]) } } },
+                    height = 40.dp, fill = true, textStyle = Ts.type.labelSmall,
+                    modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 16.dp).fillMaxWidth(),
+                )
                 HDivider()
                 TsListRow(
                     tr("அநாமதேயப் பயன்பாட்டுப் புள்ளிவிவரம்", "Share anonymous usage stats"),
