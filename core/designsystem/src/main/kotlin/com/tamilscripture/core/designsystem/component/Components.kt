@@ -270,7 +270,8 @@ fun ReferencePill(title: String, version: String, onClick: () -> Unit, modifier:
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        Text(title, style = Ts.type.barTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The book name gives way first, so the version (or "IRV + KJV") stays readable.
+        Text(title, style = Ts.type.barTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
         Text("$version ▾", style = Ts.type.caption, color = c.muted, maxLines = 1)
     }
 }

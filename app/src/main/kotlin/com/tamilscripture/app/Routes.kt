@@ -2,7 +2,7 @@ package com.tamilscripture.app
 
 import android.net.Uri
 import androidx.navigation3.runtime.NavKey
-import com.tamilscripture.core.model.Book
+import com.tamilscripture.core.model.ContentManifest
 import com.tamilscripture.core.model.Passage
 import kotlinx.serialization.Serializable
 
@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object HomeRoute : NavKey
 @Serializable data object PlansRoute : NavKey
 @Serializable data object StudyRoute : NavKey
-@Serializable data class SearchRoute(val focus: Boolean = false) : NavKey
+@Serializable data class SearchRoute(val focus: Boolean = false, val query: String? = null) : NavKey
 
 /** Full-screen destinations above the tabs. */
 @Serializable data class ReaderRoute(val passage: Passage) : NavKey
@@ -29,24 +29,30 @@ fun NavKey.tab(): Tab? = when (this) {
     else -> null
 }
 
+/** Where a website link leads, and the second version when it names two (dual view). */
+data class DeepLink(val route: NavKey, val compare: String? = null)
+
 /**
  * Website links (A-2.10): `/irvtam/john/3`, `/irvtam/john/3/16`, `/irvtam/john/3.16`,
- * `/irvtam+bsb/john/3` (first version), `/john/3`. Anything else opens the home screen.
+ * `/john/3`, `/irvtam+kjv/john/3` (dual view, as on the website) and `/search?q=…`.
+ * Anything else opens the home screen.
  */
-fun parseDeepLink(uri: Uri, books: List<Book>, defaultVersion: String): Passage? {
+fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): DeepLink? {
     val seg = uri.pathSegments.filter { it.isNotBlank() }
     if (seg.isEmpty()) return null
-    val versionCodes = setOf("irvtam", "tcv", "tov", "bsb", "web", "kjv")
-    val first = seg[0].lowercase()
-    val hasVersion = first.split('+').first() in versionCodes
-    val version = if (hasVersion) first.split('+').first().uppercase() else defaultVersion
+    if (seg.size == 1 && seg[0] == "search") return DeepLink(SearchRoute(query = uri.getQueryParameter("q")?.trim()?.takeIf { it.isNotEmpty() }))
+    val codes = manifest.versions.associateBy { it.code.lowercase() }
+    val parts = seg[0].lowercase().split('+')
+    val hasVersion = parts.size <= 2 && parts.all { it in codes }
+    val version = if (hasVersion) codes.getValue(parts[0]).code else defaultVersion
+    val compare = if (hasVersion) parts.getOrNull(1)?.let { codes.getValue(it).code } else null
     val rest = if (hasVersion) seg.drop(1) else seg
     if (rest.size < 2) return null
-    val book = books.firstOrNull { b -> b.slug == rest[0].lowercase() || rest[0].lowercase() in b.abbrEn.map { it.lowercase() } || b.code.equals(rest[0], true) }
+    val book = manifest.books.firstOrNull { b -> b.slug == rest[0].lowercase() || rest[0].lowercase() in b.abbrEn.map { it.lowercase() } || b.code.equals(rest[0], true) }
         ?: return null
     val chapterPart = rest[1]
     val chapter = chapterPart.substringBefore('.').toIntOrNull() ?: return null
     val verse = chapterPart.substringAfter('.', "").substringBefore('-').toIntOrNull()
         ?: rest.getOrNull(2)?.substringBefore('-')?.toIntOrNull()
-    return Passage(version, book.code, chapter, verse)
+    return DeepLink(ReaderRoute(Passage(version, book.code, chapter, verse)), compare)
 }

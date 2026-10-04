@@ -16,19 +16,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation3.runtime.NavKey
 import com.tamilscripture.core.data.settings.Appearance
 import com.tamilscripture.core.data.settings.Typeface
 import com.tamilscripture.core.designsystem.theme.ScriptureFace
 import com.tamilscripture.core.designsystem.theme.ThemeMode
 import com.tamilscripture.core.designsystem.theme.TsTheme
-import com.tamilscripture.core.model.Passage
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
-    private var pendingLink by mutableStateOf<Passage?>(null)
+    private var pendingLink by mutableStateOf<NavKey?>(null)
     private var pendingUri by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,17 +39,24 @@ class MainActivity : ComponentActivity() {
         val services = (application as TsApplication).services
         // One DataStore read before the first frame so the theme and language never flash (NF-2).
         val initial = runBlocking { services.graph.settings.settings.first() }
+        // A recreated activity (rotation, or a restore after the process was killed) carries an
+        // intent that was already opened, possibly the task's first one; new links arrive
+        // through onNewIntent.
         if (savedInstanceState == null) pendingUri = intent?.data
 
         setContent {
             val settings by services.graph.settings.settings.collectAsStateWithLifecycle(initial)
             val manifest by services.graph.content.manifest.collectAsStateWithLifecycle()
             // Website links wait for the manifest (book slugs), which never blocks the main thread.
-            LaunchedEffect(pendingUri, manifest) {
+            val ready = manifest != null
+            LaunchedEffect(pendingUri, ready) {
                 val uri = pendingUri
                 val m = manifest
                 if (uri != null && m != null) {
-                    pendingLink = parseDeepLink(uri, m.books, settings.version)
+                    val link = parseDeepLink(uri, m, settings.version)
+                    // Not awaited: a manifest refresh must not cancel the navigation half-way.
+                    link?.compare?.let { code -> lifecycleScope.launch { services.graph.settings.update { it.copy(compare = code) } } }
+                    pendingLink = link?.route
                     pendingUri = null
                 }
             }

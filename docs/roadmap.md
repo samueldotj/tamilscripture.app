@@ -122,8 +122,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-20 Interface strings in Tamil and English; per-app language switch.
 
 **Stats**
-- [ ] M1-21 **[web]** Migration: `source`, `event_id`, `app_version`, `window_class`, `offline` columns; widen `kind`; `track_app_batch(jsonb, text, text, text)`, anon-executable and validating like `track()`; pgTAP tests ([design §12.4](design.md#124-server-side-website-repo-supabasemigrations20261004100000_app_analyticssql)). Website PR samueldotj/tamilscripture.com#3.
-- [ ] M1-21a **[web]** `/api/t/app` Vercel route: size limits, Vercel geo headers, per-address rate limit, one `track_app_batch` call per batch, `{accepted:[ids]}` ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)). JWT verification moves to M6.
+- [x] M1-21 **[web]** Migration: `source`, `event_id`, `app_version`, `window_class`, `offline` columns; widen `kind`; `track_app_batch(jsonb, text, text, text)`, anon-executable and validating like `track()`; pgTAP tests ([design §12.4](design.md#124-server-side-website-repo-supabasemigrations20261004100000_app_analyticssql)). Merged (samueldotj/tamilscripture.com#3) and live on 4 Oct 2026; the Pixel 9 uploaded its queue.
+- [x] M1-21a **[web]** `/api/t/app` Vercel route: size limits, Vercel geo headers, per-address rate limit, one `track_app_batch` call per batch, `{accepted:[ids]}` ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)). JWT verification moves to M6.
 - [x] M1-22 `StatsRecorder` channel → Room `pending_event`; retention cap; opt-out setting.
 - [x] M1-23 `StatsSyncWorker`: batching, back-off, delete on confirmation, expedited run on background.
 - [x] M1-24 `VisibleVerseTracker` for `read` events (60% visible for 2 s, confirmed) ([design §6.6](design.md#66-verse-read-tracking-for-stats)); `view` events with `source` pack/cache/online.
@@ -181,7 +181,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 **Requirements:** A-3.1 (Study Bible), A-3.3–A-3.5, A-4.1–A-4.5, A-4.7, A-4.8, A-5.1, NF-4.
 
 ### Tasks
-- [ ] M3-1 **[web]** Port romanised-Tamil conversion to `ts-mobile` with the website's fixtures.
+- [x] M3-1 Romanised-Tamil search ("anbu" → அன்பு): the website's converter (`lib/search/romanised.ts`, TypeScript, not Rust) ported to Kotlin as `Romanised`, with the same rule: the Tamil reading is used when the words as typed find nothing, otherwise offered as a chip. Website `/search?q=` and `/irvtam+kjv/…` dual links open in the app.
 - [x] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
 - [ ] M3-3 Trigram fallback when fewer than 5 hits.
 - [ ] M3-4 Match highlighting by token normalisation.

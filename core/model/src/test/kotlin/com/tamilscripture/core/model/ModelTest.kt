@@ -1,7 +1,9 @@
 package com.tamilscripture.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -43,5 +45,25 @@ class ModelTest {
         // A day later with day 2 still unread, it counts as missed.
         val later = Plans.stats(plan, PlanProgress(start, done), now = LocalDate.of(2026, 10, 4))
         assertEquals(listOf(2), later.missed)
+    }
+}
+
+class RomanisedTest {
+    @Test
+    fun commonWords() {
+        assertEquals("அன்பு", Romanised.toTamil("anbu"))
+        assertEquals("கிருபை", Romanised.toTamil("kirubai"))
+        assertEquals("தேவன்", Romanised.toTamil("thEvan"))
+        assertEquals("நான் இயேசு", Romanised.toTamil("naan iyEsu"))
+        assertEquals("அன்பு கிருபை", Romanised.toTamil("  anbu   kirubai "))
+    }
+
+    @Test
+    fun detection() {
+        assertTrue(Romanised.isRomanised("anbu"))
+        assertTrue(Romanised.isRomanised("o'brien-x"))
+        assertFalse(Romanised.isRomanised("அன்பு"))
+        assertFalse(Romanised.isRomanised("john 3:16"))
+        assertFalse(Romanised.isRomanised("  "))
     }
 }

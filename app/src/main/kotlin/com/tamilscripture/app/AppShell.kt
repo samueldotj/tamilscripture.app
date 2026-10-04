@@ -66,7 +66,7 @@ import com.tamilscripture.feature.study.StudyNav
  * rail from 600 dp; the reader opens over the tabs and takes the 14″ layout from 840 dp.
  */
 @Composable
-fun AppShell(start: List<NavKey>, pending: Passage?, onPendingHandled: () -> Unit) {
+fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit) {
     val services = LocalAppServices.current
     val backStack = rememberNavBackStack(*start.toTypedArray())
     val settings by services.graph.settings.settings.collectAsStateWithLifecycle(Settings())
@@ -75,7 +75,10 @@ fun AppShell(start: List<NavKey>, pending: Passage?, onPendingHandled: () -> Uni
 
     LaunchedEffect(pending) {
         if (pending != null) {
-            backStack.add(ReaderRoute(pending))
+            if (pending is SearchRoute) {
+                backStack.clear()
+            }
+            backStack.add(pending)
             onPendingHandled()
         }
     }
@@ -124,7 +127,7 @@ fun AppShell(start: List<NavKey>, pending: Passage?, onPendingHandled: () -> Uni
                             backStack.add(CommentaryRoute(last))
                         }, soon = soon))
                     }
-                    entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus) }
+                    entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
                         ReaderScreen(
                             r.passage, wide,

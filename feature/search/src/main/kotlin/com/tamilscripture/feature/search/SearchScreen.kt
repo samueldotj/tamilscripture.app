@@ -64,20 +64,22 @@ import kotlinx.coroutines.delay
 
 /** தேடல் · Search across verses (design 1H). Dictionary and places arrive with their packs (M8). */
 @Composable
-fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
+fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQuery: String? = null) {
     val services = LocalAppServices.current
     val graph = services.graph
     val c = Ts.colors
     val lang = LocalUiLang.current
     val manifest by graph.content.manifest.collectAsStateWithLifecycle()
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
-    var query by rememberSaveable { mutableStateOf("") }
+    var query by rememberSaveable(initialQuery) { mutableStateOf(initialQuery.orEmpty()) }
     var filter by rememberSaveable { mutableStateOf(0) }
     var hits by remember { mutableStateOf<List<SearchHit>>(emptyList()) }
     var total by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var offline by remember { mutableStateOf(false) }
+    var shown by remember { mutableStateOf("") }
+    var romanOffer by remember { mutableStateOf<String?>(null) }
     val ref = remember(query, manifest) { References.parse(query, manifest) }
     // A-4.5: book names in both scripts while the reader is still typing one.
     val suggestions = remember(query, manifest) {
@@ -89,14 +91,14 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
     LaunchedEffect(query, settings.version, ref) {
         failed = false
         if (query.trim().length < 2 || ref != null) {
-            hits = emptyList(); total = 0; loading = false
+            hits = emptyList(); total = 0; loading = false; romanOffer = null
             return@LaunchedEffect
         }
         delay(350)
         loading = true
         try {
-            val r = graph.search.search(query.trim(), settings.version)
-            hits = r.response.hits; total = r.response.total; offline = r.offline
+            val r = graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta")
+            hits = r.response.hits; total = r.response.total; offline = r.offline; shown = r.shown; romanOffer = r.romanOffer
             graph.stats.record("search", query = query.trim(), amount = r.response.total.toLong(), version = settings.version, offline = r.offline)
         } catch (e: Exception) {
             failed = true
@@ -177,6 +179,20 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
                     )
                 }
                 if (hits.isNotEmpty()) {
+                    if (shown != query.trim()) item {
+                        Text(
+                            tr("“$shown” என்பதற்கான முடிவுகள்", "Showing results for “$shown”"),
+                            style = Ts.type.body, color = c.ink2, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
+                        )
+                    }
+                    romanOffer?.let { offer ->
+                        item {
+                            TsChip(
+                                tr("“$offer” எனத் தேடு", "Search “$offer” instead"), false, { query = offer },
+                                Modifier.padding(start = 20.dp, top = 12.dp),
+                            )
+                        }
+                    }
                     item {
                         Kicker(
                             tr("வசனங்கள்", "Verses") + " · $total" + if (offline) tr(" · சாதனத்தில்", " · on device") else tr(" · இணையத்தில்", " · online"),
@@ -191,7 +207,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(book?.label(lang, vid.chapter, vid.verse) ?: h.verseId, style = Ts.type.labelSmall, color = c.accent)
-                            Text(highlight(h.text, query.trim(), c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
+                            Text(highlight(h.text, shown, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
                         }
                         HDivider(Modifier.padding(horizontal = 20.dp))
                     }
