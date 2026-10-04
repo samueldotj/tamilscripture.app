@@ -76,6 +76,7 @@ fun HomeScreen(nav: HomeNav) {
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
     val progress by graph.plans.progress.collectAsStateWithLifecycle(emptyMap())
     val active by graph.plans.activePlan.collectAsStateWithLifecycle(null)
+    val community by graph.plans.community.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -123,7 +124,7 @@ fun HomeScreen(nav: HomeNav) {
             }
             // Today's reading
             val planId = active ?: progress.keys.firstOrNull()
-            val plan = m?.let { Plans.builtIn(it.books) }?.firstOrNull { it.id == planId }
+            val plan = m?.let { Plans.all(it.books, community) }?.firstOrNull { it.id == planId }
             val prog = planId?.let { progress[it] }
             if (plan != null && prog != null) {
                 val schedule = Plans.schedule(plan)

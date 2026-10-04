@@ -41,7 +41,7 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val commentary = CommentaryRepository(http, onlineCache, json, packs)
     val search = SearchRepository(http, packs, json)
     val settings = SettingsRepository(context)
-    val plans = PlanRepository(context)
+    val plans = PlanRepository(context, http)
     val stats = StatsRecorder(File(context.filesDir, "stats"), appScope, json)
 }
 

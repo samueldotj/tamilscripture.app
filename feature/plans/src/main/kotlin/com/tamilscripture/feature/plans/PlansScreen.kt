@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,11 +56,11 @@ import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
-import kotlinx.coroutines.launch
 import java.time.LocalDate
-import kotlin.math.roundToInt
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 private val MONTHS_TA = listOf("ஜனவரி", "பிப்ரவரி", "மார்ச்", "ஏப்ரல்", "மே", "ஜூன்", "ஜூலை", "ஆகஸ்ட்", "செப்டம்பர்", "அக்டோபர்", "நவம்பர்", "டிசம்பர்")
 private val MONTHS_TA_SHORT = listOf("ஜன", "பிப்", "மார்", "ஏப்", "மே", "ஜூன்", "ஜூலை", "ஆக", "செப்", "அக்", "நவ", "டிச")
@@ -78,7 +79,9 @@ fun PlansScreen(onRead: (Passage) -> Unit) {
     val progress by graph.plans.progress.collectAsStateWithLifecycle(emptyMap())
     val active by graph.plans.activePlan.collectAsStateWithLifecycle(null)
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
-    val plans = remember(manifest) { manifest?.let { Plans.builtIn(it.books) }.orEmpty() }
+    val community by graph.plans.community.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { graph.plans.refreshCommunity() }
+    val plans = remember(manifest, community) { manifest?.let { Plans.all(it.books, community) }.orEmpty() }
     val planId = active ?: progress.keys.firstOrNull()
     val plan = plans.firstOrNull { it.id == planId }
     val prog = planId?.let { progress[it] }
@@ -109,7 +112,11 @@ fun PlansScreen(onRead: (Passage) -> Unit) {
                 } else {
                     EmptyPlan(mod) { tab = 1 }
                 }
-                1 -> plans.forEach { p ->
+                1 -> plans.forEachIndexed { i, p ->
+                    // M7-3: the community's plans follow the built-in ones under their own heading.
+                    if (p.community && plans.getOrNull(i - 1)?.community != true) {
+                        Kicker(tr("சமூகத் திட்டங்கள்", "Community plans"), mod.padding(top = 8.dp))
+                    }
                     PlanCard(p, progress[p.id], p.id == planId, mod,
                         onStart = { scope.launch { graph.plans.join(p.id); tab = 0 } },
                         onContinue = { scope.launch { graph.plans.setActive(p.id); tab = 0 } },

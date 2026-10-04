@@ -6,12 +6,20 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.tamilscripture.core.data.net.Http
+import com.tamilscripture.core.data.net.SupabaseConfig
+import com.tamilscripture.core.model.CommunityPlan
 import com.tamilscripture.core.model.PlanProgress
+import java.io.File
+import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import java.time.LocalDate
 
 private val Context.plansStore: DataStore<Preferences> by preferencesDataStore("plans")
 
@@ -22,8 +30,29 @@ private data class StoredProgress(val plan: String, val start: String, val done:
  * Reading-plan progress, kept on the device (signed-out behaviour of the website, A-8.1).
  * Sync with `plan_progress` arrives with accounts (roadmap M6).
  */
-class PlanRepository(private val context: Context) {
+class PlanRepository(private val context: Context, private val http: Http) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val communityFile = File(context.filesDir, "plans/community.json")
+    private val communityState = MutableStateFlow(readCommunity())
+
+    /** Published community plans (M7-3), kept on the device so they open offline. */
+    val community: StateFlow<List<CommunityPlan>> = communityState
+
+    private fun readCommunity(): List<CommunityPlan> =
+        runCatching { json.decodeFromString<List<CommunityPlan>>(communityFile.readText()) }.getOrDefault(emptyList())
+
+    /** The website's published plans, read the way the website does: anon PostgREST under RLS. */
+    suspend fun refreshCommunity() {
+        val url = "${SupabaseConfig.URL}/rest/v1/reading_plans?select=id,title_ta,title_en,blurb,days,tracks" +
+            "&status=eq.published&order=published_at.asc&apikey=${SupabaseConfig.ANON_KEY}"
+        val bytes = runCatching { http.getAbsolute(url) }.getOrNull() ?: return
+        val rows = runCatching { json.decodeFromString<List<CommunityPlan>>(bytes.decodeToString()) }.getOrNull() ?: return
+        withContext(Dispatchers.IO) {
+            communityFile.parentFile?.mkdirs()
+            File(communityFile.path + ".tmp").apply { writeBytes(bytes) }.renameTo(communityFile.also { it.delete() })
+        }
+        communityState.value = rows
+    }
     private val progressKey = stringPreferencesKey("progress")
     private val activeKey = stringPreferencesKey("active")
 

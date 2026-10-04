@@ -67,3 +67,24 @@ class RomanisedTest {
         assertFalse(Romanised.isRomanised("  "))
     }
 }
+
+class CommunityPlanTest {
+    private fun book(code: String, order: Int, ch: Int, t: String = "NT") = Book(code, order, t, ch, code.lowercase(), code, code)
+    private val books = listOf(book("GEN", 1, 50, "OT"), book("MAT", 40, 28), book("MRK", 41, 16), book("LUK", 42, 24), book("JHN", 43, 21))
+
+    @Test
+    fun tracksReadTheirBookRangeInOrder() {
+        val row = CommunityPlan("x", titleTa = "நற்செய்தி", days = 90, tracks = listOf(TrackSpec("Gospels", "MAT", "JHN"), TrackSpec("Bad", "JHN", "MAT")))
+        val plan = Plans.fromRow(row, books)!!
+        assertEquals(1, plan.tracks.size)
+        assertEquals(28 + 16 + 24 + 21, plan.tracks[0].units.size)
+        assertEquals("MAT", plan.tracks[0].units.first().book.code)
+        assertEquals("நற்செய்தி", plan.titleEn) // no English title: the Tamil one, as on the website
+        assertTrue(plan.community)
+    }
+
+    @Test
+    fun aPlanWithNoUsableTrackIsDropped() {
+        assertNull(Plans.fromRow(CommunityPlan("y", days = 30, tracks = listOf(TrackSpec("", "XXX", "JHN"))), books))
+    }
+}

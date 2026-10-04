@@ -290,7 +290,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 ### Tasks
 - [x] M7-1 Port `schedule.ts` (built-in plans, rest days, Psalm 119 stanzas) to Kotlin; test against the website's outputs for every day of every plan.
 - [x] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
-- [ ] M7-3 Community plans from `reading_plans` (published only), cached offline.
+- [x] M7-3 Community plans from `reading_plans` (published only), cached offline. Anon PostgREST as the website does; `fromRow` ported with tests.
 - [ ] M7-4 Progress local when signed out; moved to the account on first sign-in, as the website does.
 - [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine). Built (Settings › Daily reminder; today's plan passages or the verse of the day); on-device check pending.
 - [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; on-device check pending.

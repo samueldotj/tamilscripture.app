@@ -4,6 +4,8 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Reading plans, ported from the website's `apps/web/src/lib/plans/schedule.ts` so both
@@ -26,6 +28,21 @@ data class ReadingPlan(
 ) {
     fun title(lang: UiLang) = if (lang == UiLang.Tamil) titleTa else titleEn
 }
+
+/** A community plan's track as stored in `reading_plans.tracks`: a name and a book range. */
+@Serializable
+data class TrackSpec(val name: String = "", val from: String, val to: String)
+
+/** A published row of the website's `reading_plans` (M7-3). */
+@Serializable
+data class CommunityPlan(
+    val id: String,
+    @SerialName("title_ta") val titleTa: String = "",
+    @SerialName("title_en") val titleEn: String = "",
+    val blurb: String = "",
+    val days: Int,
+    val tracks: List<TrackSpec> = emptyList(),
+)
 
 data class PlanPassage(val trackIndex: Int, val track: PlanTrack, val units: List<PlanUnit>, val chapters: Int)
 
@@ -98,6 +115,33 @@ object Plans {
                 )
             }
         }
+    }
+
+    /** Built-in plans, then the community's, as the website lists them. */
+    fun all(books: List<Book>, community: List<CommunityPlan>): List<ReadingPlan> =
+        builtIn(books) + community.mapNotNull { fromRow(it, books) }
+
+    /** Port of the website's `fromRow`: each track reads its book range in canon order. */
+    fun fromRow(r: CommunityPlan, books: List<Book>): ReadingPlan? {
+        val tracks = r.tracks.mapIndexed { i, t ->
+            val name = t.name.trim().ifEmpty { if (i > 0) "Track ${i + 1}" else "Track" }
+            PlanTrack(name, name, unitsOf(bookRange(books, t.from, t.to)))
+        }.filter { it.units.isNotEmpty() }
+        if (tracks.isEmpty() || r.days < 1) return null
+        return ReadingPlan(
+            r.id,
+            r.titleTa.ifBlank { r.titleEn.ifBlank { "பெயரிடப்படாத திட்டம்" } },
+            r.titleEn.ifBlank { r.titleTa.ifBlank { "Untitled plan" } },
+            r.blurb, r.blurb, r.days, tracks, community = true,
+        )
+    }
+
+    /** Books from [from] to [to] inclusive, in canon order; empty when reversed or unknown. */
+    private fun bookRange(books: List<Book>, from: String, to: String): List<Book> {
+        val a = books.firstOrNull { it.code == from } ?: return emptyList()
+        val b = books.firstOrNull { it.code == to } ?: return emptyList()
+        if (a.order > b.order) return emptyList()
+        return books.filter { it.order in a.order..b.order }.sortedBy { it.order }
     }
 
     private fun jsRound(x: Double): Int = kotlin.math.floor(x + 0.5).toInt()

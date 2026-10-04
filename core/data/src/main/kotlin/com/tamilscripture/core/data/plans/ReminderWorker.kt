@@ -97,7 +97,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
         val m = manifest ?: return null
         val progress = graph.plans.progress.firstOrNull().orEmpty()
         val planId = graph.plans.activePlan.firstOrNull() ?: progress.keys.firstOrNull() ?: return null
-        val plan = Plans.builtIn(m.books).firstOrNull { it.id == planId } ?: return null
+        val plan = Plans.all(m.books, graph.plans.community.value).firstOrNull { it.id == planId } ?: return null
         val prog = progress[planId] ?: return null
         val day = ChronoUnit.DAYS.between(prog.start, LocalDate.now()).toInt().coerceIn(0, plan.days - 1)
         val passages = Plans.schedule(plan)[day]
