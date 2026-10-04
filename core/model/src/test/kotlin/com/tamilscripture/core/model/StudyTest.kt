@@ -59,4 +59,16 @@ class StudyTest {
         assertTrue(j.paths.any { it.first == "route" })
         assertTrue(j.places.all { it.em } && j.places.first().number == "1")
     }
+
+    @Test
+    fun atlasLayers() {
+        val rivers = GeoJson.parse(fixture("rivers.geojson"))
+        assertTrue(rivers.isNotEmpty() && rivers.all { it.parts.isNotEmpty() && it.parts[0].size >= 4 })
+        val places = GeoJson.parse(fixture("places-5.geojson"))
+        assertEquals(5, places.size)
+        assertTrue(places.all { it.point != null && it.props["id"] != null })
+        val journeys = json.decodeFromString<List<Journey>>(fixture("journeys-2.json"))
+        assertTrue(journeys.first().stops.isNotEmpty())
+        assertEquals(0.0, Mercator.y(0.0), 1e-9)
+    }
 }

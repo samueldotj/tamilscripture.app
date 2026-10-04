@@ -43,6 +43,7 @@ import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.SchematicMap
 import com.tamilscripture.core.designsystem.component.TsChip
+import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.ArticleIndexEntry
@@ -70,6 +71,8 @@ class StudyLinks(
     val person: (String) -> Unit,
     val place: (String) -> Unit,
     val article: (String) -> Unit,
+    /** The atlas, centred on a place when one is given. */
+    val atlas: (String?) -> Unit,
 )
 
 // ---- shared pieces ---------------------------------------------------------------------
@@ -240,6 +243,7 @@ fun PlaceScreen(id: String, links: StudyLinks) {
     StudyPage(name, p?.let { listOfNotNull(it.placeType, it.modern?.takeIf { m -> m != it.nameEn }).joinToString(" · ") }, links, state.first, !state.first && p == null) {
         if (p == null) return@StudyPage
         map?.let { d -> item { SchematicMap(d, lang == UiLang.Tamil, selected = id, description = name, onPlace = { other -> if (other != id) links.place(other) }) } }
+        if (p.geo?.lat != null) item { TsPillButton(lang.t("வரைபடத்தில் காட்டு", "Show on the atlas"), { links.atlas(id) }, height = 36.dp) }
         paragraph(p.description?.brief, big = true)
         paragraph(p.description?.article ?: p.description?.short)
         p.geo?.lat?.let { lat ->

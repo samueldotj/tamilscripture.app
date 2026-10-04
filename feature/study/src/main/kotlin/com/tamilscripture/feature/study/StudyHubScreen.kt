@@ -41,7 +41,7 @@ import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.services.tr
 
-class StudyNav(val commentary: () -> Unit, val dictionary: () -> Unit, val rootWords: () -> Unit, val soon: (String) -> Unit)
+class StudyNav(val commentary: () -> Unit, val dictionary: () -> Unit, val rootWords: () -> Unit, val atlas: () -> Unit, val soon: (String) -> Unit)
 
 /** ஆய்வு · Study hub (design 1G). */
 @Composable
@@ -57,8 +57,7 @@ fun StudyHubScreen(nav: StudyNav) {
             val mod = Modifier.widthIn(max = 720.dp).fillMaxWidth()
             val psalms = tr("சங்கீத ஆய்வு", "Psalm explorer")
             PsalmCard(mod) { nav.soon(psalms) }
-            val atlas = tr("வரைபடம்", "Atlas")
-            AtlasCard(mod) { nav.soon(atlas) }
+            AtlasCard(mod, nav.atlas)
             Row(mod, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val dict = tr("அகராதி", "Dictionary")
                 Tile(dict, tr("ஈஸ்டன் · ஸ்மித் · அக்வைஃபர்", "Easton · Smith · Aquifer"), Modifier.weight(1f), onClick = nav.dictionary)
@@ -144,9 +143,8 @@ private fun AtlasCard(mod: Modifier, onClick: () -> Unit) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tr("வரைபடம்", "Atlas"), style = Ts.type.cardTitle.copy(fontSize = 18.sp), color = c.ink)
-                TsBadge(tr("விரைவில்", "Soon"), tinted = false)
             }
-            Text(tr("பயணங்கள் · காலவரிசை · இடங்கள்", "Journeys · timeline · places"), style = Ts.type.caption, color = c.ink2)
+            Text(tr("பயணங்கள் · இடங்கள்", "Journeys · places"), style = Ts.type.caption, color = c.ink2)
         }
         Row(
             Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))

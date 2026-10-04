@@ -59,6 +59,7 @@ import com.tamilscripture.feature.reader.ReaderNav
 import com.tamilscripture.feature.reader.ReaderScreen
 import com.tamilscripture.feature.search.SearchScreen
 import com.tamilscripture.feature.study.ArticleScreen
+import com.tamilscripture.feature.study.AtlasScreen
 import com.tamilscripture.feature.study.DictionaryScreen
 import com.tamilscripture.feature.study.PersonScreen
 import com.tamilscripture.feature.study.PlaceScreen
@@ -116,6 +117,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
         person = { id -> backStack.add(PersonRoute(id)) },
         place = { id -> backStack.add(PlaceRoute(id)) },
         article = { id -> backStack.add(ArticleRoute(id)) },
+        atlas = { focus -> backStack.add(AtlasRoute(focus)) },
     )
 
     val soon: (String) -> Unit = { name ->
@@ -141,7 +143,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                         StudyHubScreen(StudyNav(commentary = {
                             val last = settings.lastRead ?: Passage(settings.version, "JHN", 3)
                             backStack.add(CommentaryRoute(last))
-                        }, dictionary = { backStack.add(DictionaryRoute) }, rootWords = { backStack.add(RootWordsRoute) }, soon = soon))
+                        }, dictionary = { backStack.add(DictionaryRoute) }, rootWords = { backStack.add(RootWordsRoute) }, atlas = { backStack.add(AtlasRoute()) }, soon = soon))
                     }
                     entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
@@ -182,6 +184,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<ArticleRoute> { r -> ArticleScreen(r.id, studyLinks) }
                     entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
+                    entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks) }
                     entry<DownloadsRoute> { DownloadsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }
                 },
             )
