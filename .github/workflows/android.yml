@@ -44,7 +44,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      # Pack tests (M0-14, M1-27) call the Rust normaliser on the JVM through JNA.
+      - name: Host build of ts-mobile for JVM tests
+        run: cargo build --manifest-path website/Cargo.toml -p ts-mobile --release
       - name: Unit tests
+        env:
+          TS_MOBILE_HOST_LIB: ${{ github.workspace }}/website/target/release
         run: ./gradlew testDebugUnitTest :core:model:test
       - name: Lint
         run: ./gradlew lintDebug

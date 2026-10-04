@@ -65,7 +65,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M0-13 `:core:design`: colour tokens light/dark, bundled subset fonts, typography scale, shapes ([design §5](design.md#5-design-system)).
 
 **Test infrastructure** ([design §15](design.md#15-testing))
-- [ ] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection.
+- [~] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection. Started: `FixturePacks` writes Bible and cross-reference packs with pack-build's schema from real chapters kept under test resources (John 3, Psalm 23, Genesis 1 in IRVTAM; John 3 in BSB); JVM tests use the desktop SQLite and the host build of ts-mobile. MockWebServer CDN is open.
 - [ ] M0-15 Roborazzi screenshot setup with the width-class × theme × language × font-scale matrix. Started: Roborazzi + Robolectric in :core:designsystem (maps, light/dark, Tamil/English); baselines in src/test/screenshots.
 - [ ] M0-16 Gradle Managed Devices (API 26 low-RAM, API 35) and a `nightly.yml` workflow for instrumented tests.
 - [x] M0-17 Network guard (`Http.guard`, `Supabase.guard`) for tests and StrictMode (logging) in debug builds.
@@ -131,7 +131,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 **Performance**
 - [ ] M1-26 `:benchmark` module: startup and chapter-swipe Macrobenchmarks; Baseline Profile generation in CI.
-- [ ] M1-27 Airplane-mode integration test (fails on any network call while reading downloaded content).
+- [x] M1-27 Airplane-mode integration test (fails on any network call while reading downloaded content): `AirplaneModeTest` reads a chapter, its cross-references and searches from fixture packs with every request failing and counted.
 - [ ] M1-28 Online-reading tests: no packs installed, cache hit with the server stopped, revalidation on a new build ([design §15.4](design.md#154-what-specific-requirements-need)).
 - [ ] M1-29 Download fault tests: dropped connections, wrong checksum, process kill during install, automatic update constraints.
 
