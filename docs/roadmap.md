@@ -105,7 +105,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-9c Online cache: `online_cache` table keyed by content path (not URL), LRU over 50 MB (keep at least 200 chapters), size setting, clear action.
 - [x] M1-9d Stale-while-revalidate when the content build changes; in-place UI update.
 - [x] M1-9e Prefetch of neighbouring chapters (±1, next 3 on Wi-Fi); data-saver setting for mobile data.
-- [ ] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action.
+- [ ] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action. Built (banner, "Not now" remembered per version, download button on the offline error); on-device check pending.
 - [ ] M1-9g Downloads screen shows packs and the online cache separately.
 
 **Reader**

@@ -38,6 +38,12 @@ data class Settings(
     val compare: String? = null,
     /** Newest first, at most 8, kept on this device only (A-4.5, like the website's). */
     val recentSearches: List<String> = emptyList(),
+    /** Large downloads wait for Wi-Fi (DL-5). */
+    val downloadWifiOnly: Boolean = true,
+    /** Chapters read online per version, for the download offer (M1-9f). */
+    val onlineChapters: Map<String, Int> = emptyMap(),
+    /** Versions whose download offer was turned down. */
+    val offersDeclined: Set<String> = emptySet(),
 )
 
 class SettingsRepository(private val context: Context) {
@@ -57,6 +63,9 @@ class SettingsRepository(private val context: Context) {
         val shareStats = booleanPreferencesKey("shareStats")
         val compare = stringPreferencesKey("compare")
         val recentSearches = stringPreferencesKey("recentSearches")
+        val downloadWifiOnly = booleanPreferencesKey("downloadWifiOnly")
+        val onlineChapters = stringPreferencesKey("onlineChapters")
+        val offersDeclined = stringPreferencesKey("offersDeclined")
     }
 
     private fun read(p: Preferences): Settings {
@@ -77,6 +86,11 @@ class SettingsRepository(private val context: Context) {
             shareStats = p[K.shareStats] ?: d.shareStats,
             compare = p[K.compare],
             recentSearches = p[K.recentSearches]?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
+            downloadWifiOnly = p[K.downloadWifiOnly] ?: d.downloadWifiOnly,
+            onlineChapters = p[K.onlineChapters]?.split(',')?.mapNotNull { e ->
+                e.split('=').takeIf { it.size == 2 }?.let { (k, v) -> v.toIntOrNull()?.let { k to it } }
+            }?.toMap().orEmpty(),
+            offersDeclined = p[K.offersDeclined]?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty(),
         )
     }
 
@@ -101,6 +115,9 @@ class SettingsRepository(private val context: Context) {
             p[K.shareStats] = n.shareStats
             if (n.compare != null) p[K.compare] = n.compare else p.remove(K.compare)
             p[K.recentSearches] = n.recentSearches.joinToString("\n")
+            p[K.downloadWifiOnly] = n.downloadWifiOnly
+            p[K.onlineChapters] = n.onlineChapters.entries.joinToString(",") { "${it.key}=${it.value}" }
+            p[K.offersDeclined] = n.offersDeclined.joinToString(",")
         }
     }
 

@@ -386,16 +386,50 @@ private fun ChapterBody(
         state.chapter == null && state.error -> Column(modifier.padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(tr("இந்த அதிகாரத்தைத் திறக்க இணைய இணைப்பு தேவை.", "This chapter needs a connection to open."), style = Ts.type.body, color = c.ink2)
             TsPillButton(tr("மீண்டும் முயல்", "Try again"), onClick = vm::retry, style = PillStyle.Filled)
+            // M1-9f: the way out of this for good.
+            vm.packFor(state.passage.version)?.let { (id, size) ->
+                Text(
+                    tr("இணைப்பின்றி வாசிக்க ${state.versionShort} பதிவிறக்குங்கள் (${mb(size)}); இணைப்பு கிடைத்ததும் பதிவிறக்கம் தொடங்கும்.",
+                        "Download ${state.versionShort} (${mb(size)}) to read without a connection; it starts when you are back online."),
+                    style = Ts.type.caption, color = c.muted,
+                )
+                TsPillButton(tr("பதிவிறக்கு", "Download"), onClick = { vm.download(id) })
+            }
         }
         state.chapter == null -> Box(modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator(color = c.accent) }
-        else -> ReaderTextList(
-            items, state.selection, playingVerse, fontSize, lineHeight, footnotes,
-            commentary = if (showInlineCommentary) state.commentary else null, commentaryName = sourceName,
-            listState = listState, chapterKey = state.passage.chapterKey(), contentPadding = padding,
-            onTapVerse = vm::tapVerse, onVerseRead = vm::verseRead,
-            onOpenCommentary = { nav.commentary(state.passage) }, modifier = modifier,
-            dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
+        else -> Column(modifier) {
+            state.offer?.let { (id, size) -> OfferBanner(state.versionShort, size, { vm.download(id) }, vm::declineOffer) }
+            ReaderTextList(
+                items, state.selection, playingVerse, fontSize, lineHeight, footnotes,
+                commentary = if (showInlineCommentary) state.commentary else null, commentaryName = sourceName,
+                listState = listState, chapterKey = state.passage.chapterKey(), contentPadding = padding,
+                onTapVerse = vm::tapVerse, onVerseRead = vm::verseRead,
+                onOpenCommentary = { nav.commentary(state.passage) }, modifier = Modifier.weight(1f).fillMaxWidth(),
+                dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
+            )
+        }
+    }
+}
+
+private fun mb(bytes: Long) = "%.1f MB".format(bytes / 1_048_576.0)
+
+/** M1-9f: offered once a reader has read ten chapters of a version online. */
+@Composable
+private fun OfferBanner(version: String, size: Long, onDownload: () -> Unit, onDecline: () -> Unit) {
+    val c = Ts.colors
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier.padding(horizontal = 14.dp, vertical = 8.dp).fillMaxWidth().clip(shape).background(c.surface2)
+            .border(1.dp, c.line, shape).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            tr("$version இணைப்பின்றி வாசிக்கவா? ${mb(size)}", "Read $version without a connection? ${mb(size)}"),
+            style = Ts.type.caption, color = c.ink2, modifier = Modifier.weight(1f),
         )
+        TsPillButton(tr("வேண்டாம்", "Not now"), onClick = onDecline, style = PillStyle.Ghost, height = 34.dp, textStyle = Ts.type.labelSmall)
+        TsPillButton(tr("பதிவிறக்கு", "Download"), onClick = onDownload, style = PillStyle.Filled, height = 34.dp, textStyle = Ts.type.labelSmall)
     }
 }
 

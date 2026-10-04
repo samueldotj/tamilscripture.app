@@ -37,6 +37,8 @@ data class ReaderState(
     /** Dual view (A-3.3): the second version's code and its copy of the chapter. */
     val compare: String? = null,
     val second: Chapter? = null,
+    /** M1-9f: after 10 chapters read online, offer this version's pack (id, size in bytes). */
+    val offer: Pair<String, Long>? = null,
 ) {
     val book: Book? get() = manifest?.book(passage.book)
     val versionShort: String get() = manifest?.version(passage.version)?.short ?: passage.version
@@ -100,6 +102,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
                 .catch { mutable.update { s -> s.copy(loading = false, error = true) } }
                 .collect { loaded ->
                     mutable.update { s -> s.copy(chapter = loaded.value, source = loaded.source, loading = false, error = false) }
+                    if (loaded.source == ContentSource.Online) countOnline(p.version)
                     graph.stats.record("view", version = p.version, book = p.book, chapter = p.chapter, source = loaded.source.name.lowercase(),
                         action = settings.value.compare?.takeIf { it != p.version }?.let { "dual:$it" })
                 }
@@ -123,6 +126,47 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
                 .catch { mutable.update { s -> s.copy(second = null) } }
                 .collect { loaded -> mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(second = loaded.value) else s } }
         }
+    }
+
+    private var counted: String? = null
+
+    /** One count per chapter shown from the network; the offer appears from the tenth. */
+    private fun countOnline(version: String) {
+        val key = state.value.passage.chapterKey()
+        if (counted == key) return
+        counted = key
+        viewModelScope.launch {
+            var count = 0
+            var declined = false
+            graph.settings.update { s ->
+                count = (s.onlineChapters[version] ?: 0) + 1
+                declined = version in s.offersDeclined
+                s.copy(onlineChapters = s.onlineChapters + (version to count))
+            }
+            refreshOffer(version, count, declined)
+        }
+    }
+
+    private fun refreshOffer(version: String, count: Int, declined: Boolean) {
+        val id = "bible.$version"
+        val entry = graph.packs.catalogue.value?.entry(id)
+        val show = entry != null && !graph.packs.hasBible(version) && !declined && count >= 10
+        mutable.update { it.copy(offer = if (show) id to entry!!.size else null) }
+    }
+
+    /** Also offered when a chapter cannot open offline (M1-9f). */
+    fun packFor(version: String): Pair<String, Long>? =
+        graph.packs.catalogue.value?.entry("bible.$version")?.takeIf { !graph.packs.hasBible(version) }?.let { it.id to it.size }
+
+    fun download(id: String) {
+        graph.packs.download(id, settings.value.downloadWifiOnly)
+        mutable.update { it.copy(offer = null) }
+    }
+
+    fun declineOffer() {
+        val v = state.value.passage.version
+        mutable.update { it.copy(offer = null) }
+        updateSettings { it.copy(offersDeclined = it.offersDeclined + v) }
     }
 
     fun setCompare(code: String?) = updateSettings { it.copy(compare = code) }

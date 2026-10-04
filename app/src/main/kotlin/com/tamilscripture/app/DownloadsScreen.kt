@@ -45,6 +45,7 @@ import com.tamilscripture.core.designsystem.component.TsToggle
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.UiLang
+import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
@@ -64,7 +65,8 @@ fun DownloadsScreen(onBack: () -> Unit) {
     val catalogue by packs.catalogue.collectAsStateWithLifecycle()
     val states by packs.states.collectAsStateWithLifecycle(emptyMap())
     val installed by packs.store.installed.collectAsStateWithLifecycle()
-    var wifiOnly by rememberSaveable { mutableStateOf(true) }
+    val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
+    val wifiOnly = settings.downloadWifiOnly
     var refreshing by remember { mutableStateOf(catalogue == null) }
     LaunchedEffect(Unit) {
         packs.refreshCatalogue()
@@ -101,7 +103,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 TsListRow(
                     tr("Wi-Fi இல் மட்டும்", "Wi-Fi only"),
                     subtitle = tr("பெரிய பதிவிறக்கங்கள் கைப்பேசித் தரவைப் பயன்படுத்தாது", "Large downloads won't use mobile data"),
-                    trailing = { TsToggle(wifiOnly, { wifiOnly = it }) },
+                    trailing = { TsToggle(wifiOnly, { v -> scope.launch { graph.settings.update { it.copy(downloadWifiOnly = v) } } }) },
                     modifier = Modifier.widthIn(max = 720.dp),
                 )
                 HDivider()
