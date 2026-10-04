@@ -155,9 +155,9 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M2-1 `NavigationSuiteScaffold` with top-level destinations (Read, Search, Plans, Library, Settings).
 - [ ] M2-2 Reader in `SupportingPaneScaffold`; book rail list pane on large windows; max text width. Built: on expanded windows one study pane beside the text with Commentary, People and places, and Original words tabs (verse actions open them there instead of sheets).
 - [ ] M2-3 `PaneDivider`: drag, keyboard adjust, snap points, hinge snapping. Built: drag, arrow keys when focused, snap to a third and a half, kept between a quarter and two thirds; hinge snapping not yet.
-- [ ] M2-4 Fold postures: tabletop and book layouts via `WindowInfoTracker`.
-- [ ] M2-5 `ShortcutRegistry`: all shortcuts in FF-5; `onProvideKeyboardShortcuts`; Ctrl+/ overlay.
-- [ ] M2-6 Focus order and arrow-key verse navigation; visible focus indicators.
+- [ ] M2-4 Fold postures: tabletop and book layouts via `WindowInfoTracker`. Built for tabletop: text above the hinge, player or chapter controls below (WindowInfoTracker); book posture not yet. Untested on a foldable.
+- [ ] M2-5 `ShortcutRegistry`: all shortcuts in FF-5; `onProvideKeyboardShortcuts`; Ctrl+/ overlay. Reader keys listed in the system helper (Meta + /); a Ctrl+/ overlay of our own not yet.
+- [ ] M2-6 Focus order and arrow-key verse navigation; visible focus indicators. Arrow keys move between verses and scroll them into view; visible focus on the pane divider.
 - [ ] M2-7 Right-click context menu on verses; hover states; Ctrl+scroll font size.
 - [ ] M2-8 Drag selected verses out as text.
 - [x] M2-9 Open in new window (multi-instance); per-window state. `ReaderWindowActivity` (Ctrl+N or the verse menu) opens as its own task next to the current window; verified in split screen on the Pixel 9.

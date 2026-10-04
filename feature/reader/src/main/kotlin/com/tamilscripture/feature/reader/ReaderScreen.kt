@@ -247,6 +247,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         if (code != null) vm.open(Passage(audio.version ?: state.passage.version, code, audio.chapter, audio.verse))
     }
 
+    val tabletop = rememberTabletop()
     val focus = remember { FocusRequester() }
     // Shortcuts work at every width: a tablet in portrait or a phone can have a keyboard too.
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
@@ -274,7 +275,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                 )
             },
     ) {
-        if (wide) {
+        // A foldable on a table uses the stacked layout, whatever its width, to split at the hinge.
+        if (wide && tabletop == null) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 WideTopBar(title, versionLabel, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, nav.home)
                 // The pane shows a study tab, or commentary when that is on; dual view has no pane.
@@ -358,16 +360,27 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                         Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 12.dp),
                     )
                 }
-                if (audio.active) {
-                    PlayingBar(audio, state, services.audio, openPlaying)
+                val bottom: @Composable () -> Unit = {
+                    if (audio.active) {
+                        PlayingBar(audio, state, services.audio, openPlaying)
+                    } else {
+                        val m = state.manifest
+                        ChapterNavBar(
+                            prevLabel = chapter?.prev?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
+                            nextLabel = chapter?.next?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
+                            position = book?.let { "${state.passage.chapter} / ${it.chapters}" } ?: "",
+                            onPrev = vm::previousChapter, onNext = vm::nextChapter,
+                        )
+                    }
+                }
+                // Tabletop (M2-4): text above the hinge, the player or chapter controls below it.
+                if (tabletop != null) {
+                    Column(Modifier.fillMaxWidth().height(tabletop.belowHingeTop).background(c.surface2)) {
+                        Box(Modifier.fillMaxWidth().height(tabletop.hinge))
+                        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { bottom() }
+                    }
                 } else {
-                    val m = state.manifest
-                    ChapterNavBar(
-                        prevLabel = chapter?.prev?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
-                        nextLabel = chapter?.next?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
-                        position = book?.let { "${state.passage.chapter} / ${it.chapters}" } ?: "",
-                        onPrev = vm::previousChapter, onNext = vm::nextChapter,
-                    )
+                    bottom()
                 }
             }
         }
