@@ -45,6 +45,14 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
         }
+        // M1-26: release code, debug-signed and profileable, for :benchmark to measure.
+        create("benchmark") {
+            initWith(getByName("release"))
+            proguardFiles("benchmark-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+        }
     }
 
     compileOptions {
@@ -60,7 +68,8 @@ android {
     splits {
         abi {
             // AGP refuses APK splits while building a bundle; the bundle splits by ABI itself.
-            isEnable = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) }
+            // :benchmark installs one APK, so benchmark runs build the universal one only.
+            isEnable = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) || it.contains("benchmark", ignoreCase = true) }
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
             isUniversalApk = true
@@ -70,6 +79,8 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    // Installs the Baseline Profile on devices without Play's cloud profiles (NF-2).
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.glance.appwidget)
     implementation(project(":core:media"))
     implementation(project(":feature:home"))

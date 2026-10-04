@@ -130,7 +130,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-25 Debug stats screen.
 
 **Performance**
-- [ ] M1-26 `:benchmark` module: startup and chapter-swipe Macrobenchmarks; Baseline Profile generation in CI.
+- [x] M1-26 `:benchmark` module: cold-start and chapter-swipe Macrobenchmarks and the Baseline Profile generator (`./gradlew :benchmark:connectedBenchmarkAndroidTest`), against the app's `benchmark` build (release code, names kept). Profile in app/src/main/baseline-prof.txt with ProfileInstaller. Galaxy Tab S11, 4 Oct 2026: cold start to first frame, median 212 ms without the profile, 189 ms with it; swiping five chapters, frame CPU time P50 4.4 ms, P90 16.1 ms. Generating the profile in CI needs a device and is open.
 - [x] M1-27 Airplane-mode integration test (fails on any network call while reading downloaded content): `AirplaneModeTest` reads a chapter, its cross-references and searches from fixture packs with every request failing and counted.
 - [x] M1-28 Online-reading tests (`OnlineReadingTest`): no packs installed, cache hit with the server stopped, revalidation on a new build ([design §15.4](design.md#154-what-specific-requirements-need)).
 - [x] M1-29 Download fault tests (`PackDownloadTest`, the real worker against `FakeCdn`): a dropped connection resumes by Range, a wrong checksum retries then fails without installing, an install cut short leaves the old version readable, automatic updates wait for Wi-Fi and storage.
