@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +59,9 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -178,6 +182,28 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         },
     )
 
+    // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
+    val verseRef: (Int) -> String = { v -> book?.label(lang, state.passage.chapter, v) ?: "" }
+    val verseText: (Int) -> String = { v -> chapter?.verseText(v).orEmpty() }
+    val interactions = VerseInteractions(
+        menu = { v, dismiss ->
+            @Composable
+            fun Entry(label: String, action: () -> Unit) = DropdownMenuItem(
+                text = { Text(label, style = Ts.type.body, color = c.ink) },
+                onClick = { dismiss(); vm.selectOnly(v); action() },
+            )
+            if (hasAudio) Entry(tr("இங்கிருந்து கேள்", "Listen from here")) { vm.recordVerseAction("listen"); play(v) }
+            Entry(tr("விளக்கவுரை", "Commentary")) { vm.recordVerseAction("commentary"); nav.commentary(state.passage.copy(verse = v)) }
+            Entry(tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { vm.recordVerseAction("xref"); showCrossRefs = true }
+            Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
+            Entry(tr("பகிர்", "Share")) {
+                vm.recordVerseAction("share")
+                shareVerses(context, verseRef(v), listOf(verseText(v)), shareUrl(state.passage, book, listOf(v)))
+            }
+        },
+        dragText = { v -> verseText(v) + "\n— " + verseRef(v) },
+    )
+
     val openPlaying: () -> Unit = {
         val code = audio.book
         if (code != null) vm.open(Passage(audio.version ?: state.passage.version, code, audio.chapter, audio.verse))
@@ -192,6 +218,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             .background(c.bg)
             // Landscape: keep text clear of a side navigation bar or cutout.
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End))
+            .ctrlScrollFontSize { step -> vm.updateSettings { it.copy(fontSize = (it.fontSize + step).coerceIn(15, 30)) } }
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
@@ -219,7 +246,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                             ChapterBody(
                                 state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                 PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
-                                showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true,
+                                showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
                             )
                         }
                         ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -259,7 +286,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                         state, items, settings.fontSize, 1.8f, settings.footnotes, listState, playingVerse, sourceName,
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
-                        showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns,
+                        showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -343,6 +370,7 @@ private fun ChapterBody(
     showInlineCommentary: Boolean = true,
     dualLabels: kotlin.Pair<String, String>? = null,
     dualColumns: Boolean = false,
+    interactions: VerseInteractions? = null,
 ) {
     val c = Ts.colors
     when {
@@ -357,7 +385,7 @@ private fun ChapterBody(
             listState = listState, chapterKey = state.passage.chapterKey(), contentPadding = padding,
             onTapVerse = vm::tapVerse, onVerseRead = vm::verseRead,
             onOpenCommentary = { nav.commentary(state.passage) }, modifier = modifier,
-            dualLabels = dualLabels, dualColumns = dualColumns,
+            dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
         )
     }
 }
@@ -500,6 +528,20 @@ private fun handleKey(
         true
     }
     else -> false
+}
+
+/** Ctrl + mouse wheel changes the text size, as in a browser (M2-7). */
+private fun Modifier.ctrlScrollFontSize(onStep: (Int) -> Unit): Modifier = this.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val e = awaitPointerEvent(PointerEventPass.Initial)
+            if (e.type == PointerEventType.Scroll && e.keyboardModifiers.isCtrlPressed) {
+                val dy = e.changes.first().scrollDelta.y
+                if (dy != 0f) onStep(if (dy < 0) 1 else -1)
+                e.changes.forEach { it.consume() }
+            }
+        }
+    }
 }
 
 /** Horizontal swipe moves between chapters (A-2.4). */

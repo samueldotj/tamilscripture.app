@@ -103,6 +103,8 @@ fun ReaderTextList(
     /** Dual view: version names over the columns; columns side by side when [dualColumns]. */
     dualLabels: kotlin.Pair<String, String>? = null,
     dualColumns: Boolean = false,
+    /** Right-click menu and drag-out on large screens; null on touch-only layouts. */
+    interactions: VerseInteractions? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -113,10 +115,12 @@ fun ReaderTextList(
         }
         items(items, key = { it.key }) { item ->
             when (item) {
-                is ReaderItem.Dual -> DualRow(
-                    item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
-                    dualLabels, onTap = { onTapVerse(item.verse) },
-                )
+                is ReaderItem.Dual -> VerseInteractionBox(item.verse, interactions) { extra ->
+                    DualRow(
+                        item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
+                        dualLabels, onTap = { onTapVerse(item.verse) }, modifier = extra,
+                    )
+                }
                 is ReaderItem.Heading -> Text(
                     item.text,
                     style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scripture),
@@ -132,7 +136,7 @@ fun ReaderTextList(
                 is ReaderItem.Verse -> Column {
                     val selected = item.verse in selection
                     val playing = item.verse == playingVerse
-                    Text(
+                    VerseInteractionBox(item.verse, interactions) { extra -> Text(
                         verseAnnotated(item, numberSize = 12, showNotes = showNotes),
                         style = Ts.type.scripture(fontSize.sp, lineHeightEm),
                         color = c.ink,
@@ -147,10 +151,11 @@ fun ReaderTextList(
                                 },
                             )
                             .then(if (playing && !selected) Modifier.border(1.dp, c.accentSoft, RoundedCornerShape(12.dp)) else Modifier)
+                            .then(extra)
                             .clickable { onTapVerse(item.verse) }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                             .semantics { contentDescription = "${item.label}. ${item.text}" },
-                    )
+                    ) }
                     if (showNotes && item.notes.isNotEmpty()) {
                         Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
                             item.notes.forEachIndexed { i, n ->
@@ -222,6 +227,7 @@ private fun DualRow(
     columns: Boolean,
     labels: kotlin.Pair<String, String>?,
     onTap: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
     val missing = tr("இந்த மொழிபெயர்ப்பில் இந்த வசனம் இல்லை", "Not in this version")
@@ -238,6 +244,7 @@ private fun DualRow(
         Row(
             Modifier.fillMaxWidth().clip(shape)
                 .background(if (selected) c.verseSelected else if (playing) c.accentWash else Color.Transparent)
+                .then(modifier)
                 .clickable(onClick = onTap)
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -255,6 +262,7 @@ private fun DualRow(
             Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(shape)
                 .background(c.surface)
                 .border(1.5.dp, if (selected) c.accent else if (playing) c.accentSoft else c.line, shape)
+                .then(modifier)
                 .clickable(onClick = onTap),
         ) {
             Row(
