@@ -17,23 +17,25 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -44,8 +46,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,11 +57,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -65,18 +71,25 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
+import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.PillStyle
+import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.component.VDivider
+import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.media.AudioController
 import com.tamilscripture.core.media.AudioState
@@ -133,6 +146,9 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     var showVersions by rememberSaveable { mutableStateOf(false) }
     var showOriginal by rememberSaveable { mutableStateOf(false) }
     var showPeople by rememberSaveable { mutableStateOf(false) }
+    // Wide windows (M2-2, M8-4): one study pane beside the text, in tabs, sized by a divider.
+    var paneTab by rememberSaveable { mutableStateOf<String?>(null) }
+    var paneShare by rememberSaveable { mutableFloatStateOf(0.42f) }
 
     val book = state.book
     val chapter = state.chapter
@@ -191,8 +207,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         onSignInFeature = {
             Toast.makeText(context, if (lang == UiLang.Tamil) "உள்நுழைவுடன் விரைவில் வருகிறது" else "Coming with sign-in", Toast.LENGTH_SHORT).show()
         },
-        onOriginal = { vm.recordVerseAction("original"); showOriginal = true },
-        onPeople = { vm.recordVerseAction("people"); showPeople = true },
+        onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
+        onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
     )
 
     // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
@@ -208,8 +224,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             if (hasAudio) Entry(tr("இங்கிருந்து கேள்", "Listen from here")) { vm.recordVerseAction("listen"); play(v) }
             Entry(tr("விளக்கவுரை", "Commentary")) { vm.recordVerseAction("commentary"); nav.commentary(state.passage.copy(verse = v)) }
             Entry(tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { vm.recordVerseAction("xref"); showCrossRefs = true }
-            Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); showOriginal = true }
-            Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); showPeople = true }
+            Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true }
+            Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
             Entry(tr("புதிய சாளரத்தில் திற", "Open in new window")) { nav.newWindow(state.passage.copy(verse = v)) }
             Entry(tr("பகிர்", "Share")) {
@@ -255,26 +271,48 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         if (wide) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
                 WideTopBar(title, versionLabel, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, nav.home)
-                Row(Modifier.weight(1f).fillMaxWidth()) {
-                    WideRail(state, settings, items, vm, Modifier.width(200.dp).fillMaxSize())
-                    VDivider()
-                    Box(Modifier.weight(1f).fillMaxSize().swipeChapters(vm::previousChapter, vm::nextChapter)) {
-                        Column(Modifier.fillMaxSize()) {
-                            Text(
-                                title, style = Ts.type.headline.copy(fontSize = 30.sp, fontWeight = FontWeight.SemiBold),
-                                color = c.ink, modifier = Modifier.padding(start = 46.dp, top = 28.dp, bottom = 4.dp),
-                            )
-                            ChapterBody(
-                                state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
-                                PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
-                                showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                            )
-                        }
-                        ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
-                    }
-                    if (settings.commentary && !state.dual) {
+                // The pane shows a study tab, or commentary when that is on; dual view has no pane.
+                val tab = if (state.dual) null else paneTab ?: if (settings.commentary) PANE_COMMENTARY else null
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                    val rowWidth = maxWidth
+                    Row(Modifier.fillMaxSize()) {
+                        WideRail(state, settings, items, vm, Modifier.width(200.dp).fillMaxSize())
                         VDivider()
-                        CommentaryPane(state, settings, Modifier.weight(1f).fillMaxSize().background(c.pane))
+                        Box(Modifier.weight(if (tab != null) 1f - paneShare else 1f).fillMaxSize().swipeChapters(vm::previousChapter, vm::nextChapter)) {
+                            Column(Modifier.fillMaxSize()) {
+                                Text(
+                                    title, style = Ts.type.headline.copy(fontSize = 30.sp, fontWeight = FontWeight.SemiBold),
+                                    color = c.ink, modifier = Modifier.padding(start = 46.dp, top = 28.dp, bottom = 4.dp),
+                                )
+                                ChapterBody(
+                                    state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
+                                    PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
+                                    showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
+                                )
+                            }
+                            ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+                        }
+                        if (tab != null) {
+                            PaneDivider(paneShare, (rowWidth - 200.dp).coerceAtLeast(1.dp)) { paneShare = it }
+                            Column(Modifier.weight(paneShare).fillMaxSize().background(c.pane)) {
+                                PaneTabs(tab, onTab = { paneTab = it }, onClose = {
+                                    if (tab == PANE_COMMENTARY) vm.updateSettings { it.copy(commentary = false) }
+                                    paneTab = null
+                                })
+                                val v = state.selection.firstOrNull()
+                                when (tab) {
+                                    PANE_COMMENTARY -> CommentaryPane(state, settings, Modifier.weight(1f).fillMaxWidth())
+                                    PANE_PEOPLE -> PeoplePlacesContent(
+                                        title, state.passage.book, state.passage.chapter, v, nav.person, nav.place,
+                                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp),
+                                    )
+                                    else -> OriginalWordsContent(
+                                        book?.label(lang, state.passage.chapter, v ?: 1) ?: "", state.passage.book, state.passage.chapter, v ?: 1, nav.strongs,
+                                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 if (audio.active) PlayingBar(audio, state, services.audio, openPlaying)
@@ -359,6 +397,70 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) },
             compare = settings.compare, onCompare = { code -> showVersions = false; vm.setCompare(code) },
         ) { showVersions = false }
+    }
+}
+
+private const val PANE_COMMENTARY = "commentary"
+private const val PANE_PEOPLE = "people"
+private const val PANE_ORIGINAL = "original"
+
+/** The study pane's tabs (M8-4) and a close button. */
+@Composable
+private fun PaneTabs(tab: String, onTab: (String) -> Unit, onClose: () -> Unit) {
+    val c = Ts.colors
+    Row(
+        Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+        TsChip(tr("விளக்கவுரை", "Commentary"), tab == PANE_COMMENTARY, { onTab(PANE_COMMENTARY) }, contentPadding = pad)
+        TsChip(tr("நபர்கள் · இடங்கள்", "People · places"), tab == PANE_PEOPLE, { onTab(PANE_PEOPLE) }, contentPadding = pad)
+        TsChip(tr("மூல மொழி", "Original"), tab == PANE_ORIGINAL, { onTab(PANE_ORIGINAL) }, contentPadding = pad)
+        Box(Modifier.weight(1f))
+        IconBox(TsIcons.Close, tr("பலகத்தை மூடு", "Close pane"), onClose)
+    }
+    HDivider()
+}
+
+/**
+ * The divider between text and pane (M2-3): drag it, or focus it and use the arrow keys.
+ * The pane keeps between a quarter and two thirds of the width, snapping to a third and a
+ * half when released near them.
+ */
+@Composable
+private fun PaneDivider(share: Float, width: Dp, onChange: (Float) -> Unit) {
+    val c = Ts.colors
+    val density = LocalDensity.current
+    val total = with(density) { width.toPx() }
+    var focused by remember { mutableStateOf(false) }
+    val latest by rememberUpdatedState(share)
+    fun snap(f: Float) = listOf(1f / 3f, 0.5f).firstOrNull { abs(it - f) < 0.03f } ?: f
+    Box(
+        Modifier
+            .width(12.dp)
+            .fillMaxHeight()
+            .onFocusChanged { focused = it.isFocused }
+            .focusable()
+            .onKeyEvent { e ->
+                if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (e.key) {
+                    Key.DirectionLeft -> { onChange((latest + 0.05f).coerceIn(0.25f, 0.67f)); true }
+                    Key.DirectionRight -> { onChange((latest - 0.05f).coerceIn(0.25f, 0.67f)); true }
+                    else -> false
+                }
+            }
+            .pointerInput(total) {
+                detectHorizontalDragGestures(onDragEnd = { onChange(snap(latest)) }) { change, dx ->
+                    change.consume()
+                    onChange((latest - dx / total).coerceIn(0.25f, 0.67f))
+                }
+            }
+            .semantics { contentDescription = "Resize pane" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(if (focused) 3.dp else 1.dp).fillMaxHeight().background(if (focused) c.accent else c.line))
+        Box(Modifier.width(4.dp).height(36.dp).clip(RoundedCornerShape(2.dp)).background(c.lineStrong))
     }
 }
 

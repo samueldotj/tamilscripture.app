@@ -43,42 +43,48 @@ import com.tamilscripture.core.services.tr
  */
 @Composable
 fun OriginalWordsSheet(reference: String, book: String, chapter: Int, verse: Int, onStrongs: (String) -> Unit, onDismiss: () -> Unit) {
+    TsSheet(onDismiss) {
+        OriginalWordsContent(reference, book, chapter, verse, onStrongs, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp))
+    }
+}
+
+/** The original-words list itself, in a sheet on phones or the study pane on wide windows. */
+@Composable
+fun OriginalWordsContent(reference: String, book: String, chapter: Int, verse: Int, onStrongs: (String) -> Unit, modifier: Modifier) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
     val lang = LocalUiLang.current
     val state by produceState<Pair<Boolean, OriginalChapter?>>(true to null, book, chapter) { value = false to graph.study.original(book, chapter) }
-    TsSheet(onDismiss) {
-        Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 16.dp)) {
-            Text(tr("மூல மொழி", "Original words") + " · " + reference, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
-            val words = state.second?.words(verse).orEmpty()
-            when {
-                state.first -> CircularProgressIndicator(color = c.accent)
-                words.isEmpty() -> Text(
-                    tr("இதற்கு இணைய இணைப்பு அல்லது ‘மூல மொழிச் சொற்கள்’ பொதி தேவை.", "This needs a connection, or the Original words pack in Downloads."),
-                    style = Ts.type.body, color = c.muted,
-                )
-                else -> words.forEachIndexed { i, w ->
-                    if (i > 0) HDivider()
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = w.strongs.isNotBlank()) { onStrongs(w.strongs) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(w.text, style = Ts.type.cardTitle.copy(fontSize = 22.sp), color = c.ink)
-                            Text(w.translit, style = Ts.type.caption, color = c.muted)
-                        }
-                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                            Text(w.gloss, style = Ts.type.body, color = c.ink2)
-                            Text(w.strongs, style = Ts.type.captionSmall, color = c.accent)
-                        }
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        Text(tr("மூல மொழி", "Original words") + " · " + reference, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
+        val words = state.second?.words(verse).orEmpty()
+        when {
+            state.first -> CircularProgressIndicator(color = c.accent)
+            words.isEmpty() -> Text(
+                tr("இதற்கு இணைய இணைப்பு அல்லது ‘மூல மொழிச் சொற்கள்’ பொதி தேவை.", "This needs a connection, or the Original words pack in Downloads."),
+                style = Ts.type.body, color = c.muted,
+            )
+            else -> words.forEachIndexed { i, w ->
+                if (i > 0) HDivider()
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(enabled = w.strongs.isNotBlank()) { onStrongs(w.strongs) }
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(w.text, style = Ts.type.cardTitle.copy(fontSize = 22.sp), color = c.ink)
+                        Text(w.translit, style = Ts.type.caption, color = c.muted)
+                    }
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                        Text(w.gloss, style = Ts.type.body, color = c.ink2)
+                        Text(w.strongs, style = Ts.type.captionSmall, color = c.accent)
                     }
                 }
             }
-            if (state.second?.lang == "he" && lang == UiLang.Tamil) {
-                Text("எபிரெயம் வலமிருந்து இடமாக வாசிக்கப்படும்.", style = Ts.type.captionSmall, color = c.muted, modifier = Modifier.padding(top = 8.dp))
-            }
+        }
+        if (state.second?.lang == "he" && lang == UiLang.Tamil) {
+            Text("எபிரெயம் வலமிருந்து இடமாக வாசிக்கப்படும்.", style = Ts.type.captionSmall, color = c.muted, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -98,6 +104,23 @@ fun PeoplePlacesSheet(
     onPlace: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    TsSheet(onDismiss) {
+        PeoplePlacesContent(title, book, chapter, verse, onPerson, onPlace, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp))
+    }
+}
+
+/** The people-and-places list itself, in a sheet on phones or the study pane on wide windows. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun PeoplePlacesContent(
+    title: String,
+    book: String,
+    chapter: Int,
+    verse: Int?,
+    onPerson: (String) -> Unit,
+    onPlace: (String) -> Unit,
+    modifier: Modifier,
+) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
     val tamil = LocalUiLang.current == UiLang.Tamil
@@ -106,45 +129,43 @@ fun PeoplePlacesSheet(
     val map by produceState<MapDrawing?>(null, state.second) {
         value = state.second?.takeIf { it.map }?.let { graph.study.file("maps/$book/$chapter.svg") }?.let(MapSvg::parse)
     }
-    TsSheet(onDismiss) {
-        Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 16.dp)) {
-            Text(tr("நபர்கள் · இடங்கள்", "People and places") + " · " + title, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
-            val m = state.second
-            if (state.first) {
-                CircularProgressIndicator(color = c.accent)
-                return@Column
-            }
-            if (m == null || (m.people.isEmpty() && m.places.isEmpty())) {
-                Text(
-                    if (m == null) tr("இதற்கு இணைய இணைப்பு அல்லது ‘நபர்களும் இடங்களும்’ பொதி தேவை.", "This needs a connection, or the People and places pack in Downloads.")
-                    else tr("இந்த அதிகாரத்தில் பெயர்கள் இல்லை.", "This chapter names no one."),
-                    style = Ts.type.body, color = c.muted,
-                )
-                return@Column
-            }
-            map?.let { d ->
-                SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), description = title, onPlace = onPlace)
-            }
-            val here = verse?.let { v -> m.verses.firstOrNull { it.verse == "$book.$chapter.$v" } }
-            val pad = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-            @Composable
-            fun group(label: String, people: List<String>, places: List<String>) {
-                if (people.isEmpty() && places.isEmpty()) return
-                Kicker(label, Modifier.padding(top = 8.dp, bottom = 6.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    people.forEach { id ->
-                        val p = m.people[id] ?: return@forEach
-                        TsChip(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, false, { onPerson(id) }, contentPadding = pad)
-                    }
-                    places.forEach { id ->
-                        val p = m.places[id] ?: return@forEach
-                        TsChip("⌖ " + (if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn), false, { onPlace(id) }, contentPadding = pad)
-                    }
+    Column(modifier.verticalScroll(rememberScrollState())) {
+        Text(tr("நபர்கள் · இடங்கள்", "People and places") + " · " + title, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
+        val m = state.second
+        if (state.first) {
+            CircularProgressIndicator(color = c.accent)
+            return@Column
+        }
+        if (m == null || (m.people.isEmpty() && m.places.isEmpty())) {
+            Text(
+                if (m == null) tr("இதற்கு இணைய இணைப்பு அல்லது ‘நபர்களும் இடங்களும்’ பொதி தேவை.", "This needs a connection, or the People and places pack in Downloads.")
+                else tr("இந்த அதிகாரத்தில் பெயர்கள் இல்லை.", "This chapter names no one."),
+                style = Ts.type.body, color = c.muted,
+            )
+            return@Column
+        }
+        map?.let { d ->
+            SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), description = title, onPlace = onPlace)
+        }
+        val here = verse?.let { v -> m.verses.firstOrNull { it.verse == "$book.$chapter.$v" } }
+        val pad = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+        @Composable
+        fun group(label: String, people: List<String>, places: List<String>) {
+            if (people.isEmpty() && places.isEmpty()) return
+            Kicker(label, Modifier.padding(top = 8.dp, bottom = 6.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                people.forEach { id ->
+                    val p = m.people[id] ?: return@forEach
+                    TsChip(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, false, { onPerson(id) }, contentPadding = pad)
+                }
+                places.forEach { id ->
+                    val p = m.places[id] ?: return@forEach
+                    TsChip("⌖ " + (if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn), false, { onPlace(id) }, contentPadding = pad)
                 }
             }
-            if (here != null && verse != null) group(tr("வசனம் $verse", "Verse $verse"), here.people, here.places)
-            group(tr("இந்த அதிகாரம்", "This chapter"), m.people.entries.sortedByDescending { it.value.mentions }.map { it.key },
-                m.places.entries.sortedByDescending { it.value.mentions }.map { it.key })
         }
+        if (here != null && verse != null) group(tr("வசனம் $verse", "Verse $verse"), here.people, here.places)
+        group(tr("இந்த அதிகாரம்", "This chapter"), m.people.entries.sortedByDescending { it.value.mentions }.map { it.key },
+            m.places.entries.sortedByDescending { it.value.mentions }.map { it.key })
     }
 }

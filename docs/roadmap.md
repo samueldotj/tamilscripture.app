@@ -153,8 +153,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 ### Tasks
 - [ ] M2-1 `NavigationSuiteScaffold` with top-level destinations (Read, Search, Plans, Library, Settings).
-- [ ] M2-2 Reader in `SupportingPaneScaffold`; book rail list pane on large windows; max text width.
-- [ ] M2-3 `PaneDivider`: drag, keyboard adjust, snap points, hinge snapping.
+- [ ] M2-2 Reader in `SupportingPaneScaffold`; book rail list pane on large windows; max text width. Built: on expanded windows one study pane beside the text with Commentary, People and places, and Original words tabs (verse actions open them there instead of sheets).
+- [ ] M2-3 `PaneDivider`: drag, keyboard adjust, snap points, hinge snapping. Built: drag, arrow keys when focused, snap to a third and a half, kept between a quarter and two thirds; hinge snapping not yet.
 - [ ] M2-4 Fold postures: tabletop and book layouts via `WindowInfoTracker`.
 - [ ] M2-5 `ShortcutRegistry`: all shortcuts in FF-5; `onProvideKeyboardShortcuts`; Ctrl+/ overlay.
 - [ ] M2-6 Focus order and arrow-key verse navigation; visible focus indicators.
@@ -315,7 +315,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M8-1 **[web]** Study packs: Strong's (lexicon, occurrences, original words), persons, places, dictionary; `study.maps` (projected geometry at three detail levels, places, journeys, polities, church) and `study.maps.chapters` (static chapter maps) ([design §11.2](design.md#112-data)). Live: study.words 6.4 MB, study.people 1.7, study.dictionary 9.6, study.maps 2.4; each keeps the website's entities/ files under their paths.
 - [ ] M8-2 Original-words view per verse; Strong's page listing every verse in the current version. Built: verse card and menu → Original words sheet → Strong's page with every verse; Study › Root words browses the Strong's index. On-device check pending.
 - [ ] M8-3 Person, place and dictionary article screens with provenance badges; search sections. Built: person, place and dictionary article screens (Tamil paragraphs where drafted), Study › Dictionary. On-device check pending.
-- [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names. People and places sheet per chapter and verse with the chapter map (the website's SVG maps drawn natively, tap a place); place pages show their map. Study side pane on wide windows to come.
+- [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names. People and places sheet per chapter and verse with the chapter map (the website's SVG maps drawn natively, tap a place); place pages show their map. On wide windows the same lists open in the study pane.
 - [ ] M8-5 Atlas screen with the chosen renderer: base map, Places layer, rank-based labels with collision, Tamil labels in the reader's typeface ([design §11](design.md#11-atlas-and-maps)). Built: base map, places ranked by mentions with collision-free labels in the reader's language, journeys with numbered stops, tap for a place card; pinch, pan, double-tap and wheel zoom. Screenshot-tested; on-device check pending.
 - [ ] M8-5a Camera: pinch, pan with fling, double-tap and two-finger-tap zoom, zoom and pan limits, animated fit-to-journey and centre-on-place, state saved across resize and fold.
 - [ ] M8-5b Selection: tap within 24 dp, details in a bottom sheet (compact), side sheet (medium) or right pane (expanded+); verses open the reader in the other pane or a new window.
