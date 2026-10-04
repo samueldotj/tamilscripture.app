@@ -33,7 +33,11 @@ object FixturePacks {
 
     private fun open(file: File): SQLiteConnection {
         file.delete()
-        return BundledSQLiteDriver().open(file.path).also { it.execSQL("PRAGMA page_size = 4096; PRAGMA user_version = 1") }
+        return BundledSQLiteDriver().open(file.path).also {
+            // One statement per call: the driver runs only the first of several.
+            it.execSQL("PRAGMA page_size = 4096")
+            it.execSQL("PRAGMA user_version = 1")
+        }
     }
 
     /** A Bible pack of [version] holding the fixture chapters given as "JHN/3". */
