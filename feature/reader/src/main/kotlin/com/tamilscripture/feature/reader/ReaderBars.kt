@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -189,6 +190,8 @@ fun VerseActionCard(
             .clip(shape)
             .background(c.surface)
             .border(1.5.dp, c.line2, shape)
+            // A phone on its side has less height than the card: it scrolls rather than clips.
+            .verticalScroll(rememberScrollState())
             .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
