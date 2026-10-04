@@ -8,6 +8,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalSize
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -50,6 +52,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * app before.
  */
 class TodayWidget : GlanceAppWidget() {
+    // The real size, so the verse shows as many whole lines as fit instead of a clipped one.
+    override val sizeMode: SizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val graph = (context.applicationContext as GraphHost).graph
         val settings = graph.settings.settings.firstOrNull() ?: Settings()
@@ -74,10 +79,13 @@ class TodayWidget : GlanceAppWidget() {
                     style = TextStyle(color = ACCENT, fontSize = 12.sp, fontWeight = FontWeight.Bold),
                 )
                 Spacer(GlanceModifier.height(6.dp))
+                // 16 sp text in lines of about 25 dp; the rest of the height is the title, the
+                // "Continue reading" row and padding.
+                val lines = ((LocalSize.current.height.value - 32f - 22f - (if (last != null) 30f else 0f)) / 25f).toInt().coerceIn(1, 8)
                 Text(
                     text ?: if (tamil) "வாசிக்கத் தட்டவும்" else "Tap to read",
                     style = TextStyle(color = INK, fontSize = 16.sp),
-                    maxLines = 6,
+                    maxLines = lines,
                     modifier = GlanceModifier.defaultWeight(),
                 )
                 if (last != null && lastRef != null) {
