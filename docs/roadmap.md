@@ -160,7 +160,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M2-6 Focus order and arrow-key verse navigation; visible focus indicators.
 - [ ] M2-7 Right-click context menu on verses; hover states; Ctrl+scroll font size.
 - [ ] M2-8 Drag selected verses out as text.
-- [ ] M2-9 Open in new window (multi-instance); per-window state.
+- [x] M2-9 Open in new window (multi-instance); per-window state. `ReaderWindowActivity` (Ctrl+N or the verse menu) opens as its own task next to the current window; verified in split screen on the Pixel 9.
 - [ ] M2-10 State survives rotation, fold, resize and window moves (tests for each).
 - [ ] M2-11 **[web]** `/.well-known/assetlinks.json`; App Links for chapter, verse and shorthand URLs.
 - [ ] M2-12 Accessibility pass: TalkBack verse labels, Tamil/English locale spans, 200% font scale, contrast on highlight colours, Accessibility Scanner clean.

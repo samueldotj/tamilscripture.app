@@ -29,7 +29,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-class MainActivity : ComponentActivity() {
+open class MainActivity : ComponentActivity() {
+    /** Where this window starts; a reader window (FF-9) opens on its passage instead. */
+    protected open fun startStack(): List<NavKey> = listOf(HomeRoute)
+
+
     private var pendingLink by mutableStateOf<NavKey?>(null)
     private var pendingUri by mutableStateOf<Uri?>(null)
 
@@ -43,6 +47,7 @@ class MainActivity : ComponentActivity() {
         // intent that was already opened, possibly the task's first one; new links arrive
         // through onNewIntent.
         if (savedInstanceState == null) pendingUri = intent?.data
+        val start = startStack()
 
         setContent {
             val settings by services.graph.settings.settings.collectAsStateWithLifecycle(initial)
@@ -78,7 +83,7 @@ class MainActivity : ComponentActivity() {
             }
             TsTheme(mode, settings.typeface.toFace()) {
                 CompositionLocalProvider(LocalAppServices provides services, LocalUiLang provides settings.uiLang) {
-                    AppShell(start = listOf(HomeRoute), pending = pendingLink, onPendingHandled = { pendingLink = null })
+                    AppShell(start = start, pending = pendingLink, onPendingHandled = { pendingLink = null })
                 }
             }
         }

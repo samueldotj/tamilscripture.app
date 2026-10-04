@@ -56,6 +56,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -95,6 +96,8 @@ class ReaderNav(
     val commentary: (Passage) -> Unit,
     val search: () -> Unit,
     val home: () -> Unit,
+    /** Opens the passage in another window (FF-9). */
+    val newWindow: (Passage) -> Unit,
 )
 
 private class VerseActions(
@@ -196,6 +199,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             Entry(tr("விளக்கவுரை", "Commentary")) { vm.recordVerseAction("commentary"); nav.commentary(state.passage.copy(verse = v)) }
             Entry(tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { vm.recordVerseAction("xref"); showCrossRefs = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
+            Entry(tr("புதிய சாளரத்தில் திற", "Open in new window")) { nav.newWindow(state.passage.copy(verse = v)) }
             Entry(tr("பகிர்", "Share")) {
                 vm.recordVerseAction("share")
                 shareVerses(context, verseRef(v), listOf(verseText(v)), shareUrl(state.passage, book, listOf(v)))
@@ -210,7 +214,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     }
 
     val focus = remember { FocusRequester() }
-    LaunchedEffect(wide) { if (wide) runCatching { focus.requestFocus() } }
+    // Shortcuts work at every width: a tablet in portrait or a phone can have a keyboard too.
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
     Box(
         Modifier
@@ -222,7 +227,11 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
-                e.type == KeyEventType.KeyDown && handleKey(
+                if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.N) {
+                    nav.newWindow(state.passage.copy(verse = state.selection.firstOrNull()))
+                    return@onPreviewKeyEvent true
+                }
+                e.type == KeyEventType.KeyDown && !e.isCtrlPressed && handleKey(
                     e.key, state, state.commentarySources.map { it.id }, vm, nav, services.audio, audio.active,
                     play = { play(it) },
                     toggleCommentary = { vm.updateSettings { it.copy(commentary = !it.commentary) } },

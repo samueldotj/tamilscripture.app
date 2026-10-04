@@ -137,6 +137,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                                 commentary = { p -> backStack.add(CommentaryRoute(p)) },
                                 search = { backStack.add(SearchRoute(focus = true)) },
                                 home = { selectTab(Tab.Home) },
+                                newWindow = { p -> ReaderWindowActivity.open(context, p) },
                             ),
                         )
                     }
