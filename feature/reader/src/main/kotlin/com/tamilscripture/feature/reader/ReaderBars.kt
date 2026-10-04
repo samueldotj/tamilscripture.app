@@ -189,6 +189,7 @@ fun VerseActionCard(
     onPeople: () -> Unit,
     onShareImage: () -> Unit,
     onWebsite: () -> Unit = {},
+    onLarge: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
@@ -235,6 +236,10 @@ fun VerseActionCard(
             SmallAction(tr("மூல மொழி", "Original words"), onOriginal, Modifier.weight(1f))
             SmallAction(tr("நபர்கள் · இடங்கள்", "People · places"), onPeople, Modifier.weight(1f))
             SmallAction(tr("படமாக", "As image"), onShareImage, Modifier.weight(1f))
+        }
+        // M8-6: the verse large on its own (present mode, from this verse); M6-9c: on the website.
+        Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallAction(tr("பெரிதாக", "Large view"), onLarge, Modifier.weight(1f))
             SmallAction(tr("இணையதளம்", "Website"), onWebsite, Modifier.weight(1f))
         }
     }

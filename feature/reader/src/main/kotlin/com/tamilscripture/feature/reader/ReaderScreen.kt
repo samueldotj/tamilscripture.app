@@ -131,6 +131,8 @@ class ReaderNav(
     val place: (String) -> Unit,
     /** Present mode from a verse (M8-8). */
     val present: (Passage) -> Unit,
+    /** The account screen, to sign in (highlights and notes need an account, design §13.2). */
+    val account: () -> Unit = {},
 )
 
 private class VerseActions(
@@ -148,6 +150,7 @@ private class VerseActions(
     val onPeople: () -> Unit,
     /** M6-9c: the same passage on tamilscripture.com, in the browser. */
     val onWebsite: () -> Unit,
+    val onLarge: () -> Unit,
 )
 
 @Composable
@@ -169,6 +172,9 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     var showOriginal by rememberSaveable { mutableStateOf(false) }
     var showPeople by rememberSaveable { mutableStateOf(false) }
     var showHighlight by rememberSaveable { mutableStateOf(false) }
+    var askSignIn by rememberSaveable { mutableStateOf(false) }
+    // Highlights and notes need an account, as on the website (design §13.2); bookmarks do not.
+    val signedIn = services.graph.account.session.collectAsStateWithLifecycle().value != null
     /** The note open in the editor: its id, [NEW_NOTE], or null. */
     var editingNote by rememberSaveable { mutableStateOf<String?>(null) }
     val userData by vm.userData.collectAsStateWithLifecycle()
@@ -252,8 +258,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             val on = vm.toggleBookmark()
             Toast.makeText(context, if (on) tr2(lang, "குறிக்கப்பட்டது", "Bookmarked") else tr2(lang, "குறி நீக்கப்பட்டது", "Bookmark removed"), Toast.LENGTH_SHORT).show()
         },
-        onNote = { editingNote = vm.noteForSelection()?.id ?: NEW_NOTE },
-        onHighlight = { showHighlight = true },
+        onNote = { if (signedIn) editingNote = vm.noteForSelection()?.id ?: NEW_NOTE else askSignIn = true },
+        onHighlight = { if (signedIn) showHighlight = true else askSignIn = true },
         onShareImage = {
             vm.recordVerseAction("share-image")
             val ref = selectedRef ?: ""
@@ -264,6 +270,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
         onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
         onWebsite = { vm.recordVerseAction("website"); openInBrowser(context, shareUrl(state.passage, book, state.selection)) },
+        onLarge = { vm.recordVerseAction("large"); nav.present(state.passage.copy(verse = state.selection.firstOrNull())) },
     )
 
     // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
@@ -473,6 +480,22 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             onPlace = { id -> showPeople = false; nav.place(id) },
         ) { showPeople = false }
     }
+    if (askSignIn) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { askSignIn = false },
+            containerColor = c.surface,
+            title = { Text(tr("உள்நுழையுங்கள்", "Sign in"), color = c.ink) },
+            text = {
+                Text(
+                    tr("முனைப்புகளும் குறிப்புகளும் உங்கள் tamilscripture.com கணக்கில் சேமிக்கப்படுகின்றன; இணையதளத்திலும் தெரியும்.",
+                        "Highlights and notes are kept in your tamilscripture.com account, and show on the website too."),
+                    color = c.ink2,
+                )
+            },
+            confirmButton = { androidx.compose.material3.TextButton({ askSignIn = false; nav.account() }) { Text(tr("உள்நுழை", "Sign in"), color = c.accent) } },
+            dismissButton = { androidx.compose.material3.TextButton({ askSignIn = false }) { Text(tr("வேண்டாம்", "Not now"), color = c.ink2) } },
+        )
+    }
     if (showHighlight) {
         val current = state.selection.firstOrNull()?.let { marks[it]?.color }
         HighlightSheet(selectedRef ?: "", current, lang == UiLang.Tamil, onPick = { color ->
@@ -582,7 +605,7 @@ private fun ActionCardOverlay(
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
-            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite,
+            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite, onLarge = a.onLarge,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
         )
