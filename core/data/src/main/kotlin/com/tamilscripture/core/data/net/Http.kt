@@ -68,6 +68,9 @@ class Http(private val origins: OriginResolver) {
                         throw HttpException(code, "HTTP $code for $url")
                     }
                 }
+                // A connection that closes early can look like a clean end of file: the length
+                // the server promised tells them apart, and the part kept is resumed next time.
+                val expected = conn.contentLengthLong.takeIf { it >= 0 }?.let { it + have }
                 java.io.FileOutputStream(dest, have > 0).use { out ->
                     conn.inputStream.use { input ->
                         val buf = ByteArray(64 * 1024)
@@ -86,6 +89,7 @@ class Http(private val origins: OriginResolver) {
                     }
                 }
                 onProgress(have)
+                if (expected != null && have < expected) throw IOException("connection closed at $have of $expected bytes")
             } finally {
                 conn.disconnect()
             }
