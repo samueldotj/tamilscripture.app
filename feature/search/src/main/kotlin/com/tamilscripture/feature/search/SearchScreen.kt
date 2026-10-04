@@ -50,11 +50,13 @@ import com.tamilscripture.core.designsystem.component.Pill
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
+import com.tamilscripture.core.model.Book
 import com.tamilscripture.core.model.Passage
 import com.tamilscripture.core.data.content.References
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import com.tamilscripture.core.model.SearchHit
+import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.model.VerseId
 import com.tamilscripture.core.model.label
 import com.tamilscripture.core.services.LocalAppServices
@@ -80,6 +82,17 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     var offline by remember { mutableStateOf(false) }
     var shown by remember { mutableStateOf("") }
     var romanOffer by remember { mutableStateOf<String?>(null) }
+    // M3-5: "OT", "NT" or a book code narrows the search; a new query starts over.
+    var scope by rememberSaveable(query) { mutableStateOf<String?>(null) }
+    var perBook by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
+    val scopeRange = remember(scope, manifest) {
+        val books = manifest?.books.orEmpty()
+        when (val sc = scope) {
+            null -> null
+            "OT", "NT" -> books.filter { it.testament == sc }.map { it.order }.takeIf { it.isNotEmpty() }?.let { it.min()..it.max() }
+            else -> books.firstOrNull { it.code == sc }?.let { it.order..it.order }
+        }
+    }
     val ref = remember(query, manifest) { References.parse(query, manifest) }
     // A-4.5: book names in both scripts while the reader is still typing one.
     val suggestions = remember(query, manifest) {
@@ -88,18 +101,19 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focus.requestFocus() } }
 
-    LaunchedEffect(query, settings.version, ref) {
+    LaunchedEffect(query, settings.version, ref, scopeRange) {
         failed = false
         if (query.trim().length < 2 || ref != null) {
-            hits = emptyList(); total = 0; loading = false; romanOffer = null
+            hits = emptyList(); total = 0; loading = false; romanOffer = null; perBook = emptyList()
             return@LaunchedEffect
         }
-        delay(350)
+        if (scopeRange == null) delay(350)
         loading = true
         try {
-            val r = graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta")
+            val r = graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta", books = scopeRange)
             hits = r.response.hits; total = r.response.total; offline = r.offline; shown = r.shown; romanOffer = r.romanOffer
-            graph.stats.record("search", query = query.trim(), amount = r.response.total.toLong(), version = settings.version, offline = r.offline)
+            perBook = r.perBook
+            if (scopeRange == null) graph.stats.record("search", query = query.trim(), amount = r.response.total.toLong(), version = settings.version, offline = r.offline)
         } catch (e: Exception) {
             failed = true
         }
@@ -178,6 +192,11 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                         style = Ts.type.body, color = c.muted, modifier = Modifier.padding(20.dp),
                     )
                 }
+                if (hits.isNotEmpty() || scope != null) {
+                    item {
+                        ScopeRow(scope, perBook, manifest?.books.orEmpty(), lang) { scope = it }
+                    }
+                }
                 if (hits.isNotEmpty()) {
                     if (shown != query.trim()) item {
                         Text(
@@ -222,4 +241,29 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
 private fun highlight(text: String, ranges: List<IntRange>, bg: androidx.compose.ui.graphics.Color) = buildAnnotatedString {
     append(text)
     ranges.forEach { r -> addStyle(SpanStyle(background = bg), r.first, r.last + 1) }
+}
+
+/**
+ * Narrow the results (M3-5, R-5.5, R-5.8): whole Bible, a testament, or one book. With a
+ * downloaded Bible each book shows how many verses matched; online, only the testaments.
+ */
+@Composable
+private fun ScopeRow(scope: String?, perBook: List<Pair<Int, Int>>, books: List<Book>, lang: UiLang, onScope: (String?) -> Unit) {
+    val byOrder = remember(books) { books.associateBy { it.order } }
+    fun count(t: String) = perBook.filter { (o, _) -> byOrder[o]?.testament == t }.sumOf { it.second }
+    val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        TsChip(tr("முழு வேதம்", "Whole Bible"), scope == null, { onScope(null) }, contentPadding = pad)
+        listOf("OT" to tr("பழைய ஏற்பாடு", "Old Testament"), "NT" to tr("புதிய ஏற்பாடு", "New Testament")).forEach { (t, label) ->
+            val n = count(t)
+            if (perBook.isEmpty() || n > 0) TsChip(if (n > 0) "$label · $n" else label, scope == t, { onScope(t) }, contentPadding = pad)
+        }
+        perBook.forEach { (order, n) ->
+            val b = byOrder[order] ?: return@forEach
+            TsChip("${b.name(lang)} · $n", scope == b.code, { onScope(b.code) }, contentPadding = pad)
+        }
+    }
 }

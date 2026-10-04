@@ -160,27 +160,44 @@ class PackRepository(
      * Offline word search in an installed Bible pack (design §8.3): words in quotes match as
      * a phrase; other words of three or more letters match as prefixes, like the website.
      */
-    suspend fun search(version: String, query: String, limit: Int = 50, offset: Int = 0): Pair<List<SearchHit>, Int>? {
+    /** A page of hits, the total, and on the first page the hits per book (canonical order → count). */
+    data class Found(val hits: List<SearchHit>, val total: Int, val perBook: List<Pair<Int, Int>>)
+
+    /** [books] limits the search to a range of canonical book orders (a testament or one book). */
+    suspend fun search(version: String, query: String, limit: Int = 50, offset: Int = 0, books: IntRange? = null): Found? {
         val match = ftsExpression(query) ?: return null
+        // Verse ids are order × 1,000,000 + chapter × 1,000 + verse, so a book range is an id range.
+        val lo = (books?.first ?: 1) * 1_000_000L
+        val hi = ((books?.last ?: 99) + 1) * 1_000_000L - 1
         return store.query("bible.$version") { c ->
-            val total = c.prepare("SELECT count(*) FROM verse_fts WHERE verse_fts MATCH ?").use { st ->
+            val total = c.prepare("SELECT count(*) FROM verse_fts WHERE verse_fts MATCH ? AND rowid BETWEEN ? AND ?").use { st ->
                 st.bindText(1, match)
+                st.bindLong(2, lo)
+                st.bindLong(3, hi)
                 if (st.step()) st.getLong(0).toInt() else 0
+            }
+            val perBook = if (offset > 0) emptyList() else c.prepare(
+                "SELECT rowid / 1000000 AS ord, count(*) FROM verse_fts WHERE verse_fts MATCH ? GROUP BY ord ORDER BY ord",
+            ).use { st ->
+                st.bindText(1, match)
+                buildList { while (st.step()) add(st.getLong(0).toInt() to st.getLong(1).toInt()) }
             }
             val hits = c.prepare(
                 "SELECT v.book, v.chapter, v.verse, v.text, v.id / 1000000 FROM verse_fts f JOIN verse v ON v.id = f.rowid " +
-                    "WHERE verse_fts MATCH ? ORDER BY f.rank LIMIT ? OFFSET ?",
+                    "WHERE verse_fts MATCH ? AND f.rowid BETWEEN ? AND ? ORDER BY f.rank LIMIT ? OFFSET ?",
             ).use { st ->
                 st.bindText(1, match)
-                st.bindLong(2, limit.toLong())
-                st.bindLong(3, offset.toLong())
+                st.bindLong(2, lo)
+                st.bindLong(3, hi)
+                st.bindLong(4, limit.toLong())
+                st.bindLong(5, offset.toLong())
                 buildList {
                     while (st.step()) {
                         add(SearchHit("${st.getText(0)}.${st.getLong(1)}.${st.getLong(2)}", version, st.getText(3), 0.0, st.getLong(4).toInt()))
                     }
                 }
             }
-            hits to total
+            Found(hits, total, perBook)
         }
     }
 

@@ -19,29 +19,40 @@ class SearchRepository(private val http: Http, private val packs: PackRepository
      * [shown] is the query the results are for (the Tamil reading when romanised input was
      * used); [romanOffer] is that reading, offered when the words as typed found results.
      */
-    data class Result(val response: SearchResponse, val offline: Boolean, val shown: String, val romanOffer: String? = null)
+    data class Result(
+        val response: SearchResponse,
+        val offline: Boolean,
+        val shown: String,
+        val romanOffer: String? = null,
+        /** Hits per book (canonical order → count) over the whole Bible; on-device searches only. */
+        val perBook: List<Pair<Int, Int>> = emptyList(),
+    )
 
     /**
      * Romanised Tamil (A-4.3), as on the website: for a Tamil version, "anbu" is read as
      * அன்பு when the words as typed find nothing; otherwise ("god") the results stand and
      * the Tamil reading is only offered.
      */
-    suspend fun search(query: String, version: String, tamil: Boolean, offset: Int = 0): Result {
+    suspend fun search(query: String, version: String, tamil: Boolean, offset: Int = 0, books: IntRange? = null): Result {
         val roman = if (tamil && Romanised.isRomanised(query)) Romanised.toTamil(query).takeIf { it.isNotBlank() } else null
-        val typed = searchAs(query, version, offset)
+        val typed = searchAs(query, version, offset, books)
         if (roman == null) return typed
         if (typed.response.total > 0) return typed.copy(romanOffer = roman)
-        val tamilResult = runCatching { searchAs(roman, version, offset) }.getOrNull()
+        val tamilResult = runCatching { searchAs(roman, version, offset, books) }.getOrNull()
         return if (tamilResult != null && tamilResult.response.total > 0) tamilResult else typed
     }
 
-    private suspend fun searchAs(query: String, version: String, offset: Int): Result {
-        val local = if (packs.hasBible(version)) packs.search(version, query, offset = offset) else null
-        if (local != null && local.second > 0) {
-            return Result(SearchResponse(query = query, hits = local.first, total = local.second), offline = true, shown = query)
+    private suspend fun searchAs(query: String, version: String, offset: Int, books: IntRange?): Result {
+        val local = if (packs.hasBible(version)) packs.search(version, query, offset = offset, books = books) else null
+        if (local != null && (local.total > 0 || local.perBook.isNotEmpty())) {
+            return Result(SearchResponse(query = query, hits = local.hits, total = local.total), offline = true, shown = query, perBook = local.perBook)
         }
         return try {
-            val bytes = http.get(Origin.Api, "api/search", mapOf("q" to query, "v" to version, "offset" to offset.toString()))
+            val bytes = http.get(Origin.Api, "api/search", buildMap {
+                put("q", query); put("v", version); put("offset", offset.toString())
+                // The website filters by canonical book order too (R-5.8).
+                books?.let { put("bmin", it.first.toString()); put("bmax", it.last.toString()) }
+            })
             Result(json.decodeFromString(bytes.decodeToString()), offline = false, shown = query)
         } catch (e: IOException) {
             if (local != null) Result(SearchResponse(query = query), offline = true, shown = query) else throw e
