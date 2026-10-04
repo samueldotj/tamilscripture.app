@@ -52,14 +52,16 @@ open class MainActivity : ComponentActivity() {
         val services = (application as TsApplication).services
         // One DataStore read before the first frame so the theme and language never flash (NF-2).
         val initial = runBlocking { services.graph.settings.settings.first() }
-        // A recreated activity (rotation, or a restore after the process was killed) carries an
-        // intent that was already opened; new links arrive through onNewIntent. After a
-        // force-stop the system restarts the task with its first intent and no saved state:
-        // that replay has the id LinkActivity gave it, which is remembered once opened.
+        // Every link carries the id LinkActivity gave it; once opened, that id is remembered.
+        // So a replay (rotation, a restore after the process was killed, a restart after a
+        // force-stop) is skipped, while a new link is opened even when it is what restores the
+        // activity after process death.
         val links = getSharedPreferences("links", MODE_PRIVATE)
-        if (savedInstanceState == null) {
-            val id = intent?.getStringExtra(LINK_ID)
-            if (id == null || id != links.getString("handled", null)) intent?.data?.let { pendingUri = it; pendingId = id }
+        val id = intent?.getStringExtra(LINK_ID)
+        if (id != null && id != links.getString("handled", null)) {
+            intent?.data?.let { pendingUri = it; pendingId = id }
+        } else if (id == null && savedInstanceState == null) {
+            intent?.data?.let { pendingUri = it }
         }
         val start = startStack()
 
