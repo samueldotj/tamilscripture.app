@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +42,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -461,13 +463,14 @@ private fun PaneTabs(tab: String, onTab: (String) -> Unit, onClose: () -> Unit) 
     Row(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
-        TsChip(tr("விளக்கவுரை", "Commentary"), tab == PANE_COMMENTARY, { onTab(PANE_COMMENTARY) }, contentPadding = pad)
-        TsChip(tr("நபர்கள் · இடங்கள்", "People · places"), tab == PANE_PEOPLE, { onTab(PANE_PEOPLE) }, contentPadding = pad)
-        TsChip(tr("மூல மொழி", "Original"), tab == PANE_ORIGINAL, { onTab(PANE_ORIGINAL) }, contentPadding = pad)
-        Box(Modifier.weight(1f))
+        // The tabs scroll when the pane is narrow (Tamil labels are long); close stays in reach.
+        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
+            TsChip(tr("விளக்கவுரை", "Commentary"), tab == PANE_COMMENTARY, { onTab(PANE_COMMENTARY) }, contentPadding = pad)
+            TsChip(tr("நபர்கள் · இடங்கள்", "People · places"), tab == PANE_PEOPLE, { onTab(PANE_PEOPLE) }, contentPadding = pad)
+            TsChip(tr("மூல மொழி", "Original"), tab == PANE_ORIGINAL, { onTab(PANE_ORIGINAL) }, contentPadding = pad)
+        }
         IconBox(TsIcons.Close, tr("பலகத்தை மூடு", "Close pane"), onClose)
     }
     HDivider()

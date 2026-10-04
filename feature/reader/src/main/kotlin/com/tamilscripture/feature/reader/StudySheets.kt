@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tamilscripture.core.data.content.References
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.SchematicMap
@@ -33,6 +34,7 @@ import com.tamilscripture.core.model.MapDrawing
 import com.tamilscripture.core.model.MapSvg
 import com.tamilscripture.core.model.OriginalChapter
 import com.tamilscripture.core.model.UiLang
+import com.tamilscripture.core.model.label
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
@@ -160,7 +162,13 @@ fun PeoplePlacesContent(
                     // Two people of one name (John the Baptist, Peter's father John) are told apart
                     // by the start of their description.
                     val twin = m.people.values.count { (if (tamil) it.nameTa.ifBlank { it.nameEn } else it.nameEn) == name } > 1
-                    val hint = p.brief.substringBefore(',').removePrefix("The ").take(28).trim()
+                    // English: the start of their description. Tamil: where they are first named
+                    // (the website's qualifier, "Mat 3:1"), as a Tamil reference; descriptions are English.
+                    val hint = if (tamil) {
+                        p.qualifier?.let { q -> References.parse(q, graph.content.manifest.value) }?.let { r -> r.book.label(UiLang.Tamil, r.chapter, r.verse) }.orEmpty()
+                    } else {
+                        p.brief.substringBefore(',').removePrefix("The ").take(28).trim()
+                    }
                     TsChip(if (twin && hint.isNotEmpty()) "$name · $hint" else name, false, { onPerson(id) }, contentPadding = pad)
                 }
                 places.forEach { id ->

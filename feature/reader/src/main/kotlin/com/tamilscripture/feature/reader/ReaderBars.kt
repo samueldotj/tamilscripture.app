@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -199,11 +200,21 @@ fun VerseActionCard(
             Text(reference, style = Ts.type.label, color = c.accent, modifier = Modifier.weight(1f))
             Icon(TsIcons.Close, tr("மூடு", "Close"), Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onClose), tint = c.muted)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (hasAudio) BigAction(TsIcons.Play, tr("இங்கே", "From here"), primary = true, onClick = onPlayHere, modifier = Modifier.weight(1f))
-            BigAction(TsIcons.Commentary, tr("விளக்கவுரை", "Commentary"), onClick = onCommentary, modifier = Modifier.weight(1f))
-            BigAction(TsIcons.Link, tr("தொடர்பு", "Cross-refs"), onClick = onCrossRefs, modifier = Modifier.weight(1f))
-            BigAction(TsIcons.Bookmark, tr("குறி", "Bookmark"), onClick = onBookmark, modifier = Modifier.weight(1f))
+        // Four across, or two by two when the card is narrow (the text column beside a wide
+        // study pane), where four would cut long Tamil labels.
+        BoxWithConstraints {
+            val big: List<@Composable (Modifier) -> Unit> = listOfNotNull(
+                if (hasAudio) { m -> BigAction(TsIcons.Play, tr("இங்கே", "From here"), primary = true, onClick = onPlayHere, modifier = m) } else null,
+                { m -> BigAction(TsIcons.Commentary, tr("விளக்கவுரை", "Commentary"), onClick = onCommentary, modifier = m) },
+                { m -> BigAction(TsIcons.Link, tr("தொடர்பு", "Cross-refs"), onClick = onCrossRefs, modifier = m) },
+                { m -> BigAction(TsIcons.Bookmark, tr("குறி", "Bookmark"), onClick = onBookmark, modifier = m) },
+            )
+            val perRow = if (maxWidth < 400.dp) 2 else big.size
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                big.chunked(perRow).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { row.forEach { it(Modifier.weight(1f)) } }
+                }
+            }
         }
         Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallAction(tr("நகல்", "Copy"), onCopy, Modifier.weight(1f))
