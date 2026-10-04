@@ -34,7 +34,11 @@ data class Settings(
     val commentarySource: String = "henry",
     val lastRead: Passage? = null,
     val shareStats: Boolean = true,
-    /** Second version shown verse by verse beside the first (A-3.3), or null. */
+    /**
+     * The version last compared with (A-3.3), offered by the reader's compare button. Whether a
+     * reader shows two columns is the reader's own state, never a setting: the Bible opens
+     * in one column.
+     */
     val compare: String? = null,
     /** Newest first, at most 8, kept on this device only (A-4.5, like the website's). */
     val recentSearches: List<String> = emptyList(),

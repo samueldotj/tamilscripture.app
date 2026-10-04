@@ -64,6 +64,7 @@ object TsIcons {
     val ChevronRight = line("chevron_right", "M9 18l6-6-6-6")
     val ChevronDown = line("chevron_down", "M6 9l6 6 6-6")
     val ChevronUp = line("chevron_up", "M6 15l6-6 6 6")
+    val Compare = line("compare", "M4 5h7v14H4z", "M13 5h7v14h-7z")
     val Close = line("close", "M18 6L6 18M6 6l12 12")
     val Plus = line("plus", "M12 5v14M5 12h14")
     val Minus = line("minus", "M5 12h14")

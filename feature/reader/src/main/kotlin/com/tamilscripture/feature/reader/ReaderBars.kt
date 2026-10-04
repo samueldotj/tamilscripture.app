@@ -63,6 +63,8 @@ fun ReaderTopBar(
     onPicker: () -> Unit,
     onPlay: () -> Unit,
     onSettings: () -> Unit,
+    comparing: Boolean,
+    onCompare: () -> Unit,
 ) {
     val c = Ts.colors
     Column {
@@ -74,6 +76,11 @@ fun ReaderTopBar(
             IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), onBack)
             ReferencePill(title, version, onPicker, Modifier.weight(1f))
             if (hasAudio) IconBox(TsIcons.Play, tr("கேள்", "Listen"), onPlay, tint = c.accent, iconSize = 18.dp)
+            // Two columns on and off (A-3.3); the Bible itself opens in one.
+            IconBox(
+                TsIcons.Compare, if (comparing) tr("ஒப்பீட்டை மூடு", "Stop comparing") else tr("ஒப்பிடு", "Compare"), onCompare,
+                tint = if (comparing) c.accent else c.ink2, badge = comparing,
+            )
             IconBox(
                 TsIcons.StudySettings, tr("ஆய்வு அமைப்பு", "Study settings"), onSettings,
                 tint = if (commentaryOn) c.accent else c.ink2, badge = commentaryOn,
@@ -275,6 +282,8 @@ fun WideTopBar(
     onSearch: () -> Unit,
     onListen: () -> Unit,
     onSettings: () -> Unit,
+    comparing: Boolean,
+    onCompare: () -> Unit,
     onHome: () -> Unit,
 ) {
     val c = Ts.colors
@@ -308,6 +317,10 @@ fun WideTopBar(
                 }
             }
             if (hasAudio) TsPillButton("▶ " + tr("கேள்", "Listen"), onListen, style = PillStyle.Tinted, height = 40.dp)
+            TsPillButton(
+                (if (comparing) "✓ " else "") + tr("ஒப்பிடு", "Compare"), onCompare,
+                style = if (comparing) PillStyle.Tinted else PillStyle.Outlined, height = 40.dp,
+            )
             TsPillButton(tr("ஆய்வு அமைப்பு", "Study settings"), onSettings, height = 40.dp)
             Avatar(tr("அ", "A"), onClick = onSettings)
         }

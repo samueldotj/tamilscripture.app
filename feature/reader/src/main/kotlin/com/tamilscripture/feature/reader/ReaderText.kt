@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -44,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.designsystem.component.HDivider
@@ -113,67 +116,71 @@ fun ReaderTextList(
     val c = Ts.colors
     val lang = LocalUiLang.current
     val unitsAfter = remember(commentary, items) { commentaryPlacement(items, commentary) }
-    LazyColumn(modifier, state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // The version names sit above the list, not in it, so list positions match [items].
+    Column(modifier) {
         if (dualLabels != null && dualColumns) {
-            stickyHeader(key = "dual-head") { DualHeader(dualLabels) }
+            DualHeader(dualLabels, Modifier.padding(start = contentPadding.calculateStartPadding(LayoutDirection.Ltr), end = contentPadding.calculateEndPadding(LayoutDirection.Ltr), top = 8.dp))
         }
-        items(items, key = { it.key }) { item ->
-            when (item) {
-                is ReaderItem.Dual -> VerseInteractionBox(item.verse, interactions) { extra ->
-                    DualRow(
-                        item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
-                        dualLabels, onTap = { onTapVerse(item.verse) }, modifier = extra,
-                        locales = textLocale to secondLocale,
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            items(items, key = { it.key }) { item ->
+                when (item) {
+                    is ReaderItem.Dual -> VerseInteractionBox(item.verse, interactions) { extra ->
+                        DualRow(
+                            item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
+                            dualLabels, onTap = { onTapVerse(item.verse) }, modifier = extra,
+                            locales = textLocale to secondLocale,
+                        )
+                    }
+                    is ReaderItem.Heading -> Text(
+                        item.text,
+                        style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scripture),
+                        color = c.amber,
+                        modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
                     )
-                }
-                is ReaderItem.Heading -> Text(
-                    item.text,
-                    style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scripture),
-                    color = c.amber,
-                    modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
-                )
-                is ReaderItem.Descriptive -> Text(
-                    item.text,
-                    style = Ts.type.scripture((fontSize - 3).sp, lineHeightEm).copy(fontWeight = FontWeight.SemiBold),
-                    color = c.muted,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-                is ReaderItem.Verse -> Column {
-                    val selected = item.verse in selection
-                    val playing = item.verse == playingVerse
-                    VerseInteractionBox(item.verse, interactions) { extra -> Text(
-                        verseAnnotated(item, numberSize = 12, showNotes = showNotes),
-                        style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
-                        color = c.ink,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                when {
-                                    selected -> c.verseSelected
-                                    playing -> c.accentWash
-                                    else -> androidx.compose.ui.graphics.Color.Transparent
-                                },
-                            )
-                            .then(if (playing && !selected) Modifier.border(1.dp, c.accentSoft, RoundedCornerShape(12.dp)) else Modifier)
-                            .then(extra)
-                            .clickable { onTapVerse(item.verse) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .semantics { contentDescription = "${item.label}. ${item.text}" },
-                    ) }
-                    if (showNotes && item.notes.isNotEmpty()) {
-                        Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
-                            item.notes.forEachIndexed { i, n ->
-                                Text("${'a' + i}  ${n.text}", style = Ts.type.caption, color = c.muted)
+                    is ReaderItem.Descriptive -> Text(
+                        item.text,
+                        style = Ts.type.scripture((fontSize - 3).sp, lineHeightEm).copy(fontWeight = FontWeight.SemiBold),
+                        color = c.muted,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    )
+                    is ReaderItem.Verse -> Column {
+                        val selected = item.verse in selection
+                        val playing = item.verse == playingVerse
+                        VerseInteractionBox(item.verse, interactions) { extra -> Text(
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes),
+                            style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
+                            color = c.ink,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    when {
+                                        selected -> c.verseSelected
+                                        playing -> c.accentWash
+                                        else -> androidx.compose.ui.graphics.Color.Transparent
+                                    },
+                                )
+                                .then(if (playing && !selected) Modifier.border(1.dp, c.accentSoft, RoundedCornerShape(12.dp)) else Modifier)
+                                .then(extra)
+                                .clickable { onTapVerse(item.verse) }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .semantics { contentDescription = "${item.label}. ${item.text}" },
+                        ) }
+                        if (showNotes && item.notes.isNotEmpty()) {
+                            Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
+                                item.notes.forEachIndexed { i, n ->
+                                    Text("${'a' + i}  ${n.text}", style = Ts.type.caption, color = c.muted)
+                                }
                             }
                         }
-                    }
-                    unitsAfter[item.verse]?.forEach { unit ->
-                        InlineCommentaryCard(unit, commentaryName ?: "", preferTamil = lang == UiLang.Tamil, onOpen = onOpenCommentary)
+                        unitsAfter[item.verse]?.forEach { unit ->
+                            InlineCommentaryCard(unit, commentaryName ?: "", preferTamil = lang == UiLang.Tamil, onOpen = onOpenCommentary)
+                        }
                     }
                 }
             }
         }
+
     }
 
     // Verse-read tracking (requirements §5.1, design §6.6).
@@ -205,9 +212,9 @@ fun ReaderTextList(
 
 /** Version names over the two columns (website 3B). */
 @Composable
-private fun DualHeader(labels: kotlin.Pair<String, String>) {
+private fun DualHeader(labels: kotlin.Pair<String, String>, modifier: Modifier = Modifier) {
     val c = Ts.colors
-    Row(Modifier.fillMaxWidth().background(c.bg).padding(start = 56.dp, end = 10.dp, top = 6.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+    Row(modifier.fillMaxWidth().background(c.bg).padding(start = 56.dp, end = 10.dp, top = 6.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         listOf(labels.first, labels.second).forEach { l ->
             Column(Modifier.weight(1f)) {
                 Text(l, style = Ts.type.labelSmall, color = c.ink)

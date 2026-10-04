@@ -48,7 +48,10 @@ data class ReaderState(
 }
 
 /** Holds one chapter at a time; chapter changes replace the content in place (A-2.4). */
-class ReaderViewModel(private val services: AppServices, initial: Passage) : ViewModel() {
+class ReaderViewModel(private val services: AppServices, initial: Passage, compareAtStart: Boolean = false) : ViewModel() {
+    /** Two columns in this reader; off unless the reader was opened to compare. */
+    private var comparing = compareAtStart
+
     private val graph = services.graph
     private val mutable = MutableStateFlow(ReaderState(initial))
     val state: StateFlow<ReaderState> = mutable
@@ -105,7 +108,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
                     // Not from a pack: read online, now or when it was prefetched into the cache.
                     if (loaded.source != ContentSource.Pack) countOnline(p.version)
                     graph.stats.record("view", version = p.version, book = p.book, chapter = p.chapter, source = loaded.source.name.lowercase(),
-                        action = settings.value.compare?.takeIf { it != p.version }?.let { "dual:$it" })
+                        action = settings.value.compare?.takeIf { comparing && it != p.version }?.let { "dual:$it" })
                 }
             graph.settings.update { it.copy(lastRead = p.copy(verse = p.verse ?: state.value.selection.firstOrNull()), version = p.version) }
             neighbours(p)
@@ -118,7 +121,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
 
     private fun loadSecond(p: Passage) {
         secondJob?.cancel()
-        val code = settings.value.compare?.takeIf { it != p.version }
+        val code = settings.value.compare?.takeIf { comparing && it != p.version }
         mutable.update { it.copy(compare = code, second = it.second?.takeIf { c -> c.version == code && c.book == p.book && c.chapter == p.chapter }) }
         if (code == null) return
         secondJob = viewModelScope.launch {
@@ -170,7 +173,28 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
         updateSettings { it.copy(offersDeclined = it.offersDeclined + v) }
     }
 
-    fun setCompare(code: String?) = updateSettings { it.copy(compare = code) }
+    /** Compare with [code] now (and remember it), or stop comparing when null. */
+    fun setCompare(code: String?) {
+        comparing = code != null
+        if (code != null) updateSettings { it.copy(compare = code) } else loadSecond(state.value.passage)
+    }
+
+    /**
+     * The top bar's compare button: off, or on with the version last compared with. Returns
+     * false when there is none yet, so the caller asks which.
+     */
+    fun toggleCompare(): Boolean {
+        if (comparing) {
+            comparing = false
+            loadSecond(state.value.passage)
+            return true
+        }
+        val remembered = settings.value.compare?.takeIf { it != state.value.passage.version } ?: return false
+        comparing = true
+        loadSecond(state.value.passage)
+        graph.stats.record("verse", version = state.value.passage.version, action = "compare:$remembered")
+        return true
+    }
 
     private fun neighbours(p: Passage) {
         val c = state.value.chapter ?: return

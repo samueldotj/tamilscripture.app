@@ -57,6 +57,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -146,9 +147,9 @@ private class VerseActions(
 )
 
 @Composable
-fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
+fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav: ReaderNav) {
     val services = LocalAppServices.current
-    val vm: ReaderViewModel = viewModel(key = "reader") { ReaderViewModel(services, passage) }
+    val vm: ReaderViewModel = viewModel(key = "reader") { ReaderViewModel(services, passage, compare) }
     LaunchedEffect(passage) { vm.open(passage) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -186,6 +187,17 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
 
     LaunchedEffect(items, state.passage.verse) {
         val v = state.passage.verse ?: return@LaunchedEffect
+        val i = items.indexOfFirst { it.verseNumber == v }
+        if (i >= 0) listState.scrollToItem(i)
+    }
+    // Switching between one and two columns keeps the verse at the top in place, instead of a
+    // pixel offset that means something else in the other layout.
+    var topVerse by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(listState, items) {
+        snapshotFlow { listState.firstVisibleItemIndex }.collect { i -> items.getOrNull(i)?.verseNumber?.let { topVerse = it } }
+    }
+    LaunchedEffect(state.dual) {
+        val v = topVerse ?: return@LaunchedEffect
         val i = items.indexOfFirst { it.verseNumber == v }
         if (i >= 0) listState.scrollToItem(i)
     }
@@ -276,6 +288,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         if (code != null) vm.open(Passage(audio.version ?: state.passage.version, code, audio.chapter, audio.verse))
     }
 
+    // On and off with the version last compared with; the first time, ask which.
+    val onCompare: () -> Unit = { if (!vm.toggleCompare()) { showVersions = true } }
     val tabletop = rememberTabletop()
     val focus = remember { FocusRequester() }
     // Shortcuts work at every width: a tablet in portrait or a phone can have a keyboard too.
@@ -311,7 +325,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         // A foldable on a table uses the stacked layout, whatever its width, to split at the hinge.
         if (wide && tabletop == null) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                WideTopBar(title, versionLabel, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, nav.home)
+                WideTopBar(title, versionLabel, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, state.compare != null, onCompare, nav.home)
                 // The pane shows a study tab, or commentary when that is on; dual view has no pane.
                 val tab = if (state.dual) null else paneTab ?: if (settings.commentary) PANE_COMMENTARY else null
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
@@ -371,7 +385,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             }
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                ReaderTopBar(title, versionLabel, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true })
+                ReaderTopBar(title, versionLabel, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true }, state.compare != null, onCompare)
                 if (settings.commentary && state.commentarySources.isNotEmpty()) {
                     CommentaryChipRow(
                         state.commentarySources, settings.commentarySource,
@@ -447,7 +461,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     if (showVersions) {
         VersionSheet(
             state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) },
-            compare = settings.compare, onCompare = { code -> showVersions = false; vm.setCompare(code) },
+            compare = state.compare, onCompare = { code -> showVersions = false; vm.setCompare(code) },
         ) { showVersions = false }
     }
 }

@@ -149,7 +149,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
                         ReaderScreen(
-                            r.passage, wide,
+                            r.passage, wide, r.compare,
                             ReaderNav(
                                 back = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) else selectTab(Tab.Home) },
                                 picker = { p -> backStack.add(PickerRoute(p)) },

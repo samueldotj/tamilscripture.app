@@ -13,7 +13,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class SearchRoute(val focus: Boolean = false, val query: String? = null) : NavKey
 
 /** Full-screen destinations above the tabs. */
-@Serializable data class ReaderRoute(val passage: Passage) : NavKey
+/** [compare] opens this reader side by side (a website link such as /irvtam+kjv/…). */
+@Serializable data class ReaderRoute(val passage: Passage, val compare: Boolean = false) : NavKey
 @Serializable data class PickerRoute(val passage: Passage) : NavKey
 @Serializable data class CommentaryRoute(val passage: Passage) : NavKey
 @Serializable data object SettingsRoute : NavKey
@@ -64,5 +65,5 @@ fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): 
     val chapter = chapterPart.substringBefore('.').toIntOrNull() ?: return null
     val verse = chapterPart.substringAfter('.', "").substringBefore('-').toIntOrNull()
         ?: rest.getOrNull(2)?.substringBefore('-')?.toIntOrNull()
-    return DeepLink(ReaderRoute(Passage(version, book.code, chapter, verse)), compare)
+    return DeepLink(ReaderRoute(Passage(version, book.code, chapter, verse), compare = compare != null), compare)
 }
