@@ -25,6 +25,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -40,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
@@ -48,6 +50,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
@@ -79,6 +82,12 @@ import kotlin.math.roundToInt
 import kotlinx.serialization.json.Json
 
 /** Everything the atlas draws, read once (base map, places, journeys). */
+/**
+ * One-pixel outlines whatever the zoom: the GPU draws these without tessellating a stroke,
+ * which for the coast and kingdoms' borders was most of a frame on a phone.
+ */
+private val Hairline = Stroke(0f)
+
 internal class AtlasData(
     val land: List<GeoFeature>,
     val lakes: List<GeoFeature>,
@@ -231,6 +240,28 @@ internal suspend fun loadAtlas(file: suspend (String) -> String?): AtlasData {
     )
 }
 
+/** The base map's paths, held as one immutable value so [BaseMap] skips recomposition. */
+@Immutable
+private class BaseLayers(val land: Path, val coast: Path, val lakes: Path, val rivers: Path)
+
+@Composable
+private fun BaseMap(layers: BaseLayers, view: () -> Triple<Float, Float, Float>) {
+    val c = Ts.colors
+    Canvas(Modifier.fillMaxSize().clipToBounds().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }) {
+        val (cx, cy, scale) = view()
+        drawRect(c.mapSea)
+        withTransform({
+            translate(size.width / 2f - cx * scale, size.height / 2f - cy * scale)
+            scale(scale, scale, Offset.Zero)
+        }) {
+            drawPath(layers.land, c.mapLand, style = Fill)
+            drawPath(layers.coast, c.mapCoast, style = Hairline)
+            drawPath(layers.lakes, c.mapLake, style = Fill)
+            drawPath(layers.rivers, c.mapRiver, style = Hairline)
+        }
+    }
+}
+
 @Composable
 private fun InfoCard(modifier: Modifier, content: @Composable () -> Unit) {
     val c = Ts.colors
@@ -298,6 +329,9 @@ internal fun AtlasCanvas(
             cy = wyv - (p.y - h / 2f) / scale
         }
 
+        // The base map in its own layer: it reads the view only while drawing, so a new year
+        // or selection redraws the overlay alone and the base is composited from its texture.
+        BaseMap(remember(land, coast, lakes, rivers) { BaseLayers(land, coast, lakes, rivers) }) { Triple(cx, cy, scale) }
         Canvas(
             // Clipped: a Canvas draws outside its bounds, over the header and chips.
             Modifier.fillMaxSize().clipToBounds()
@@ -332,21 +366,16 @@ internal fun AtlasCanvas(
                     }
                 },
         ) {
-            drawRect(c.mapSea)
             withTransform({
                 translate(w / 2f - cx * scale, h / 2f - cy * scale)
                 scale(scale, scale, Offset.Zero)
             }) {
                 val px = 1f / scale
-                drawPath(land, c.mapLand, style = Fill)
-                drawPath(coast, c.mapCoast, style = Stroke(1f * px, join = StrokeJoin.Round))
-                drawPath(lakes, c.mapLake, style = Fill)
-                drawPath(rivers, c.mapRiver, style = Stroke(1.1f * px, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 // Kingdoms of the chosen year, each in its own colour (M8-5c).
                 kingdoms.forEach { k ->
                     val col = polityColor(k.id, c.isDark)
                     drawPath(k.path, col.copy(alpha = 0.16f), style = Fill)
-                    drawPath(k.path, col.copy(alpha = 0.7f), style = Stroke(1.2f * px, join = StrokeJoin.Round))
+                    drawPath(k.path, col.copy(alpha = 0.7f), style = Hairline)
                 }
                 route?.let {
                     drawPath(
