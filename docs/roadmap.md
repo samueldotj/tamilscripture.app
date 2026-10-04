@@ -209,7 +209,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 **Requirements:** A-5.2–A-5.4.
 
 ### Tasks
-- [ ] M4-1 **[web]** `pack-build` commentary packs from `bible-commentaries/dist/commentary/{version}` for the five commentaries, with Tamil drafts and provenance.
+- [x] M4-1 **[web]** `pack-build` commentary packs from `bible-commentaries/dist/commentary/{version}` for the five commentaries, with Tamil drafts and provenance. Live since 4 Oct 2026 (Henry 22.8 MB, Calvin 10.8, Trapp 6.7, Poole 6.2, Geneva 2.1); the deploy fetches a commentary version only when `latest.json` changes. Geneva read offline on the Pixel 9.
 - [x] M4-2 `CommentaryRepository` through `ContentSource`: pack, then cache, then the existing commentary CDN (`latest.json`); Tamil when available and the UI is Tamil, else English with the "translation coming" label.
 - [x] M4-3 Commentary focus pane (expanded+) with source tabs and "also in" previews from other installed commentaries.
 - [x] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.

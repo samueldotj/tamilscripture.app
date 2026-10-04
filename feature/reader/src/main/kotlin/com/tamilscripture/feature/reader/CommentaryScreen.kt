@@ -80,6 +80,8 @@ data class CommentaryState(
     val source: String = "henry",
     val commentary: CommentaryChapter? = null,
     val loading: Boolean = true,
+    /** The commentary covers this chapter but could not be fetched and is not downloaded. */
+    val unreachable: Boolean = false,
 )
 
 class CommentaryViewModel(private val services: AppServices, initial: Passage) : ViewModel() {
@@ -118,8 +120,9 @@ class CommentaryViewModel(private val services: AppServices, initial: Passage) :
             val idx = graph.commentary.index()
             mutable.update { it.copy(sources = idx?.sources.orEmpty(), manifest = graph.content.manifest.value) }
             val c = graph.commentary.chapter(s.source, s.passage.book, s.passage.chapter)
-            mutable.update { it.copy(commentary = c, loading = false) }
-            graph.stats.record("commentary", book = s.passage.book, chapter = s.passage.chapter, action = s.source)
+            val unreachable = c == null && idx?.covers(s.source, s.passage.book, s.passage.chapter) == true
+            mutable.update { it.copy(commentary = c, loading = false, unreachable = unreachable) }
+            if (c != null) graph.stats.record("commentary", book = s.passage.book, chapter = s.passage.chapter, action = s.source)
         }
         viewModelScope.launch {
             graph.content.chapter(s.passage.version, s.passage.book, s.passage.chapter)
@@ -175,8 +178,17 @@ fun CommentaryScreen(passage: Passage, onBack: () -> Unit, onReadWithVerses: (Pa
             if (state.loading && state.commentary == null) {
                 CircularProgressIndicator(color = c.accent, modifier = Modifier.padding(32.dp))
             } else if (state.commentary == null) {
-                Text(tr("இந்த அதிகாரத்துக்கு இந்த விளக்கவுரை இல்லை.", "This commentary has nothing on this chapter."),
-                    style = Ts.type.body, color = c.muted, modifier = Modifier.padding(32.dp))
+                Text(
+                    if (state.unreachable) {
+                        tr(
+                            "இணைய இணைப்பு இல்லை. இணைப்பின்றி வாசிக்க இந்த விளக்கவுரையை அமைப்புகள் › பதிவிறக்கங்களில் பதிவிறக்குங்கள்.",
+                            "No connection. To read this commentary offline, download it in Settings › Downloads.",
+                        )
+                    } else {
+                        tr("இந்த அதிகாரத்துக்கு இந்த விளக்கவுரை இல்லை.", "This commentary has nothing on this chapter.")
+                    },
+                    style = Ts.type.body, color = c.muted, modifier = Modifier.padding(32.dp),
+                )
             } else {
                 LazyColumn(
                     Modifier.widthIn(max = 720.dp).fillMaxSize(),
