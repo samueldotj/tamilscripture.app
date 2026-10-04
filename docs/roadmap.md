@@ -238,7 +238,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M5-6 Verse sync: highlight current verse, follow-audio scrolling, "play from here".
 - [x] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
 - [ ] M5-8 Audio downloads per book and per version; storage display; delete. Built: Downloads › Audio Bible, a book at a time (MP3s at their CDN paths plus verse timings), played from the device when present; on-device check pending.
-- [ ] M5-9 Android Auto browse tree (versions → books → chapters).
+- [ ] M5-9 Android Auto browse tree (versions → books → chapters). Built: PlaybackService is a MediaLibraryService with that tree, a chosen chapter queueing its book; not yet tried in a car or the Desktop Head Unit.
 - [x] M5-10 `audio` stats events with seconds listened and offline flag. Done with the player (play, jump, next, end, time).
 
 ### Exit criteria

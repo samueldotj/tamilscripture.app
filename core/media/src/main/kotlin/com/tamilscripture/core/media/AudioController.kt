@@ -52,8 +52,9 @@ class AudioController(
     private val origins: OriginResolver,
     private val stats: StatsRecorder,
     private val scope: CoroutineScope,
-    private val audio: AudioStore,
+    audio: AudioStore,
 ) {
+    private val items = ChapterItems(audio, origins)
     private val mutable = MutableStateFlow(AudioState())
     val state: StateFlow<AudioState> = mutable
 
@@ -75,7 +76,7 @@ class AudioController(
             val rec = manifest.version(version)?.audio?.recording ?: return@launch
             val c = connect()
             flushListened()
-            val items = (1..book.chapters).map { ch -> item(version, rec, book, ch) }
+            val items = items.book(version, rec, book)
             c.setMediaItems(items, chapter - 1, 0L)
             c.prepare()
             if (fromVerse != null && fromVerse > 1) {
@@ -117,23 +118,6 @@ class AudioController(
         controller?.run { stop(); clearMediaItems() }
         ticker?.cancel()
         mutable.value = AudioState()
-    }
-
-    private fun item(version: String, rec: String, book: Book, chapter: Int): MediaItem {
-        // A downloaded chapter plays from the device (A-6.6); otherwise it streams.
-        val local = audio.local(version, rec, book.code, chapter)
-        return MediaItem.Builder()
-            .setMediaId("$version/${book.code}/$chapter")
-            .setUri(local?.let(Uri::fromFile) ?: Uri.parse(origins.url(Origin.Audio, AudioPaths.chapter(version, rec, book.code, chapter))))
-            .setMediaMetadata(
-                MediaMetadata.Builder()
-                    .setTitle("${book.nameTa} $chapter")
-                    .setArtist(version)
-                    .setAlbumTitle(book.nameTa)
-                    .setTrackNumber(chapter)
-                    .build(),
-            )
-            .build()
     }
 
     private suspend fun connect(): MediaController {
@@ -180,10 +164,11 @@ class AudioController(
 
     private fun publish() {
         val c = controller ?: return
-        val id = c.currentMediaItem?.mediaId?.split('/')
-        val version = id?.getOrNull(0)
-        val book = id?.getOrNull(1)
-        val chapter = id?.getOrNull(2)?.toIntOrNull() ?: 0
+        // c:VERSION:BOOK:chapter (ChapterItems), from the app or from Android Auto.
+        val id = c.currentMediaItem?.mediaId?.split(':')?.takeIf { it.size == 4 && it[0] == "c" }
+        val version = id?.getOrNull(1)
+        val book = id?.getOrNull(2)
+        val chapter = id?.getOrNull(3)?.toIntOrNull() ?: 0
         if (version != null && book != null && timingsKey != "$version/$book/$chapter") {
             timingsKey = "$version/$book/$chapter"
             timings = null
