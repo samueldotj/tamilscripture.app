@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tamilscripture.core.data.packs.CatalogueEntry
 import com.tamilscripture.core.data.packs.PackState
+import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -45,7 +47,6 @@ import com.tamilscripture.core.designsystem.component.TsToggle
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.UiLang
-import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
@@ -65,6 +66,10 @@ fun DownloadsScreen(onBack: () -> Unit) {
     val catalogue by packs.catalogue.collectAsStateWithLifecycle()
     val states by packs.states.collectAsStateWithLifecycle(emptyMap())
     val installed by packs.store.installed.collectAsStateWithLifecycle()
+    val manifest by graph.content.manifest.collectAsStateWithLifecycle()
+    val audioOnDevice by graph.audio.downloaded.collectAsStateWithLifecycle()
+    val audioWorking by graph.audio.working.collectAsStateWithLifecycle(emptyMap())
+    var openAudio by rememberSaveable { mutableStateOf<String?>(null) }
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
     val wifiOnly = settings.downloadWifiOnly
     var refreshing by remember { mutableStateOf(catalogue == null) }
@@ -92,7 +97,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(tr("பதிவிறக்கங்கள்", "Downloads"), style = Ts.type.barTitle, color = c.ink)
                 Text(
-                    tr("சாதனத்தில்: ", "On this device: ") + mb(installed.values.sumOf { it.size }),
+                    tr("சாதனத்தில்: ", "On this device: ") + mb(installed.values.sumOf { it.size } + remember(audioOnDevice) { graph.audio.bytes() }),
                     style = Ts.type.caption, color = c.muted,
                 )
             }
@@ -122,6 +127,52 @@ fun DownloadsScreen(onBack: () -> Unit) {
                     commentaryTitle to cat.packs.filter { it.type == "commentary" },
                     studyTitle to cat.packs.filter { it.type != "bible" && it.type != "commentary" },
                 )
+                // M5-8: audio, a book at a time, per recorded version.
+                val recorded = manifest?.versions.orEmpty().filter { it.audio != null }.sortedBy { it.order }
+                if (recorded.isNotEmpty()) {
+                    item { Kicker(tr("ஒலி வேதாகமம்", "Audio Bible"), Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(start = 22.dp, top = 18.dp, bottom = 6.dp)) }
+                    recorded.forEach { v ->
+                        val books = manifest?.books.orEmpty()
+                        val onDevice = books.count { b -> (audioOnDevice["${v.code}/${b.code}"] ?: 0) >= b.chapters }
+                        item(key = "audio-${v.code}") {
+                            TsListRow(
+                                v.short + " · " + (if (lang == UiLang.Tamil) v.nameNative ?: v.name else v.name),
+                                subtitle = tr("சாதனத்தில் $onDevice / ${books.size} புத்தகங்கள்", "$onDevice of ${books.size} books on device") +
+                                    (remember(audioOnDevice) { graph.audio.bytes(v.code) }.takeIf { it > 0 }?.let { " · " + mb(it) } ?: ""),
+                                onClick = { openAudio = if (openAudio == v.code) null else v.code },
+                                trailing = { Icon(if (openAudio == v.code) TsIcons.ChevronUp else TsIcons.ChevronDown, null, tint = c.muted) },
+                                modifier = Modifier.widthIn(max = 720.dp),
+                            )
+                            HDivider()
+                        }
+                        if (openAudio == v.code) {
+                            items(books, key = { "audio-${v.code}-${it.code}" }) { b ->
+                                val key = "${v.code}/${b.code}"
+                                val have = audioOnDevice[key] ?: 0
+                                val progress = audioWorking[key]
+                                AudioBookRow(
+                                    b.name(lang), have, b.chapters, progress,
+                                    onDownload = { graph.audio.download(v.code, b.code, wifiOnly) },
+                                    onCancel = { graph.audio.cancel(v.code, b.code) },
+                                    onDelete = { scope.launch { graph.audio.delete(v.code, b.code) } },
+                                    modifier = Modifier.widthIn(max = 720.dp),
+                                )
+                            }
+                            item(key = "audio-${v.code}-all") {
+                                Row(Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 22.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TsPillButton(tr("எல்லாம் பதிவிறக்கு", "Download all"), {
+                                        books.filter { (audioOnDevice["${v.code}/${it.code}"] ?: 0) < it.chapters }
+                                            .forEach { graph.audio.download(v.code, it.code, wifiOnly) }
+                                    }, style = PillStyle.Filled, height = 36.dp)
+                                    if (onDevice > 0 || audioOnDevice.keys.any { it.startsWith("${v.code}/") }) {
+                                        TsPillButton(tr("எல்லாம் நீக்கு", "Delete all"), { scope.launch { graph.audio.delete(v.code) } }, height = 36.dp)
+                                    }
+                                }
+                                HDivider()
+                            }
+                        }
+                    }
+                }
                 groups.forEach { (title, list) ->
                     if (list.isNotEmpty()) {
                         item { Kicker(title, Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(start = 22.dp, top = 18.dp, bottom = 6.dp)) }
@@ -139,6 +190,43 @@ fun DownloadsScreen(onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/** One book of a recording: chapters on the device, progress while downloading. */
+@Composable
+private fun AudioBookRow(
+    name: String,
+    have: Int,
+    chapters: Int,
+    progress: Float?,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier,
+) {
+    val c = Ts.colors
+    Column(modifier.fillMaxWidth().padding(start = 34.dp, end = 22.dp, top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(name, style = Ts.type.body, color = c.ink)
+                Text(
+                    when {
+                        progress != null -> tr("பதிவிறக்குகிறது", "Downloading") + " · ${(progress * 100).toInt()}%"
+                        have >= chapters -> tr("சாதனத்தில்", "On device")
+                        have > 0 -> tr("$have / $chapters அதிகாரங்கள்", "$have of $chapters chapters")
+                        else -> tr("$chapters அதிகாரங்கள்", "$chapters chapters")
+                    },
+                    style = Ts.type.caption, color = c.muted,
+                )
+            }
+            when {
+                progress != null -> TsPillButton(tr("நிறுத்து", "Cancel"), onCancel, height = 34.dp, textStyle = Ts.type.labelSmall)
+                have >= chapters -> TsPillButton(tr("நீக்கு", "Delete"), onDelete, height = 34.dp, textStyle = Ts.type.labelSmall)
+                else -> TsPillButton(tr("பதிவிறக்கு", "Download"), onDownload, style = PillStyle.Filled, height = 34.dp, textStyle = Ts.type.labelSmall)
+            }
+        }
+        if (progress != null) TsProgress(progress)
     }
 }
 

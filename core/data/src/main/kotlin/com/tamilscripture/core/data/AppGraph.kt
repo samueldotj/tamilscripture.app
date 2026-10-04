@@ -1,6 +1,7 @@
 package com.tamilscripture.core.data
 
 import android.content.Context
+import com.tamilscripture.core.data.audio.AudioStore
 import com.tamilscripture.core.data.cache.OnlineCache
 import com.tamilscripture.core.data.content.CommentaryRepository
 import com.tamilscripture.core.data.content.ContentRepository
@@ -35,7 +36,8 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val http = Http(origins)
     val onlineCache = OnlineCache(File(context.filesDir, "online_cache"))
     val packs = PackRepository(context, http, json, appScope)
-    val content = ContentRepository(http, onlineCache, packs, json, appScope)
+    val audio = AudioStore(context, http)
+    val content = ContentRepository(http, onlineCache, packs, json, appScope, localTimings = audio::timings)
     val commentary = CommentaryRepository(http, onlineCache, json, packs)
     val search = SearchRepository(http, packs, json)
     val settings = SettingsRepository(context)

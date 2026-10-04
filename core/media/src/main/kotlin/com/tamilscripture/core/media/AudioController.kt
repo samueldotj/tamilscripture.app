@@ -8,6 +8,8 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.tamilscripture.core.data.audio.AudioPaths
+import com.tamilscripture.core.data.audio.AudioStore
 import com.tamilscripture.core.data.content.ContentRepository
 import com.tamilscripture.core.data.net.Origin
 import com.tamilscripture.core.data.net.OriginResolver
@@ -50,6 +52,7 @@ class AudioController(
     private val origins: OriginResolver,
     private val stats: StatsRecorder,
     private val scope: CoroutineScope,
+    private val audio: AudioStore,
 ) {
     private val mutable = MutableStateFlow(AudioState())
     val state: StateFlow<AudioState> = mutable
@@ -117,10 +120,11 @@ class AudioController(
     }
 
     private fun item(version: String, rec: String, book: Book, chapter: Int): MediaItem {
-        val path = "$version/$rec/${book.code}/${book.code}_${chapter.toString().padStart(3, '0')}.mp3"
+        // A downloaded chapter plays from the device (A-6.6); otherwise it streams.
+        val local = audio.local(version, rec, book.code, chapter)
         return MediaItem.Builder()
             .setMediaId("$version/${book.code}/$chapter")
-            .setUri(Uri.parse(origins.url(Origin.Audio, path)))
+            .setUri(local?.let(Uri::fromFile) ?: Uri.parse(origins.url(Origin.Audio, AudioPaths.chapter(version, rec, book.code, chapter))))
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setTitle("${book.nameTa} $chapter")

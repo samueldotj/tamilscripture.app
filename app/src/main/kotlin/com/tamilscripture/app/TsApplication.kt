@@ -25,7 +25,7 @@ class TsApplication : Application(), GraphHost {
     override fun onCreate() {
         super.onCreate()
         val graph = AppGraph(this, packsBaseOverride = BuildConfig.DEV_PACKS_BASE.ifBlank { null })
-        val audio = AudioController(this, graph.content, graph.origins, graph.stats, graph.appScope)
+        val audio = AudioController(this, graph.content, graph.origins, graph.stats, graph.appScope, graph.audio)
         services = AppServices(graph, audio)
 
         graph.content.start()

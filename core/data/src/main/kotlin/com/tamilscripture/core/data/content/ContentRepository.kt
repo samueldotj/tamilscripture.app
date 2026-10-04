@@ -36,6 +36,8 @@ class ContentRepository(
     private val packs: PackRepository,
     val json: Json,
     private val scope: CoroutineScope,
+    /** Verse timings saved with downloaded audio (M5-8), read before any cache or network. */
+    private val localTimings: ((version: String, book: String, chapter: Int) -> java.io.File)? = null,
 ) {
 
     private val manifestState = MutableStateFlow<ContentManifest?>(null)
@@ -146,8 +148,11 @@ class ContentRepository(
     suspend fun crossRefs(book: String, chapter: Int): Map<String, List<CrossRef>> =
         packs.crossRefs(book, chapter) ?: cachedJson("xref/$book/$chapter", { "content/$it/xref/$book/$chapter.json" }) ?: emptyMap()
 
-    suspend fun timings(version: String, book: String, chapter: Int): AudioTimings? =
-        cachedJson("timing/$version/$book/$chapter", { "content/$it/$version/$book/$chapter.audio.json" })
+    suspend fun timings(version: String, book: String, chapter: Int): AudioTimings? {
+        val local = localTimings?.invoke(version, book, chapter)
+        if (local != null && local.isFile) runCatching { json.decodeFromString<AudioTimings>(local.readText()) }.getOrNull()?.let { return it }
+        return cachedJson("timing/$version/$book/$chapter", { "content/$it/$version/$book/$chapter.audio.json" })
+    }
 
     private suspend inline fun <reified T> cachedJson(key: String, path: (String) -> String): T? {
         val build = manifest.value?.build
