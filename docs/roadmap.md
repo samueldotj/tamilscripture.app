@@ -186,7 +186,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M3-3 Trigram fallback when fewer than 5 hits.
 - [x] M3-4 Match highlighting by token normalisation.
 - [ ] M3-5 Results grouped by book with counts; testament/book filters; multi-version search in parallel. Scope row done (whole Bible, testaments, books with counts on device; testaments online via `bmin`/`bmax`); multi-version search still to do.
-- [ ] M3-6 Autocomplete (book names, recent searches); common searches cached from Supabase.
+- [x] M3-6 Autocomplete (book names, recent searches); common searches from the website's `/api/common-searches` (once per session).
 - [x] M3-6a Online search through the website's `/api/search` for versions that are not downloaded, mapped to the same result model with an "online results" label.
 - [x] M3-7 `search` stats events; queries also feed `search_log` server-side.
 - [x] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.

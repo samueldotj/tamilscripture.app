@@ -36,6 +36,8 @@ data class Settings(
     val shareStats: Boolean = true,
     /** Second version shown verse by verse beside the first (A-3.3), or null. */
     val compare: String? = null,
+    /** Newest first, at most 8, kept on this device only (A-4.5, like the website's). */
+    val recentSearches: List<String> = emptyList(),
 )
 
 class SettingsRepository(private val context: Context) {
@@ -54,6 +56,7 @@ class SettingsRepository(private val context: Context) {
         val lastRead = stringPreferencesKey("lastRead")
         val shareStats = booleanPreferencesKey("shareStats")
         val compare = stringPreferencesKey("compare")
+        val recentSearches = stringPreferencesKey("recentSearches")
     }
 
     private fun read(p: Preferences): Settings {
@@ -73,6 +76,7 @@ class SettingsRepository(private val context: Context) {
             lastRead = p[K.lastRead]?.let(::parsePassage),
             shareStats = p[K.shareStats] ?: d.shareStats,
             compare = p[K.compare],
+            recentSearches = p[K.recentSearches]?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
         )
     }
 
@@ -96,8 +100,17 @@ class SettingsRepository(private val context: Context) {
             n.lastRead?.let { p[K.lastRead] = formatPassage(it) }
             p[K.shareStats] = n.shareStats
             if (n.compare != null) p[K.compare] = n.compare else p.remove(K.compare)
+            p[K.recentSearches] = n.recentSearches.joinToString("\n")
         }
     }
+
+    suspend fun addRecentSearch(text: String) {
+        val q = text.trim().replace(Regex("\\s+"), " ")
+        if (q.isEmpty() || q.length > 120) return
+        update { s -> s.copy(recentSearches = (listOf(q) + s.recentSearches.filter { !it.equals(q, ignoreCase = true) }).take(8)) }
+    }
+
+    suspend fun clearRecentSearches() = update { it.copy(recentSearches = emptyList()) }
 
     private fun formatPassage(p: Passage) = listOf(p.version, p.book, p.chapter, p.verse ?: 0).joinToString("/")
 

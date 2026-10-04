@@ -15,6 +15,22 @@ import java.io.IOException
  * tolerates misspellings, which the packs leave out to stay small (design §8.3).
  */
 class SearchRepository(private val http: Http, private val packs: PackRepository, private val json: Json) {
+    @Volatile private var common: Pair<String, List<String>>? = null
+
+    /**
+     * What people search for most (the website's common searches, A-4.5): a short list
+     * fetched once per app session and language; an empty list offline.
+     */
+    suspend fun commonSearches(lang: String): List<String> {
+        common?.takeIf { it.first == lang }?.let { return it.second }
+        return try {
+            val bytes = http.get(Origin.Api, "api/common-searches", mapOf("lang" to lang))
+            json.decodeFromString<List<String>>(bytes.decodeToString()).also { common = lang to it }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     /**
      * [shown] is the query the results are for (the Tamil reading when romanised input was
      * used); [romanOffer] is that reading, offered when the words as typed found results.

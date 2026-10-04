@@ -3,9 +3,12 @@ package com.tamilscripture.feature.search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,7 +31,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,19 +48,19 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tamilscripture.core.data.content.References
 import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.Pill
+import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsChip
+import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.Book
 import com.tamilscripture.core.model.Passage
-import com.tamilscripture.core.data.content.References
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import com.tamilscripture.core.model.SearchHit
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.model.VerseId
@@ -63,6 +69,7 @@ import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** தேடல் · Search across verses (design 1H). Dictionary and places arrive with their packs (M8). */
 @Composable
@@ -98,6 +105,15 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     val suggestions = remember(query, manifest) {
         if (ref != null || query.isBlank() || query.any { it.isDigit() }) emptyList() else References.suggest(query, manifest)
     }
+    val coroutines = rememberCoroutineScope()
+    // A-4.5: recent searches (this device only) and what people search for most.
+    val saveRecent: (String) -> Unit = { q -> coroutines.launch { graph.settings.addRecentSearch(q) } }
+    val common by produceState(emptyList<String>(), lang) { value = graph.search.commonSearches(if (lang == UiLang.Tamil) "ta" else "en") }
+    val recentMatches = remember(query, settings.recentSearches) {
+        val t = query.trim().lowercase()
+        if (t.isEmpty()) emptyList() else settings.recentSearches.filter { it.lowercase().contains(t) && it.lowercase() != t }.take(4)
+    }
+    val openHit: (Passage) -> Unit = { p -> saveRecent(query); onOpen(p) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focus.requestFocus() } }
 
@@ -137,7 +153,10 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                         cursorBrush = SolidColor(c.accent),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { ref?.let { r -> onOpen(Passage(settings.version, r.book.code, r.chapter, r.verse)) } }),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            if (query.isNotBlank()) saveRecent(query)
+                            ref?.let { r -> onOpen(Passage(settings.version, r.book.code, r.chapter, r.verse)) }
+                        }),
                         modifier = Modifier.fillMaxWidth().focusRequester(focus),
                     )
                 }
@@ -150,6 +169,20 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            if (query.isBlank()) {
+                if (settings.recentSearches.isNotEmpty()) item {
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Kicker(tr("சமீபத்திய தேடல்கள்", "Recent searches"), Modifier.weight(1f))
+                        TsPillButton(tr("அழி", "Clear"), { coroutines.launch { graph.settings.clearRecentSearches() } }, style = PillStyle.Ghost, height = 32.dp)
+                    }
+                    ChipFlow(settings.recentSearches) { query = it }
+                }
+                if (common.isNotEmpty()) item {
+                    Kicker(tr("அதிகம் தேடப்பட்டவை", "Common searches"), Modifier.padding(start = 20.dp, top = 16.dp))
+                    ChipFlow(common) { query = it }
+                }
+            }
+            if (recentMatches.isNotEmpty()) item { ChipFlow(recentMatches) { query = it } }
             if (suggestions.isNotEmpty()) {
                 item {
                     Row(
@@ -166,7 +199,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                 item {
                     Kicker(tr("வசனக் குறிப்பு", "Reference"), Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp))
                     Row(
-                        Modifier.fillMaxWidth().clickable { onOpen(Passage(settings.version, ref.book.code, ref.chapter, ref.verse)) }.padding(horizontal = 20.dp, vertical = 12.dp),
+                        Modifier.fillMaxWidth().clickable { openHit(Passage(settings.version, ref.book.code, ref.chapter, ref.verse)) }.padding(horizontal = 20.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(ref.book.label(lang, ref.chapter, ref.verse, ref.verseEnd), style = Ts.type.cardTitle, color = c.ink, modifier = Modifier.weight(1f))
@@ -222,7 +255,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                         val vid = VerseId.parse(h.verseId) ?: return@items
                         val book = manifest?.book(vid.book)
                         Column(
-                            Modifier.fillMaxWidth().clickable { onOpen(Passage(h.version, vid.book, vid.chapter, vid.verse)) }.padding(horizontal = 20.dp, vertical = 8.dp),
+                            Modifier.fillMaxWidth().clickable { openHit(Passage(h.version, vid.book, vid.chapter, vid.verse)) }.padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(book?.label(lang, vid.chapter, vid.verse) ?: h.verseId, style = Ts.type.labelSmall, color = c.accent)
@@ -265,5 +298,18 @@ private fun ScopeRow(scope: String?, perBook: List<Pair<Int, Int>>, books: List<
             val b = byOrder[order] ?: return@forEach
             TsChip("${b.name(lang)} · $n", scope == b.code, { onScope(b.code) }, contentPadding = pad)
         }
+    }
+}
+
+/** Searches to tap, wrapping onto as many lines as they need. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipFlow(items: List<String>, onPick: (String) -> Unit) {
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items.forEach { q -> TsChip(q, false, { onPick(q) }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp)) }
     }
 }
