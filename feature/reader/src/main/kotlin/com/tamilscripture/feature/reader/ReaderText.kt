@@ -9,14 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -24,10 +24,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,26 +35,27 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import com.tamilscripture.core.designsystem.component.HDivider
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.tamilscripture.core.designsystem.component.TsPillButton
+import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.PillStyle
+import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.CommentaryChapter
 import com.tamilscripture.core.model.CommentaryUnit
+import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
-import com.tamilscripture.core.model.UiLang
 import kotlinx.coroutines.delay
 
 /** A verse's text with its superscript number, in the design's 1B style. */
@@ -105,6 +106,9 @@ fun ReaderTextList(
     dualColumns: Boolean = false,
     /** Right-click menu and drag-out on large screens; null on touch-only layouts. */
     interactions: VerseInteractions? = null,
+    /** Languages of the text and, in dual view, of the second version (M2-12: TalkBack reads each in its own voice). */
+    textLocale: LocaleList? = null,
+    secondLocale: LocaleList? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -119,6 +123,7 @@ fun ReaderTextList(
                     DualRow(
                         item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
                         dualLabels, onTap = { onTapVerse(item.verse) }, modifier = extra,
+                        locales = textLocale to secondLocale,
                     )
                 }
                 is ReaderItem.Heading -> Text(
@@ -138,7 +143,7 @@ fun ReaderTextList(
                     val playing = item.verse == playingVerse
                     VerseInteractionBox(item.verse, interactions) { extra -> Text(
                         verseAnnotated(item, numberSize = 12, showNotes = showNotes),
-                        style = Ts.type.scripture(fontSize.sp, lineHeightEm),
+                        style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                         color = c.ink,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -228,15 +233,16 @@ private fun DualRow(
     labels: kotlin.Pair<String, String>?,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
+    locales: kotlin.Pair<LocaleList?, LocaleList?> = null to null,
 ) {
     val c = Ts.colors
     val missing = tr("இந்த மொழிபெயர்ப்பில் இந்த வசனம் இல்லை", "Not in this version")
     @Composable
-    fun Cell(v: ReaderItem.Verse?, size: Int, modifier: Modifier) {
+    fun Cell(v: ReaderItem.Verse?, size: Int, locale: LocaleList?, modifier: Modifier) {
         if (v == null) {
             Text("—", style = Ts.type.body, color = c.muted, modifier = modifier.semantics { contentDescription = missing })
         } else {
-            Text(v.text, style = Ts.type.scripture(size.sp, lineHeightEm), color = c.ink, modifier = modifier)
+            Text(v.text, style = Ts.type.scripture(size.sp, lineHeightEm).copy(localeList = locale), color = c.ink, modifier = modifier)
         }
     }
     val shape = RoundedCornerShape(14.dp)
@@ -253,8 +259,8 @@ private fun DualRow(
                 item.label, style = Ts.type.label, color = if (selected) c.amber else c.muted,
                 modifier = Modifier.width(22.dp).padding(top = 4.dp),
             )
-            Cell(item.a, fontSize, Modifier.weight(1f))
-            Cell(item.b, fontSize, Modifier.weight(1f))
+            Cell(item.a, fontSize, locales.first, Modifier.weight(1f))
+            Cell(item.b, fontSize, locales.second, Modifier.weight(1f))
         }
         HDivider()
     } else {
@@ -278,7 +284,7 @@ private fun DualRow(
                 if (i > 0) HDivider()
                 Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     if (label != null) Text(label, style = Ts.type.captionSmall, color = c.muted)
-                    Cell(v, if (i == 0) fontSize else (fontSize - 2).coerceAtLeast(14), Modifier.fillMaxWidth())
+                    Cell(v, if (i == 0) fontSize else (fontSize - 2).coerceAtLeast(14), if (i == 0) locales.first else locales.second, Modifier.fillMaxWidth())
                 }
             }
         }

@@ -10,15 +10,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,7 +29,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.designsystem.component.Avatar
@@ -219,15 +222,17 @@ private fun BigAction(icon: ImageVector, label: String, onClick: () -> Unit, mod
     val c = Ts.colors
     val shape = RoundedCornerShape(14.dp)
     Column(
-        modifier.height(64.dp).clip(shape).background(if (primary) c.accent else c.surface2).clickable(role = Role.Button, onClick = onClick),
+        // At large text sizes (M2-12) the button grows and its label wraps rather than clipping.
+        modifier.heightIn(min = 64.dp).clip(shape).background(if (primary) c.accent else c.surface2).clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
         val fg = if (primary) c.onAccent else c.ink
         Icon(icon, null, Modifier.size(if (primary) 16.dp else 20.dp), tint = fg)
         BasicText(
-            label, style = Ts.type.labelSmall.copy(color = fg), maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 12.sp),
+            label, style = Ts.type.labelSmall.copy(color = fg, textAlign = TextAlign.Center), maxLines = labelLines(label),
+            autoSize = TextAutoSize.StepBased(minFontSize = (8f / LocalDensity.current.fontScale).sp, maxFontSize = 12.sp),
             modifier = Modifier.padding(horizontal = 4.dp),
         )
     }
@@ -240,8 +245,8 @@ private fun SmallAction(label: String, onClick: () -> Unit, modifier: Modifier =
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
-            label, style = Ts.type.label.copy(color = Ts.colors.ink2), maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 13.sp),
+            label, style = Ts.type.label.copy(color = Ts.colors.ink2, textAlign = TextAlign.Center), maxLines = labelLines(label),
+            autoSize = TextAutoSize.StepBased(minFontSize = (8f / LocalDensity.current.fontScale).sp, maxFontSize = 13.sp),
         )
     }
 }
@@ -315,3 +320,9 @@ fun KeyHintStrip(hints: List<Hint>, trailing: Hint?) {
         }
     }
 }
+
+/**
+ * A label wraps only between words; a single word shrinks to fit instead of breaking, down
+ * to 8 sp on screen whatever the text-size setting (the minimum above is divided by it).
+ */
+private fun labelLines(label: String) = if (label.trim().contains(' ')) 2 else 1

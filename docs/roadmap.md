@@ -163,7 +163,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M2-9 Open in new window (multi-instance); per-window state. `ReaderWindowActivity` (Ctrl+N or the verse menu) opens as its own task next to the current window; verified in split screen on the Pixel 9.
 - [ ] M2-10 State survives rotation, fold, resize and window moves (tests for each).
 - [ ] M2-11 **[web]** `/.well-known/assetlinks.json`; App Links for chapter, verse and shorthand URLs.
-- [ ] M2-12 Accessibility pass: TalkBack verse labels, Tamil/English locale spans, 200% font scale, contrast on highlight colours, Accessibility Scanner clean.
+- [ ] M2-12 Accessibility pass: TalkBack verse labels, Tamil/English locale spans, 200% font scale, contrast on highlight colours, Accessibility Scanner clean. Started: scripture text carries its version's language (TalkBack reads Tamil in a Tamil voice, both columns in dual view); verse card labels wrap or shrink instead of clipping at 200% (screenshot test). Accessibility Scanner run still to do on a device.
 - [ ] M2-13 Screenshot tests at compact, medium, expanded, large; light/dark; Tamil/English.
 - [ ] M2-14 Device runs: Pixel Fold, Pixel Tablet, an ALOS/ChromeOS device with keyboard and mouse, a 2 GB Android 8 phone.
 

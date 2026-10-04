@@ -77,6 +77,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -582,6 +583,8 @@ private fun ChapterBody(
                 onTapVerse = vm::tapVerse, onVerseRead = vm::verseRead,
                 onOpenCommentary = { nav.commentary(state.passage) }, modifier = Modifier.weight(1f).fillMaxWidth(),
                 dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
+                textLocale = state.manifest?.version(state.passage.version)?.lang?.let(::LocaleList),
+                secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
             )
         }
     }
