@@ -23,6 +23,50 @@ sealed interface ReaderItem {
         val notes: List<Note>,
         val poetry: Boolean,
     ) : ReaderItem
+
+    /** Dual view (A-3.3): one verse in both versions; a null side lacks the verse (A-3.4). */
+    data class Dual(
+        override val key: String,
+        val verse: Int,
+        val label: String,
+        val a: Verse?,
+        val b: Verse?,
+    ) : ReaderItem
+}
+
+/** The verse an item shows, for scrolling, selection and read tracking. */
+val ReaderItem.verseNumber: Int?
+    get() = when (this) {
+        is ReaderItem.Verse -> verse
+        is ReaderItem.Dual -> verse
+        else -> null
+    }
+
+/**
+ * Aligns two versions' items verse by verse, as the website's DualChapter does: rows
+ * follow verse number, so a verse only one version has lands in place with a dash on
+ * the other side. Headings come from the first version.
+ */
+fun dualItems(a: List<ReaderItem>, b: List<ReaderItem>): List<ReaderItem> {
+    val second = b.filterIsInstance<ReaderItem.Verse>().associateBy { it.verse }
+    val first = a.filterIsInstance<ReaderItem.Verse>().associateBy { it.verse }
+    val headingsBefore = HashMap<Int, MutableList<ReaderItem>>()
+    var pending = mutableListOf<ReaderItem>()
+    for (item in a) {
+        when (item) {
+            is ReaderItem.Verse -> if (pending.isNotEmpty()) { headingsBefore[item.verse] = pending; pending = mutableListOf() }
+            is ReaderItem.Heading, is ReaderItem.Descriptive -> pending += item
+            else -> Unit
+        }
+    }
+    val out = ArrayList<ReaderItem>()
+    for (v in (first.keys + second.keys).sorted()) {
+        headingsBefore[v]?.let { out += it }
+        val x = first[v]
+        val y = second[v]
+        out += ReaderItem.Dual("p$v", v, x?.label ?: y?.label ?: v.toString(), x, y)
+    }
+    return out + pending
 }
 
 /** Flattens the chapter's blocks into headings and whole verses, joining poetry lines with line breaks. */

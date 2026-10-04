@@ -17,6 +17,14 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -113,7 +121,13 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
 
     val book = state.book
     val chapter = state.chapter
-    val items = remember(chapter, settings.headings) { chapter?.toItems(settings.headings).orEmpty() }
+    val second = state.second.takeIf { state.dual }
+    val items = remember(chapter, second, settings.headings) {
+        val a = chapter?.toItems(settings.headings).orEmpty()
+        if (second == null) a else dualItems(a, second.toItems(showHeadings = false))
+    }
+    val versionLabel = state.versionShort + (state.compareShort?.let { " + $it" } ?: "")
+    val dualLabels = if (state.dual) state.versionShort to (state.compareShort ?: "") else null
     val listState = rememberLazyListState()
     val hasAudio = services.audio.hasAudio(state.manifest, state.passage.version)
     val title = book?.label(lang, state.passage.chapter) ?: ""
@@ -124,13 +138,13 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
 
     LaunchedEffect(items, state.passage.verse) {
         val v = state.passage.verse ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it is ReaderItem.Verse && it.verse == v }
+        val i = items.indexOfFirst { it.verseNumber == v }
         if (i >= 0) listState.scrollToItem(i)
     }
     // Follow the verse being read while listening (A-6.4).
     LaunchedEffect(playingVerse) {
         val v = playingVerse ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it is ReaderItem.Verse && it.verse == v }
+        val i = items.indexOfFirst { it.verseNumber == v }
         if (i >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == i }) listState.animateScrollToItem(i)
     }
 
@@ -176,6 +190,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         Modifier
             .fillMaxSize()
             .background(c.bg)
+            // Landscape: keep text clear of a side navigation bar or cutout.
+            .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End))
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
@@ -190,7 +206,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     ) {
         if (wide) {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                WideTopBar(title, state.versionShort, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, nav.home)
+                WideTopBar(title, versionLabel, hasAudio, { nav.picker(state.passage) }, nav.search, { play() }, { showSettings = true }, nav.home)
                 Row(Modifier.weight(1f).fillMaxWidth()) {
                     WideRail(state, settings, items, vm, Modifier.width(200.dp).fillMaxSize())
                     VDivider()
@@ -203,12 +219,12 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                             ChapterBody(
                                 state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                 PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
-                                showInlineCommentary = false,
+                                showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true,
                             )
                         }
                         ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
                     }
-                    if (settings.commentary) {
+                    if (settings.commentary && !state.dual) {
                         VDivider()
                         CommentaryPane(state, settings, Modifier.weight(1f).fillMaxSize().background(c.pane))
                     }
@@ -228,7 +244,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             }
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                ReaderTopBar(title, state.versionShort, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true })
+                ReaderTopBar(title, versionLabel, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true })
                 if (settings.commentary && state.commentarySources.isNotEmpty()) {
                     CommentaryChipRow(
                         state.commentarySources, settings.commentarySource,
@@ -236,11 +252,14 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
                         { vm.updateSettings { it.copy(commentary = false) } },
                     )
                 }
-                Box(Modifier.weight(1f).fillMaxWidth().swipeChapters(vm::previousChapter, vm::nextChapter), contentAlignment = Alignment.TopCenter) {
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().swipeChapters(vm::previousChapter, vm::nextChapter), contentAlignment = Alignment.TopCenter) {
+                    // Medium windows show dual view as columns; phones stack the versions (A-3.3).
+                    val columns = maxWidth >= 600.dp
                     ChapterBody(
                         state, items, settings.fontSize, 1.8f, settings.footnotes, listState, playingVerse, sourceName,
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
-                        Modifier.widthIn(max = 720.dp).fillMaxSize(),
+                        Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
+                        showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns,
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -263,7 +282,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     }
 
     if (showSettings) {
-        StudySettingsSheet(settings, state.commentarySources, vm::updateSettings) { showSettings = false }
+        StudySettingsSheet(settings, state.commentarySources, vm::updateSettings, versionLabel, onVersions = { showSettings = false; showVersions = true }) { showSettings = false }
     }
     if (showCrossRefs) {
         val v = state.selection.firstOrNull()
@@ -274,7 +293,10 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         }) { showCrossRefs = false }
     }
     if (showVersions) {
-        VersionSheet(state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) }) { showVersions = false }
+        VersionSheet(
+            state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) },
+            compare = settings.compare, onCompare = { code -> showVersions = false; vm.setCompare(code) },
+        ) { showVersions = false }
     }
 }
 
@@ -319,6 +341,8 @@ private fun ChapterBody(
     nav: ReaderNav,
     modifier: Modifier,
     showInlineCommentary: Boolean = true,
+    dualLabels: kotlin.Pair<String, String>? = null,
+    dualColumns: Boolean = false,
 ) {
     val c = Ts.colors
     when {
@@ -333,6 +357,7 @@ private fun ChapterBody(
             listState = listState, chapterKey = state.passage.chapterKey(), contentPadding = padding,
             onTapVerse = vm::tapVerse, onVerseRead = vm::verseRead,
             onOpenCommentary = { nav.commentary(state.passage) }, modifier = modifier,
+            dualLabels = dualLabels, dualColumns = dualColumns,
         )
     }
 }
@@ -360,9 +385,9 @@ private fun WideRail(state: ReaderState, settings: Settings, items: List<ReaderI
         val firstSelected = state.selection.firstOrNull()
         sections.forEachIndexed { si, (index, text) ->
             val nextIndex = sections.getOrNull(si + 1)?.first ?: items.size
-            val verses = items.subList(index, nextIndex).filterIsInstance<ReaderItem.Verse>()
-            val range = verses.firstOrNull()?.let { f -> "${f.verse}–${verses.last().verse}" } ?: ""
-            val on = firstSelected != null && verses.any { it.verse == firstSelected }
+            val verses = items.subList(index, nextIndex).mapNotNull { it.verseNumber }
+            val range = verses.firstOrNull()?.let { f -> "$f–${verses.last()}" } ?: ""
+            val on = firstSelected != null && firstSelected in verses
             Text(
                 "$range $text",
                 style = Ts.type.caption.copy(fontSize = 13.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal),
@@ -370,7 +395,7 @@ private fun WideRail(state: ReaderState, settings: Settings, items: List<ReaderI
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
                     .background(if (on) c.surface else Color.Transparent)
-                    .clickable { verses.firstOrNull()?.let { vm.selectOnly(it.verse) } }
+                    .clickable { verses.firstOrNull()?.let(vm::selectOnly) }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             )
         }

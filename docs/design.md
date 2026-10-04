@@ -327,7 +327,9 @@ sequenceDiagram
 
 ### 6.5 Dual view
 
-- `VersificationMap` (shipped in every Bible pack as a table `versification(from_id, to_id)`) aligns verses of version B to version A.
+- **Now:** rows are aligned by verse number, exactly as the website's `DualChapter` does, so a verse only one version has lands in place with a dash on the other side. All current versions share the English versification, so this is exact for them.
+- **Later:** a `VersificationMap` (shipped in Bible packs as a table `versification(from_id, to_id)`) aligns verses of version B to version A, for versions whose numbering differs.
+- Dual view replaces the commentary pane and inline commentary, as on the website. The setting `compare` persists; a second version that cannot load (offline, not downloaded, or missing the book) falls back to the single view.
 - The reader builds a list of rows `(blockA?, blockB?)` per verse in Study-like layout. On medium+ windows a row is a two-column `Row` inside one `LazyColumn`, so both columns scroll together without synchronising two lists. On compact windows the row becomes two stacked items (A then B).
 - A missing verse produces an empty cell with a dash and an explanatory footnote [R-9.4].
 

@@ -34,6 +34,8 @@ data class Settings(
     val commentarySource: String = "henry",
     val lastRead: Passage? = null,
     val shareStats: Boolean = true,
+    /** Second version shown verse by verse beside the first (A-3.3), or null. */
+    val compare: String? = null,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -51,6 +53,7 @@ class SettingsRepository(private val context: Context) {
         val commentarySource = stringPreferencesKey("commentarySource")
         val lastRead = stringPreferencesKey("lastRead")
         val shareStats = booleanPreferencesKey("shareStats")
+        val compare = stringPreferencesKey("compare")
     }
 
     private fun read(p: Preferences): Settings {
@@ -69,6 +72,7 @@ class SettingsRepository(private val context: Context) {
             commentarySource = p[K.commentarySource] ?: d.commentarySource,
             lastRead = p[K.lastRead]?.let(::parsePassage),
             shareStats = p[K.shareStats] ?: d.shareStats,
+            compare = p[K.compare],
         )
     }
 
@@ -91,6 +95,7 @@ class SettingsRepository(private val context: Context) {
             p[K.commentarySource] = n.commentarySource
             n.lastRead?.let { p[K.lastRead] = formatPassage(it) }
             p[K.shareStats] = n.shareStats
+            if (n.compare != null) p[K.compare] = n.compare else p.remove(K.compare)
         }
     }
 

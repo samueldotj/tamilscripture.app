@@ -76,6 +76,8 @@ fun StudySettingsSheet(
     settings: Settings,
     sources: List<CommentarySource>,
     onChange: ((Settings) -> Settings) -> Unit,
+    versionLabel: String,
+    onVersions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val c = Ts.colors
@@ -85,6 +87,12 @@ fun StudySettingsSheet(
                 Text(tr("ஆய்வு அமைப்பு", "Study settings"), style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.weight(1f))
                 Text("Study Bible", style = Ts.type.caption, color = c.muted)
             }
+            HDivider()
+            TsListRow(
+                tr("மொழிபெயர்ப்பு", "Translation"), subtitle = tr("ஒப்பிட இரண்டாவது மொழிபெயர்ப்பு", "And a second one to compare"),
+                onClick = onVersions,
+                trailing = { Text("$versionLabel ›", style = Ts.type.label, color = c.accent) },
+            )
             HDivider()
             TsListRow(
                 tr("தலைப்புகள்", "Section headings"), subtitle = tr("பகுதித் தலைப்புகள்", "Headings between passages"),
@@ -200,19 +208,43 @@ fun CrossRefsSheet(
 
 /** Version chooser for the "IRV ▾" control. */
 @Composable
-fun VersionSheet(versions: List<BibleVersion>, current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+fun VersionSheet(
+    versions: List<BibleVersion>,
+    current: String,
+    onPick: (String) -> Unit,
+    /** The reader passes these to offer "Compare with" (M3-11); the book picker does not. */
+    compare: String? = null,
+    onCompare: ((String?) -> Unit)? = null,
+    onDismiss: () -> Unit,
+) {
     val c = Ts.colors
     val lang = LocalUiLang.current
+    val sorted = versions.sortedBy { it.order }
     TsSheet(onDismiss) {
-        Text(tr("மொழிபெயர்ப்பு", "Translation"), style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
-        versions.sortedBy { it.order }.forEach { v ->
-            HDivider()
-            TsListRow(
-                v.short + " · " + (if (lang == UiLang.Tamil) v.nameNative ?: v.name else v.name),
-                subtitle = v.licence,
-                onClick = { onPick(v.code) },
-                titleColor = if (v.code == current) c.accent else c.ink,
-            )
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Text(tr("மொழிபெயர்ப்பு", "Translation"), style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(start = 22.dp, bottom = 12.dp))
+            sorted.forEach { v ->
+                HDivider()
+                TsListRow(
+                    v.short + " · " + (if (lang == UiLang.Tamil) v.nameNative ?: v.name else v.name),
+                    subtitle = v.licence,
+                    onClick = { onPick(v.code) },
+                    titleColor = if (v.code == current) c.accent else c.ink,
+                )
+            }
+            if (onCompare != null) {
+                HDivider()
+                Column(Modifier.fillMaxWidth().background(c.surface2).padding(top = 14.dp, bottom = 18.dp)) {
+                    Kicker(tr("ஒப்பிடு", "Compare with"), Modifier.padding(start = 22.dp, bottom = 10.dp))
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 22.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        TsChip(tr("இல்லை", "Off"), compare == null || compare == current, { onCompare(null) })
+                        sorted.filter { it.code != current }.forEach { v -> TsChip(v.short, v.code == compare, { onCompare(v.code) }) }
+                    }
+                }
+            }
         }
     }
 }

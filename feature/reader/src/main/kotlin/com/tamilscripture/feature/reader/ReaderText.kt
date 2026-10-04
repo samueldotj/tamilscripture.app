@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -31,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import com.tamilscripture.core.designsystem.component.HDivider
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -95,13 +100,23 @@ fun ReaderTextList(
     onOpenCommentary: () -> Unit,
     modifier: Modifier = Modifier,
     sectionHeadingSize: Int = 15,
+    /** Dual view: version names over the columns; columns side by side when [dualColumns]. */
+    dualLabels: kotlin.Pair<String, String>? = null,
+    dualColumns: Boolean = false,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
     val unitsAfter = remember(commentary, items) { commentaryPlacement(items, commentary) }
     LazyColumn(modifier, state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (dualLabels != null && dualColumns) {
+            stickyHeader(key = "dual-head") { DualHeader(dualLabels) }
+        }
         items(items, key = { it.key }) { item ->
             when (item) {
+                is ReaderItem.Dual -> DualRow(
+                    item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
+                    dualLabels, onTap = { onTapVerse(item.verse) },
+                )
                 is ReaderItem.Heading -> Text(
                     item.text,
                     style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scripture),
@@ -155,6 +170,7 @@ fun ReaderTextList(
     val readNow by rememberUpdatedState(onVerseRead)
     val visibleSince = remember(chapterKey) { mutableStateMapOf<Int, Long>() }
     val reported = remember(chapterKey) { HashSet<Int>() }
+    val byKey = remember(items) { items.associateBy { it.key } }
     LaunchedEffect(chapterKey, items) {
         while (true) {
             delay(250)
@@ -164,15 +180,99 @@ fun ReaderTextList(
             val now = System.currentTimeMillis()
             val seen = HashSet<Int>()
             for (vi in info.visibleItemsInfo) {
-                val item = items.getOrNull(vi.index) as? ReaderItem.Verse ?: continue
+                val verse = byKey[vi.key]?.verseNumber ?: continue
                 val visible = (minOf(bottom, vi.offset + vi.size) - maxOf(top, vi.offset)).coerceAtLeast(0)
                 if (vi.size > 0 && visible.toFloat() / vi.size >= 0.6f) {
-                    seen += item.verse
-                    val since = visibleSince.getOrPut(item.verse) { now }
-                    if (now - since >= 2_000 && reported.add(item.verse)) readNow(item.verse, now - since)
+                    seen += verse
+                    val since = visibleSince.getOrPut(verse) { now }
+                    if (now - since >= 2_000 && reported.add(verse)) readNow(verse, now - since)
                 }
             }
             visibleSince.keys.retainAll(seen)
+        }
+    }
+}
+
+/** Version names over the two columns (website 3B). */
+@Composable
+private fun DualHeader(labels: kotlin.Pair<String, String>) {
+    val c = Ts.colors
+    Row(Modifier.fillMaxWidth().background(c.bg).padding(start = 56.dp, end = 10.dp, top = 6.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        listOf(labels.first, labels.second).forEach { l ->
+            Column(Modifier.weight(1f)) {
+                Text(l, style = Ts.type.labelSmall, color = c.ink)
+                Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(2.dp).background(c.ink))
+            }
+        }
+    }
+}
+
+/**
+ * One verse in both versions (A-3.3). Columns: the number in a gutter, then the two
+ * texts. Compact: a card with the number on top and the versions stacked. A version
+ * without the verse shows a dash (A-3.4). Tapping anywhere selects the verse in both.
+ */
+@Composable
+private fun DualRow(
+    item: ReaderItem.Dual,
+    selected: Boolean,
+    playing: Boolean,
+    fontSize: Int,
+    lineHeightEm: Float,
+    columns: Boolean,
+    labels: kotlin.Pair<String, String>?,
+    onTap: () -> Unit,
+) {
+    val c = Ts.colors
+    val missing = tr("இந்த மொழிபெயர்ப்பில் இந்த வசனம் இல்லை", "Not in this version")
+    @Composable
+    fun Cell(v: ReaderItem.Verse?, size: Int, modifier: Modifier) {
+        if (v == null) {
+            Text("—", style = Ts.type.body, color = c.muted, modifier = modifier.semantics { contentDescription = missing })
+        } else {
+            Text(v.text, style = Ts.type.scripture(size.sp, lineHeightEm), color = c.ink, modifier = modifier)
+        }
+    }
+    val shape = RoundedCornerShape(14.dp)
+    if (columns) {
+        Row(
+            Modifier.fillMaxWidth().clip(shape)
+                .background(if (selected) c.verseSelected else if (playing) c.accentWash else Color.Transparent)
+                .clickable(onClick = onTap)
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            Text(
+                item.label, style = Ts.type.label, color = if (selected) c.amber else c.muted,
+                modifier = Modifier.width(22.dp).padding(top = 4.dp),
+            )
+            Cell(item.a, fontSize, Modifier.weight(1f))
+            Cell(item.b, fontSize, Modifier.weight(1f))
+        }
+        HDivider()
+    } else {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(shape)
+                .background(c.surface)
+                .border(1.5.dp, if (selected) c.accent else if (playing) c.accentSoft else c.line, shape)
+                .clickable(onClick = onTap),
+        ) {
+            Row(
+                Modifier.fillMaxWidth().background(c.surface2).padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.size(26.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+                    Text(item.label, style = Ts.type.labelSmall, color = c.onAccent, maxLines = 1)
+                }
+                Text("${tr("வசனம்", "Verse")} ${item.label}", style = Ts.type.kicker, color = c.muted)
+            }
+            listOf(item.a to labels?.first, item.b to labels?.second).forEachIndexed { i, (v, label) ->
+                if (i > 0) HDivider()
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    if (label != null) Text(label, style = Ts.type.captionSmall, color = c.muted)
+                    Cell(v, if (i == 0) fontSize else (fontSize - 2).coerceAtLeast(14), Modifier.fillMaxWidth())
+                }
+            }
         }
     }
 }

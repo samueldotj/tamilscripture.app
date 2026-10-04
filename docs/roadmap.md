@@ -191,8 +191,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M3-7 `search` stats events; queries also feed `search_log` server-side.
 - [x] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.
 - [x] M3-9 Study Bible format: one verse per item, inline cross-references.
-- [ ] M3-10 Dual view: versification alignment, two-column rows (medium+), interleaved (compact), shared selection, missing-verse cells.
-- [ ] M3-11 Version switcher and "compare with" control.
+- [x] M3-10 Dual view: alignment by verse number (as the website), two-column rows with a pinned version header (600 dp+), stacked cards (compact), shared selection, missing-verse cells. A versification table is still to come (design §6.5).
+- [x] M3-11 Version switcher and "compare with" control (study settings → Translation, or V on a keyboard).
 - [ ] M3-12 Search benchmark in `:benchmark` (Tamil and English queries from the website's search log).
 
 ### Exit criteria

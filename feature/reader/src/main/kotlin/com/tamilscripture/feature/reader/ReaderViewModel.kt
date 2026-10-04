@@ -34,9 +34,15 @@ data class ReaderState(
     val commentarySources: List<CommentarySource> = emptyList(),
     val commentary: CommentaryChapter? = null,
     val commentaryLoading: Boolean = false,
+    /** Dual view (A-3.3): the second version's code and its copy of the chapter. */
+    val compare: String? = null,
+    val second: Chapter? = null,
 ) {
     val book: Book? get() = manifest?.book(passage.book)
     val versionShort: String get() = manifest?.version(passage.version)?.short ?: passage.version
+    val compareShort: String? get() = compare?.let { manifest?.version(it)?.short ?: it }
+    /** Dual view shows once the second version's chapter is here. */
+    val dual: Boolean get() = compare != null && second != null
 }
 
 /** Holds one chapter at a time; chapter changes replace the content in place (A-2.4). */
@@ -48,6 +54,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
 
     private var loadJob: Job? = null
     private var commentaryJob: Job? = null
+    private var secondJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -57,7 +64,12 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
         viewModelScope.launch {
             var lastSource: String? = null
             var lastOn: Boolean? = null
+            var lastCompare: String? = null
             settings.collect { s ->
+                if (s.compare != lastCompare) {
+                    lastCompare = s.compare
+                    loadSecond(state.value.passage)
+                }
                 if (s.commentary != lastOn || s.commentarySource != lastSource) {
                     lastOn = s.commentary
                     lastSource = s.commentarySource
@@ -88,7 +100,8 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
                 .catch { mutable.update { s -> s.copy(loading = false, error = true) } }
                 .collect { loaded ->
                     mutable.update { s -> s.copy(chapter = loaded.value, source = loaded.source, loading = false, error = false) }
-                    graph.stats.record("view", version = p.version, book = p.book, chapter = p.chapter, source = loaded.source.name.lowercase())
+                    graph.stats.record("view", version = p.version, book = p.book, chapter = p.chapter, source = loaded.source.name.lowercase(),
+                        action = settings.value.compare?.takeIf { it != p.version }?.let { "dual:$it" })
                 }
             graph.settings.update { it.copy(lastRead = p.copy(verse = p.verse ?: state.value.selection.firstOrNull()), version = p.version) }
             neighbours(p)
@@ -96,7 +109,23 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
             mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(crossRefs = refs) else s }
         }
         loadCommentary()
+        loadSecond(p)
     }
+
+    private fun loadSecond(p: Passage) {
+        secondJob?.cancel()
+        val code = settings.value.compare?.takeIf { it != p.version }
+        mutable.update { it.copy(compare = code, second = it.second?.takeIf { c -> c.version == code && c.book == p.book && c.chapter == p.chapter }) }
+        if (code == null) return
+        secondJob = viewModelScope.launch {
+            graph.content.chapter(code, p.book, p.chapter)
+                // A version without this book (or offline and not downloaded) leaves the single view.
+                .catch { mutable.update { s -> s.copy(second = null) } }
+                .collect { loaded -> mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(second = loaded.value) else s } }
+        }
+    }
+
+    fun setCompare(code: String?) = updateSettings { it.copy(compare = code) }
 
     private fun neighbours(p: Passage) {
         val c = state.value.chapter ?: return
