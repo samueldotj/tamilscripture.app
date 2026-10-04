@@ -10,6 +10,8 @@ import com.tamilscripture.core.model.CommentaryChapter
 import com.tamilscripture.core.model.CommentarySource
 import com.tamilscripture.core.model.ContentManifest
 import com.tamilscripture.core.model.CrossRef
+import com.tamilscripture.core.model.HighlightColor
+import com.tamilscripture.core.model.UserNote
 import com.tamilscripture.core.model.Passage
 import com.tamilscripture.core.services.AppServices
 import kotlinx.coroutines.Job
@@ -56,6 +58,8 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
     private val mutable = MutableStateFlow(ReaderState(initial))
     val state: StateFlow<ReaderState> = mutable
     val settings: StateFlow<Settings> = graph.settings.settings.stateIn(viewModelScope, SharingStarted.Eagerly, Settings())
+    /** Highlights, notes, bookmarks (M6). */
+    val userData = graph.userData.data
 
     private var loadJob: Job? = null
     private var commentaryJob: Job? = null
@@ -111,6 +115,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
                         action = settings.value.compare?.takeIf { comparing && it != p.version }?.let { "dual:$it" })
                 }
             graph.settings.update { it.copy(lastRead = p.copy(verse = p.verse ?: state.value.selection.firstOrNull()), version = p.version) }
+            graph.userData.recordVisit(p.book, p.chapter, p.version, p.verse)
             neighbours(p)
             val refs = graph.content.crossRefs(p.book, p.chapter)
             mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(crossRefs = refs) else s }
@@ -266,6 +271,46 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
         val p = state.value.passage
         graph.stats.record("read", verse = "${p.book}.${p.chapter}.$verse", version = p.version, amount = dwellMs,
             source = state.value.source?.name?.lowercase())
+    }
+
+    /** Highlights the selected verses in [color], or removes their highlight when null. */
+    fun highlight(color: HighlightColor?) {
+        val s = state.value
+        val sel = s.selection.ifEmpty { return }
+        viewModelScope.launch {
+            if (color == null) graph.userData.removeHighlight(s.passage.book, s.passage.chapter, sel)
+            else graph.userData.setHighlight(s.passage.book, s.passage.chapter, sel, color)
+        }
+        recordVerseAction(if (color == null) "unhighlight" else "highlight")
+    }
+
+    /** Bookmarks the first selected verse, or removes its bookmark; returns whether it is now bookmarked. */
+    fun toggleBookmark(): Boolean {
+        val s = state.value
+        val v = s.selection.firstOrNull() ?: return false
+        val was = userData.value.bookmarks.any { it.book == s.passage.book && it.chapter == s.passage.chapter && it.verse == v }
+        viewModelScope.launch { graph.userData.toggleBookmark(s.passage.book, s.passage.chapter, v, s.passage.version) }
+        recordVerseAction("bookmark")
+        return !was
+    }
+
+    /** The note to open for the selection: the one on exactly these verses, if any. */
+    fun noteForSelection(): UserNote? {
+        val s = state.value
+        val sel = s.selection.ifEmpty { return null }
+        return userData.value.notes.firstOrNull { it.book == s.passage.book && it.chapter == s.passage.chapter && it.verseStart == sel.first() && it.verseEnd == sel.last() }
+    }
+
+    fun saveNote(note: UserNote?, body: String) {
+        val s = state.value
+        val start = note?.verseStart ?: s.selection.firstOrNull() ?: return
+        val end = note?.verseEnd ?: s.selection.lastOrNull() ?: return
+        viewModelScope.launch { graph.userData.saveNote(note?.id, note?.book ?: s.passage.book, note?.chapter ?: s.passage.chapter, start, end, body) }
+        if (note == null) recordVerseAction("note")
+    }
+
+    fun deleteNote(note: UserNote) {
+        viewModelScope.launch { graph.userData.deleteNote(note.id) }
     }
 
     fun updateSettings(transform: (Settings) -> Settings) {

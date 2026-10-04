@@ -45,6 +45,13 @@
                 <data android:host="www.tamilscripture.com" />
                 <data android:host="tamilscripture.com" />
             </intent-filter>
+            <!-- M6: the website's sign-in callback hands the code back here (tamilscripture://auth). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tamilscripture" android:host="auth" />
+            </intent-filter>
         </activity>
 
         <!-- FF-9: extra windows on a passage, each its own task (see ReaderWindowActivity). -->

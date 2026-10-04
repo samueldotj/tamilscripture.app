@@ -256,21 +256,21 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 ### Tasks
 - [ ] M6-1 **[web]** Migrations: `bookmarks`, `deleted_rows` with triggers, `updated_at` triggers verified; pgTAP RLS tests.
-- [ ] M6-2 **[web]** `/auth/app-callback` route for magic links.
+- [x] M6-2 **[web]** App sign-in callback: the website's `/auth/callback?app=1` hands the PKCE code to `tamilscripture://auth` (website PR #7), for magic links and Google alike.
 - [ ] M6-2a Google Cloud: Android OAuth client in the website's existing project (package name, SHA-1 of the Play app-signing and debug keys); confirm Supabase automatic identity linking by verified email ([design §13.1](design.md#131-sign-in)).
 - [ ] M6-2b **[web]** Bookmarks on the website: verse-action-bar action and `/me/bookmarks`; bookmarks in `export_my_data()`.
 - [ ] M6-2c **[web]** Website refetches personal data on tab focus and every 60 s while visible; "Continue reading" uses the account's latest history when signed in; "Open in app" banner on Android ([design §13.5](design.md#135-app-and-website-parity)).
-- [ ] M6-3 Google sign-in via Credential Manager + `signInWithIdToken`; email magic link via App Link.
-- [ ] M6-4 Room tables for highlights, notes, bookmarks, history, plan progress, sync cursors.
-- [ ] M6-5 Highlights: whole-verse and word-range, four colours, change/remove; highlights list by colour and book.
-- [ ] M6-6 Notes: editor with autosave, markers, margin notes on wide windows, notes list with search.
-- [ ] M6-7 Bookmarks and history screens; pause and clear history.
-- [ ] M6-8 `UserDataSyncWorker`: push dirty, pull by cursor, apply deletes, full re-pull on stale cursor ([design §13.3](design.md#133-sync-protocol)).
+- [x] M6-3 Sign-in in the browser with PKCE (email link or Google, the website's own providers), code exchanged in the app; no Android OAuth client needed. Credential Manager can follow once M6-2a exists.
+- [x] M6-4 Local store for highlights, notes, bookmarks, history with dirty/deleted sets (one JSON file, `UserDataRepository`; small enough that Room is not needed). Plan progress still in plans.
+- [~] M6-5 Highlights: whole-verse, four colours, change/remove (splitting rows like the website); list by colour. Word-range highlights from the website show as whole verses; making them in the app is open.
+- [~] M6-6 Notes: editor sheet, notes under their verse, notes list with search. Autosave and margin notes on wide windows are open.
+- [x] M6-7 Bookmarks (device only until M6-1) and history screens; pause and clear history.
+- [~] M6-8 `SyncWorker`: push dirty rows (upsert), deletes, visits via `record_visit`, then a full pull per table (soon after a change, on sign-in, every 12 h). Pull by cursor waits for `deleted_rows` (M6-1).
 - [ ] M6-9 Settings sync through `profiles.settings` with the website's keys; per-device overrides kept local.
 - [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.
-- [ ] M6-9b Sign-out wipes the account's local data; account deletion from the website detected on next sync and wiped locally.
+- [x] M6-9b Sign-out sends what is pending, then wipes the account's local data; a dead session (refresh refused) signs the app out.
 - [ ] M6-9c "Open on website" action for the current passage.
-- [ ] M6-10 Export my data (share JSON) and delete account.
+- [x] M6-10 Export my data (`export_my_data`, saved as a JSON file) and delete account (`delete_my_account`).
 - [ ] M6-11 Sync tests: two devices + website, offline edits for 7 days, conflicting edits, deletes, clear history, both sign-in orders reaching one account, export from either side.
 
 ### Exit criteria

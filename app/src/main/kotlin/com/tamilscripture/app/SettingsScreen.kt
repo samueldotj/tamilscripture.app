@@ -51,7 +51,7 @@ import kotlinx.coroutines.launch
 
 /** Profile / settings / about: language, appearance, stats, cache, licences (A-1.4, ST-8, DL-7). */
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit, onAccount: () -> Unit, onMine: () -> Unit) {
     val services = LocalAppServices.current
     val graph = services.graph
     val c = Ts.colors
@@ -62,6 +62,7 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
     val manifest by graph.content.manifest.collectAsStateWithLifecycle()
     val cacheBytes by produceState(0L) { value = graph.onlineCache.sizeBytes() }
     val pending by produceState(0) { value = graph.stats.pendingCount() }
+    val session by graph.account.session.collectAsStateWithLifecycle()
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -74,6 +75,20 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
+                TsListRow(
+                    tr("கணக்கு", "Account"),
+                    subtitle = session?.email ?: tr("உள்நுழைந்து இணையதளத்துடன் ஒத்திசையுங்கள்", "Sign in to sync with the website"),
+                    onClick = onAccount,
+                    trailing = { androidx.compose.material3.Icon(TsIcons.ChevronRight, null, tint = c.muted) },
+                )
+                HDivider()
+                TsListRow(
+                    tr("என் முனைப்புகள், குறிப்புகள், குறிகள்", "My highlights, notes, bookmarks"),
+                    subtitle = tr("வாசிப்பு வரலாறும்", "And reading history"),
+                    onClick = onMine,
+                    trailing = { androidx.compose.material3.Icon(TsIcons.ChevronRight, null, tint = c.muted) },
+                )
+                HDivider()
                 TsListRow(tr("மொழி", "Language"), trailing = {
                     TsSegmented(listOf("தமிழ்", "English"), if (lang == UiLang.Tamil) 0 else 1,
                         { i -> scope.launch { graph.settings.update { it.copy(uiLang = if (i == 0) UiLang.Tamil else UiLang.English) } } },

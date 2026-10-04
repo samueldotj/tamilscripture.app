@@ -1,6 +1,8 @@
 package com.tamilscripture.core.data
 
 import android.content.Context
+import com.tamilscripture.core.data.account.AccountRepository
+import com.tamilscripture.core.data.account.Supabase
 import com.tamilscripture.core.data.audio.AudioStore
 import com.tamilscripture.core.data.cache.OnlineCache
 import com.tamilscripture.core.data.content.CommentaryRepository
@@ -14,6 +16,7 @@ import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.data.plans.PlanRepository
 import com.tamilscripture.core.data.settings.SettingsRepository
 import com.tamilscripture.core.data.stats.StatsRecorder
+import com.tamilscripture.core.data.user.UserDataRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +48,9 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val settings = SettingsRepository(context)
     val plans = PlanRepository(context, http)
     val stats = StatsRecorder(File(context.filesDir, "stats"), appScope, json)
+    val supabase = Supabase()
+    val account = AccountRepository(File(context.filesDir, "account"), supabase, json)
+    val userData = UserDataRepository(File(context.filesDir, "user"), supabase, account, json)
 }
 
 /** Implemented by the Application so WorkManager workers reach the single graph. */

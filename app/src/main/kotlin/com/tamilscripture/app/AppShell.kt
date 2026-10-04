@@ -178,7 +178,10 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                         })
                     }
                     entry<SettingsRoute> {
-                        SettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onDownloads = { backStack.add(DownloadsRoute) })
+                        SettingsScreen(
+                            onBack = { backStack.removeAt(backStack.lastIndex) }, onDownloads = { backStack.add(DownloadsRoute) },
+                            onAccount = { backStack.add(AccountRoute) }, onMine = { backStack.add(MineRoute()) },
+                        )
                     }
                     entry<StrongsRoute> { r -> StrongsScreen(r.number, studyLinks) }
                     entry<PersonRoute> { r -> PersonScreen(r.id, studyLinks) }
@@ -188,6 +191,8 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
                     entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks) }
                     entry<PresentRoute> { r -> PresentScreen(r.passage, onExit = { backStack.removeAt(backStack.lastIndex) }) }
+                    entry<AccountRoute> { AccountScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onMine = { backStack.add(MineRoute()) }) }
+                    entry<MineRoute> { r -> MineScreen(r.tab, onBack = { backStack.removeAt(backStack.lastIndex) }, onRead = ::read) }
                     entry<DownloadsRoute> { DownloadsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }
                 },
             )

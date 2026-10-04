@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
 import android.view.Menu
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -73,6 +74,13 @@ open class MainActivity : ComponentActivity() {
             val ready = manifest != null
             LaunchedEffect(pendingUri, ready) {
                 val uri = pendingUri
+                // A sign-in coming back (M6): the code is exchanged here, then the account opens.
+                if (uri != null && isSignIn(uri)) {
+                    pendingUri = null
+                    pendingId?.let { links.edit().putString("handled", it).apply() }
+                    finishSignIn(uri)
+                    return@LaunchedEffect
+                }
                 val m = manifest
                 if (uri != null && m != null) {
                     val link = parseDeepLink(uri, m, settings.version)
@@ -129,6 +137,23 @@ open class MainActivity : ComponentActivity() {
                 k(t("காட்சிப்படுத்து", "Present"), KeyEvent.KEYCODE_P),
             ),
         )
+    }
+
+    private fun isSignIn(uri: Uri) =
+        (uri.scheme == "tamilscripture" && uri.host == "auth") ||
+            (uri.path?.trimEnd('/') == "/auth/callback" && uri.getQueryParameter("app") == "1")
+
+    private suspend fun finishSignIn(uri: Uri) {
+        val graph = (application as TsApplication).services.graph
+        val tamil = uiLang == UiLang.Tamil
+        val code = uri.getQueryParameter("code")
+        val ok = code != null && runCatching { graph.account.exchange(code) }.isSuccess
+        Toast.makeText(
+            this,
+            if (ok) (if (tamil) "உள்நுழைந்தீர்கள்" else "Signed in") else (if (tamil) "உள்நுழைய முடியவில்லை. மீண்டும் முயலுங்கள்." else "Could not sign in. Please try again."),
+            Toast.LENGTH_LONG,
+        ).show()
+        pendingLink = AccountRoute
     }
 
     override fun onNewIntent(intent: Intent) {

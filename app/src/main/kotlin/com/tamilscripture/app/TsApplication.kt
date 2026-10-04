@@ -12,8 +12,11 @@ import com.tamilscripture.core.data.GraphHost
 import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.data.stats.StatsContext
 import com.tamilscripture.core.data.stats.StatsRecorder
+import com.tamilscripture.core.data.user.SyncWorker
 import com.tamilscripture.core.media.AudioController
 import com.tamilscripture.core.services.AppServices
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 class TsApplication : Application(), GraphHost {
@@ -40,6 +43,23 @@ class TsApplication : Application(), GraphHost {
                 graph.stats.enabled = s.shareStats
                 if (!s.shareStats) graph.stats.clear()
                 graph.stats.context = graph.stats.context.copy(lang = s.uiLang.code, theme = s.appearance.name.lowercase())
+            }
+        }
+
+        // M6-6: the account follows the device's changes; signed out, nothing is sent.
+        graph.appScope.launch {
+            graph.account.session.distinctUntilChangedBy { it?.userId }.collect { s ->
+                if (s != null) {
+                    SyncWorker.schedule(this@TsApplication)
+                    SyncWorker.syncSoon(this@TsApplication, delaySeconds = 0)
+                } else SyncWorker.cancel(this@TsApplication)
+            }
+        }
+        graph.appScope.launch {
+            graph.userData.data.drop(1).collect { d ->
+                val pending = d.dirtyHighlights.isNotEmpty() || d.dirtyNotes.isNotEmpty() || d.deletedHighlights.isNotEmpty() ||
+                    d.deletedNotes.isNotEmpty() || d.pendingVisits.isNotEmpty() || d.clearHistory
+                if (pending && graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication)
             }
         }
 

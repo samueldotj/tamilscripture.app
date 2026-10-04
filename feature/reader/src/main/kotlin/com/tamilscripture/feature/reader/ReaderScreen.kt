@@ -139,8 +139,10 @@ private class VerseActions(
     val onCrossRefs: () -> Unit,
     val onCopy: () -> Unit,
     val onShare: () -> Unit,
-    /** Bookmark, note and highlight arrive with sign-in (roadmap M6). */
-    val onSignInFeature: () -> Unit,
+    /** The reader's own marks (M6): kept on the device, and in the account when signed in. */
+    val onBookmark: () -> Unit,
+    val onNote: () -> Unit,
+    val onHighlight: () -> Unit,
     val onShareImage: () -> Unit,
     val onOriginal: () -> Unit,
     val onPeople: () -> Unit,
@@ -164,6 +166,11 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     var showVersions by rememberSaveable { mutableStateOf(false) }
     var showOriginal by rememberSaveable { mutableStateOf(false) }
     var showPeople by rememberSaveable { mutableStateOf(false) }
+    var showHighlight by rememberSaveable { mutableStateOf(false) }
+    /** The note open in the editor: its id, [NEW_NOTE], or null. */
+    var editingNote by rememberSaveable { mutableStateOf<String?>(null) }
+    val userData by vm.userData.collectAsStateWithLifecycle()
+    val marks = remember(userData, state.passage.book, state.passage.chapter) { userData.marksFor(state.passage.book, state.passage.chapter) }
     // Wide windows (M2-2, M8-4): one study pane beside the text, in tabs, sized by a divider.
     var paneTab by rememberSaveable { mutableStateOf<String?>(null) }
     var paneShare by rememberSaveable { mutableFloatStateOf(0.42f) }
@@ -239,9 +246,12 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             vm.recordVerseAction("share")
             shareVerses(context, selectedRef, state.selection.map { chapter?.verseText(it).orEmpty() }, shareUrl(state.passage, book, state.selection))
         },
-        onSignInFeature = {
-            Toast.makeText(context, if (lang == UiLang.Tamil) "உள்நுழைவுடன் விரைவில் வருகிறது" else "Coming with sign-in", Toast.LENGTH_SHORT).show()
+        onBookmark = {
+            val on = vm.toggleBookmark()
+            Toast.makeText(context, if (on) tr2(lang, "குறிக்கப்பட்டது", "Bookmarked") else tr2(lang, "குறி நீக்கப்பட்டது", "Bookmark removed"), Toast.LENGTH_SHORT).show()
         },
+        onNote = { editingNote = vm.noteForSelection()?.id ?: NEW_NOTE },
+        onHighlight = { showHighlight = true },
         onShareImage = {
             vm.recordVerseAction("share-image")
             val ref = selectedRef ?: ""
@@ -343,6 +353,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id },
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -401,6 +412,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
+                        marks = marks, onOpenNote = { n -> editingNote = n.id },
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -458,6 +470,23 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             onPlace = { id -> showPeople = false; nav.place(id) },
         ) { showPeople = false }
     }
+    if (showHighlight) {
+        val current = state.selection.firstOrNull()?.let { marks[it]?.color }
+        HighlightSheet(selectedRef ?: "", current, lang == UiLang.Tamil, onPick = { color ->
+            showHighlight = false
+            vm.highlight(color)
+            vm.clearSelection()
+        }) { showHighlight = false }
+    }
+    editingNote?.let { id ->
+        val note = userData.notes.firstOrNull { it.id == id }
+        val ref = note?.let { n -> book?.label(lang, n.chapter, n.verseStart, n.verseEnd.takeIf { it != n.verseStart }) } ?: selectedRef ?: ""
+        NoteSheet(
+            ref, note,
+            onSave = { body -> editingNote = null; vm.saveNote(note, body); vm.clearSelection() },
+            onDelete = note?.let { n -> { editingNote = null; vm.deleteNote(n) } },
+        ) { editingNote = null }
+    }
     if (showVersions) {
         VersionSheet(
             state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) },
@@ -467,6 +496,9 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
 }
 
 private const val PANE_COMMENTARY = "commentary"
+private const val NEW_NOTE = "new"
+
+private fun tr2(lang: UiLang, tamil: String, english: String) = if (lang == UiLang.Tamil) tamil else english
 private const val PANE_PEOPLE = "people"
 private const val PANE_ORIGINAL = "original"
 
@@ -546,7 +578,7 @@ private fun ActionCardOverlay(
     ) {
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
-            onBookmark = a.onSignInFeature, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onSignInFeature, onHighlight = a.onSignInFeature,
+            onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
             onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
@@ -578,6 +610,8 @@ private fun ChapterBody(
     dualLabels: kotlin.Pair<String, String>? = null,
     dualColumns: Boolean = false,
     interactions: VerseInteractions? = null,
+    marks: Map<Int, VerseMarks> = emptyMap(),
+    onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
 ) {
     val c = Ts.colors
     when {
@@ -606,6 +640,7 @@ private fun ChapterBody(
                 dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
                 textLocale = state.manifest?.version(state.passage.version)?.lang?.let(::LocaleList),
                 secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
+                marks = marks, onOpenNote = onOpenNote,
             )
         }
     }

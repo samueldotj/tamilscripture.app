@@ -20,6 +20,10 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute : NavKey
 @Serializable data object DownloadsRoute : NavKey
 
+/** The account and the reader's own marks (M6). [tab]: highlights, notes, bookmarks, history. */
+@Serializable data object AccountRoute : NavKey
+@Serializable data class MineRoute(val tab: Int = 0) : NavKey
+
 /** Study pages (roadmap M8). */
 @Serializable data class StrongsRoute(val number: String) : NavKey
 @Serializable data class PersonRoute(val id: String) : NavKey

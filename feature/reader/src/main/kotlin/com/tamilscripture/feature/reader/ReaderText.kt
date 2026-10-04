@@ -112,6 +112,9 @@ fun ReaderTextList(
     /** Languages of the text and, in dual view, of the second version (M2-12: TalkBack reads each in its own voice). */
     textLocale: LocaleList? = null,
     secondLocale: LocaleList? = null,
+    /** The reader's highlights, notes and bookmarks (M6), by verse. */
+    marks: Map<Int, VerseMarks> = emptyMap(),
+    onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -146,6 +149,8 @@ fun ReaderTextList(
                     is ReaderItem.Verse -> Column {
                         val selected = item.verse in selection
                         val playing = item.verse == playingVerse
+                        val mark = marks[item.verse]
+                        val bookmarkColor = c.accent
                         VerseInteractionBox(item.verse, interactions) { extra -> Text(
                             verseAnnotated(item, numberSize = 12, showNotes = showNotes),
                             style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
@@ -157,11 +162,14 @@ fun ReaderTextList(
                                     when {
                                         selected -> c.verseSelected
                                         playing -> c.accentWash
+                                        mark?.color != null -> c.highlight(mark.color)
                                         else -> androidx.compose.ui.graphics.Color.Transparent
                                     },
                                 )
                                 .then(if (playing && !selected) Modifier.border(1.dp, c.accentSoft, RoundedCornerShape(12.dp)) else Modifier)
                                 .then(extra)
+                                // A bookmarked verse carries a bar in the margin.
+                                .then(if (mark?.bookmarked == true) Modifier.drawBehind { drawRect(bookmarkColor, size = Size(3.dp.toPx(), size.height)) } else Modifier)
                                 .clickable { onTapVerse(item.verse) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                 .semantics { contentDescription = "${item.label}. ${item.text}" },
@@ -173,6 +181,7 @@ fun ReaderTextList(
                                 }
                             }
                         }
+                        mark?.notes?.forEach { n -> NoteChip(n) { onOpenNote(n) } }
                         unitsAfter[item.verse]?.forEach { unit ->
                             InlineCommentaryCard(unit, commentaryName ?: "", preferTamil = lang == UiLang.Tamil, onOpen = onOpenCommentary)
                         }
