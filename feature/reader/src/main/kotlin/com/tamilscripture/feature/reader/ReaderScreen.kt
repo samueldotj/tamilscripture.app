@@ -172,6 +172,12 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         val i = items.indexOfFirst { it.verseNumber == v }
         if (i >= 0) listState.scrollToItem(i)
     }
+    // A verse selected from the keyboard (M2-6) is scrolled into view.
+    LaunchedEffect(state.selection.lastOrNull()) {
+        val v = state.selection.lastOrNull() ?: return@LaunchedEffect
+        val i = items.indexOfFirst { it.verseNumber == v }
+        if (i >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == i }) listState.animateScrollToItem(i)
+    }
     // Follow the verse being read while listening (A-6.4).
     LaunchedEffect(playingVerse) {
         val v = playingVerse ?: return@LaunchedEffect
@@ -686,8 +692,8 @@ private fun handleKey(
     setSource: (String) -> Unit,
     versions: () -> Unit,
 ): Boolean = when (key) {
-    Key.J -> { selectAdjacent(state, vm, +1); true }
-    Key.K -> { selectAdjacent(state, vm, -1); true }
+    Key.J, Key.DirectionDown -> { selectAdjacent(state, vm, +1); true }
+    Key.K, Key.DirectionUp -> { selectAdjacent(state, vm, -1); true }
     Key.DirectionRight, Key.PageDown -> { vm.nextChapter(); true }
     Key.DirectionLeft, Key.PageUp -> { vm.previousChapter(); true }
     Key.C -> { toggleCommentary(); true }
