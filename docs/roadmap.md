@@ -122,8 +122,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-20 Interface strings in Tamil and English; per-app language switch.
 
 **Stats**
-- [ ] M1-21 **[web]** Migration: `source`, `event_id`, `app`, `window`, `offline` columns; widen `kind`; `track_app_batch(jsonb, uuid, text, text, text)` executable by the service role only; pgTAP tests ([design §12.4](design.md#124-server-side-new-migration-in-the-website-repo)).
-- [ ] M1-21a **[web]** `/api/t/app` Vercel route: size limits, optional JWT verification via JWKS, Vercel geo headers, bot and rate checks, calls `track_app_batch` with the service role ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)).
+- [ ] M1-21 **[web]** Migration: `source`, `event_id`, `app_version`, `window_class`, `offline` columns; widen `kind`; `track_app_batch(jsonb, text, text, text)`, anon-executable and validating like `track()`; pgTAP tests ([design §12.4](design.md#124-server-side-website-repo-supabasemigrations20261004100000_app_analyticssql)). Website PR samueldotj/tamilscripture.com#3.
+- [ ] M1-21a **[web]** `/api/t/app` Vercel route: size limits, Vercel geo headers, per-address rate limit, one `track_app_batch` call per batch, `{accepted:[ids]}` ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)). JWT verification moves to M6.
 - [x] M1-22 `StatsRecorder` channel → Room `pending_event`; retention cap; opt-out setting.
 - [x] M1-23 `StatsSyncWorker`: batching, back-off, delete on confirmation, expedited run on background.
 - [x] M1-24 `VisibleVerseTracker` for `read` events (60% visible for 2 s, confirmed) ([design §6.6](design.md#66-verse-read-tracking-for-stats)); `view` events with `source` pack/cache/online.

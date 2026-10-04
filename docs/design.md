@@ -78,7 +78,7 @@ flowchart LR
   CDNC[("R2: commentary JSON\n(existing)")]
   UI -- "on-demand commentary" --> CDNC
   W -- "stats batches" --> WEBC
-  WEBC -- "track_app_batch (service role)" --> SB
+  WEBC -- "track_app_batch (anon, validated)" --> SB
 ```
 
 | System | Role for the app | Owned by |
@@ -926,7 +926,7 @@ flowchart LR
   CH -- "batch every 2 s or 100 events" --> DB[("Room: pending_event")]
   DB --> W["StatsSyncWorker\n(network required)"]
   W -- "POST /api/t/app\n≤ 500 events" --> V["Vercel function\n(geo headers, JWT check)"]
-  V -- "rpc track_app_batch\n(service role)" --> SB[("Supabase")]
+  V -- "rpc track_app_batch\n(anon key)" --> SB[("Supabase")]
   SB -- "accepted ids" --> V
   V -- "accepted ids" --> W
   W -- "delete accepted" --> DB
@@ -972,42 +972,40 @@ Stats still end up in the Supabase database; only the entry point is the website
 
 `/api/t/app` does this:
 
-1. Rejects bodies over 256 kB and batches over 500 events.
-2. If `Authorization: Bearer <jwt>` is present, verifies it against Supabase's JWKS (cached) and takes `sub` as the user ID. An invalid token is ignored, not an error.
-3. Reads the geo headers and the IP. The IP is passed to Postgres only to be hashed with the day's salt, never written, exactly as `/api/t` does.
-4. Calls `track_app_batch` with the **service role key**, which exists only on the server. Because only the service role can execute the function, nobody can spoof a location or a user.
-5. Returns the accepted event IDs.
+1. Rejects bodies over 300 kB, keeps at most 500 events, and allows 20 batches a minute per address (best effort, per function instance).
+2. Reads Vercel's geo headers. The IP is not passed on: the install ID is the visitor key.
+3. Calls `track_app_batch` once per batch with the **anon key**, the same trust model as the website's `track()`. Anyone could call the function directly with a made-up location, as they can `track()` today; the function validates every field and caps each install, so the worst case is noise in the counts, not exposure of data. Moving both functions behind the service role is an option later.
+4. Returns `{accepted: [ids]}` with every event ID in the batch once Postgres has processed it, including events it skipped as invalid or over the cap, so the phone never resends them. Any other answer (429, 5xx, network) keeps the phone's queue.
 
-### 12.4 Server side (new migration in the website repo)
+Signed-in users (`member`) are not recorded from the app yet; that comes with accounts (M6), when the route verifies the bearer token against Supabase's JWKS.
+
+### 12.4 Server side (website repo: `supabase/migrations/20261004100000_app_analytics.sql`)
 
 ```sql
--- 2026xxxx_app_analytics.sql
 alter table public.analytics_events
   add column source  text not null default 'web' check (source in ('web','android')),
   add column event_id uuid,
-  add column app     text,
-  add column window  text,
+  add column app_version  text,
+  add column window_class text,     -- "window" is a reserved word
   add column offline boolean;
 create unique index analytics_events_event_id on public.analytics_events (event_id)
   where event_id is not null;
--- widen the kind check to: view, verse, audio, read, search, commentary, plan, download
+-- kind check widened to: view, verse, audio, read, search, commentary, plan, download
 
 create or replace function public.track_app_batch(
   p jsonb,                 -- the app's payload (12.2)
-  p_user uuid,             -- verified by /api/t/app, or null
   p_country text, p_region text, p_city text)
-returns uuid[]             -- ids accepted (including duplicates already stored)
+returns int                -- events stored
 language plpgsql security definer set search_path = public as $$
-  -- for each event in p->'events':
-  --   reject if at < now() - 30 days or at > now() + 1 day
-  --   visitor := left(encode(sha256(salt || p->>'install'), 'hex'), 16)   -- today's salt
-  --   member  := case when p_user is not null then left(encode(sha256(salt || p_user::text),'hex'),16) end
-  --   rate limit: ≤ 5000 events per visitor per day
-  --   insert … (country, region, city from the parameters) on conflict (event_id) do nothing
-  --   search events also go to search_log (no visitor, no member)
+  -- for each event in p->'events' (at most 500):
+  --   skip unknown kinds, bad dates, at < now() - 30 days or at > now() + 1 day
+  --   visitor := left(encode(sha256(salt || 'app|' || p->>'install'), 'hex'), 16)   -- today's salt
+  --   stop at 5000 events per visitor per day
+  --   path '/app/{version}/{BOOK}/{chapter}', route 'app:{kind}[:{source}]'
+  --   insert … on conflict (event_id) do nothing
+  --   search events also go to search_log through log_search()
 $$;
-revoke all on function public.track_app_batch(jsonb, uuid, text, text, text) from public, anon, authenticated;
-grant execute on function public.track_app_batch(jsonb, uuid, text, text, text) to service_role;
+grant execute on function public.track_app_batch(jsonb, text, text, text) to anon, authenticated;
 ```
 
 - The install ID is hashed with the day's salt exactly like the website's IP + user-agent hash, so it becomes unlinkable the next day [ST-7].
@@ -1075,7 +1073,7 @@ sequenceDiagram
 | Realtime publication for highlights, notes, bookmarks, plan_progress, profiles | Foreground freshness in the app |
 | `export_my_data()` and `delete_my_account()` updated | Include bookmarks; delete is unchanged in effect |
 | `updated_at` triggers on all synced tables (verify existing) | Pull cursors |
-| `track_app_batch(jsonb, uuid, text, text, text)` | Stats (section 12) |
+| `track_app_batch(jsonb, text, text, text)` | Stats (section 12) |
 | `/auth/app-callback` route on the website | Magic-link handoff to the app |
 | `/.well-known/assetlinks.json` on the website | App Links verification |
 
@@ -1119,7 +1117,7 @@ The app and the website are two clients of one account. Neither owns the data; S
 
 ### 14.2 Security and privacy
 
-- Only the Supabase URL and anon key ship in the app. All writes go through RLS or `security definer` functions. The stats function is executable only by the service role, which lives on the Vercel server.
+- Only the Supabase URL and anon key ship in the app. All writes go through RLS or `security definer` functions. The stats function is anon-executable like the website's `track()` and validates every field (section 12.3).
 - Catalogue signed with Ed25519; packs checked by SHA-256 before and after decompression. Online content is fetched over HTTPS from the website's own domain and parsed with the same strict JSON schema as pack content.
 - Packs opened read-only with `query_only`; the app never executes SQL from a pack's content.
 - Network security config: HTTPS only, no user CAs in release builds.

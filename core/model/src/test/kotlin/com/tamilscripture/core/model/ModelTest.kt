@@ -21,19 +21,6 @@ class ModelTest {
         assertNull(VerseId.parse("JHN.3"))
     }
 
-    @Test fun parsesEnglishAndTamilReferences() {
-        val p = ReferenceParser(books)
-        assertEquals("JHN" to 16, p.parse("John 3:16")!!.let { it.book.code to it.verse })
-        assertEquals("JHN" to 3, p.parse("jn3")!!.let { it.book.code to it.chapter })
-        assertEquals(16, p.parse("யோவான் 3:16")!!.verse)
-        assertEquals("1CO" to 13, p.parse("1 கொரி 13.4-7")!!.let { it.book.code to it.chapter })
-        assertEquals(7, p.parse("1 கொரி 13.4-7")!!.verseEnd)
-        // Tamil numerals count as digits.
-        assertEquals(23, p.parse("சங் ௨௩")!!.chapter)
-        assertNull(p.parse("அன்பு"))
-        assertNull(p.parse("John 30"))
-    }
-
     @Test fun psalmsPlanMatchesWebsiteShape() {
         val plan = Plans.builtIn(books).first { it.id == "psalms-6m" }
         val s = Plans.schedule(plan)

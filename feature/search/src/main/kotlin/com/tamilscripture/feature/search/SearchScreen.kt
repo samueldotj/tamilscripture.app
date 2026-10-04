@@ -51,7 +51,9 @@ import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.Passage
-import com.tamilscripture.core.model.ReferenceParser
+import com.tamilscripture.core.data.content.References
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import com.tamilscripture.core.model.SearchHit
 import com.tamilscripture.core.model.VerseId
 import com.tamilscripture.core.model.label
@@ -76,8 +78,11 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
     var offline by remember { mutableStateOf(false) }
-    val parser = remember(manifest) { manifest?.let { ReferenceParser(it.books) } }
-    val ref = remember(query, parser) { parser?.parse(query) }
+    val ref = remember(query, manifest) { References.parse(query, manifest) }
+    // A-4.5: book names in both scripts while the reader is still typing one.
+    val suggestions = remember(query, manifest) {
+        if (ref != null || query.isBlank() || query.any { it.isDigit() }) emptyList() else References.suggest(query, manifest)
+    }
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focus.requestFocus() } }
 
@@ -129,6 +134,18 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp)) {
+            if (suggestions.isNotEmpty()) {
+                item {
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        suggestions.forEach { b ->
+                            TsChip(b.name(lang), false, { query = b.name(lang) + " " }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 7.dp))
+                        }
+                    }
+                }
+            }
             if (ref != null) {
                 item {
                     Kicker(tr("வசனக் குறிப்பு", "Reference"), Modifier.padding(start = 20.dp, top = 10.dp, bottom = 4.dp))
