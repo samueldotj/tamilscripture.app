@@ -24,8 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +63,11 @@ fun BookPickerScreen(current: Passage, onPick: (Passage) -> Unit, onClose: () ->
     var showVersions by rememberSaveable { mutableStateOf(false) }
     val books = m.books.filter { it.isNewTestament == nt }
     val listState = rememberLazyListState()
+    // M8-7: the book heatmap, when community heat is on (chapters many readers highlighted).
+    val heatOn by remember { services.graph.settings.settings.map { it.heat } }.collectAsStateWithLifecycle(false)
+    val heat by produceState<Map<String, Map<Int, Int>>>(emptyMap(), heatOn) {
+        value = if (heatOn) services.graph.heat.all().orEmpty() else emptyMap()
+    }
     LaunchedEffect(nt) {
         val i = books.indexOfFirst { it.code == expanded }
         if (i > 1) listState.scrollToItem(i - 1)
@@ -100,7 +108,9 @@ fun BookPickerScreen(current: Passage, onPick: (Passage) -> Unit, onClose: () ->
                         )
                     }
                     if (open) {
-                        ChapterGrid(b.chapters, if (b.code == current.book) current.chapter else null) { ch ->
+                        val counts = heat[b.code].orEmpty()
+                        val buckets = counts.mapValues { (_, n) -> com.tamilscripture.core.data.content.HeatRepository.bucket(n, counts.values.toList()) }
+                        ChapterGrid(b.chapters, if (b.code == current.book) current.chapter else null, buckets) { ch ->
                             onPick(Passage(version, b.code, ch))
                         }
                     }
@@ -115,7 +125,7 @@ fun BookPickerScreen(current: Passage, onPick: (Passage) -> Unit, onClose: () ->
 }
 
 @Composable
-private fun ChapterGrid(count: Int, current: Int?, onPick: (Int) -> Unit) {
+private fun ChapterGrid(count: Int, current: Int?, heat: Map<Int, Int> = emptyMap(), onPick: (Int) -> Unit) {
     val c = Ts.colors
     val cols = 6
     Column(Modifier.widthIn(max = 560.dp).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,7 +136,13 @@ private fun ChapterGrid(count: Int, current: Int?, onPick: (Int) -> Unit) {
                     val shape = RoundedCornerShape(12.dp)
                     Box(
                         Modifier.weight(1f).height(48.dp).clip(shape)
-                            .background(if (on) c.accent else c.surface)
+                            .background(
+                                when {
+                                    on -> c.accent
+                                    (heat[ch] ?: 0) > 0 -> c.accent.copy(alpha = floatArrayOf(0f, 0.10f, 0.18f, 0.28f, 0.40f)[heat.getValue(ch)])
+                                    else -> c.surface
+                                },
+                            )
                             .then(if (on) Modifier else Modifier.border(1.dp, c.line, shape))
                             .clickable(role = Role.Button) { onPick(ch) },
                         contentAlignment = Alignment.Center,

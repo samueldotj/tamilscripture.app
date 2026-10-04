@@ -20,7 +20,7 @@ class HeatRepository(private val http: Http, private val json: Json) {
     /** Chapter → verse → readers, or null when it cannot be had. */
     suspend fun book(slug: String): Map<Int, Map<Int, Int>>? {
         cache[slug]?.takeIf { System.currentTimeMillis() - it.at < 3_600_000 }?.let { return it.chapters }
-        val bytes = runCatching { http.get(Origin.Api, "/api/heat/$slug.json") }.getOrNull() ?: return null
+        val bytes = runCatching { http.get(Origin.Api, "api/heat/$slug.json") }.getOrNull() ?: return null
         val chapters = runCatching {
             json.parseToJsonElement(bytes.decodeToString()).jsonObject.mapNotNull { (c, verses) ->
                 c.toIntOrNull()?.let { ch -> ch to verses.jsonObject.mapNotNull { (v, n) -> v.toIntOrNull()?.let { it to n.jsonPrimitive.int } }.toMap() }
@@ -29,6 +29,21 @@ class HeatRepository(private val http: Http, private val json: Json) {
         cache[slug] = Entry(System.currentTimeMillis(), chapters)
         return chapters
     }
+
+    /** Book code → chapter → readers, for the book heatmap (the website's /api/heat/all.json). */
+    suspend fun all(): Map<String, Map<Int, Int>>? {
+        allCache?.takeIf { System.currentTimeMillis() - it.first < 3_600_000 }?.let { return it.second }
+        val bytes = runCatching { http.get(Origin.Api, "api/heat/all.json") }.getOrNull() ?: return null
+        val books = runCatching {
+            json.parseToJsonElement(bytes.decodeToString()).jsonObject.mapValues { (_, chapters) ->
+                chapters.jsonObject.mapNotNull { (c, n) -> c.toIntOrNull()?.let { it to n.jsonPrimitive.int } }.toMap()
+            }
+        }.getOrNull() ?: return null
+        allCache = System.currentTimeMillis() to books
+        return books
+    }
+
+    @Volatile private var allCache: Pair<Long, Map<String, Map<Int, Int>>>? = null
 
     companion object {
         /** Quartile 1..4 of [value] among the whole book's [values], as the website buckets it; 0 when absent. */

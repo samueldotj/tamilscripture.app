@@ -324,7 +324,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M8-5e Static chapter maps in the Study pane, opening the atlas focused on the chapter.
 - [ ] M8-5f Accessibility: place semantics in rank order, list view, timeline and zoom controls; screenshot, gesture and Macrobenchmark tests.
 - [ ] M8-6 Large single-verse view and share as image. Share as image built: a 4:5 card (cross, verse in Mukta Malar shrunk to fit, reference, site) from the verse card and menu, through a FileProvider; screenshot-tested. The large single-verse view is still to do.
-- [~] M8-7 Community highlight counts, book heatmap, heat overlay (from `/api/heat/{book}.json`, cached). Built: the heat overlay in the reader (Study settings toggle, the website's quartiles and tints, an hour in memory). The book heatmap is open; the API stays empty until readers highlight.
+- [x] M8-7 Community highlight counts, book heatmap, heat overlay (from `/api/heat/{book}.json` and `all.json`, an hour in memory). Built behind the Study settings toggle, as on the website: verse tints in the reader and chapter tints in the book picker, in the website's quartiles. The API is empty until readers highlight.
 - [ ] M8-8 Present mode: full screen, keyboard navigation, external display via `Presentation` on tablets and ALOS. Built: a passage verse by verse, full screen, sized to fill; clicker keys, taps, P from the reader; on a second display the verses go there through Presentation and the device shows now/next. Screenshot-tested; untested with a real second display.
 - [ ] M8-9 Stylus highlighting.
 
