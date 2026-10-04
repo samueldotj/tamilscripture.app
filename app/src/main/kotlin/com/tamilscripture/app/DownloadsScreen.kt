@@ -112,6 +112,20 @@ fun DownloadsScreen(onBack: () -> Unit) {
                     modifier = Modifier.widthIn(max = 720.dp),
                 )
                 HDivider()
+                // M1-9g: chapters kept from reading online are not downloads; shown apart, cleared apart.
+                var cacheBytes by remember { mutableStateOf<Long?>(null) }
+                LaunchedEffect(Unit) { cacheBytes = graph.onlineCache.sizeBytes() }
+                TsListRow(
+                    tr("இணைய வாசிப்புச் சேமிப்பு", "Online reading cache"),
+                    subtitle = tr("இணையத்தில் வாசித்த அதிகாரங்கள்; நிரம்பினால் பழையவை நீங்கும்", "Chapters read online; the oldest make way when it is full") +
+                        (cacheBytes?.let { " · " + mb(it) } ?: ""),
+                    trailing = {
+                        TsPillButton(tr("அழி", "Clear"), { scope.launch { graph.onlineCache.clear(); cacheBytes = graph.onlineCache.sizeBytes() } },
+                            height = 36.dp, style = PillStyle.Outlined)
+                    },
+                    modifier = Modifier.widthIn(max = 720.dp),
+                )
+                HDivider()
             }
             val cat = catalogue
             if (cat == null) {

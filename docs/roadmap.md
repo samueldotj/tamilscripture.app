@@ -105,8 +105,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-9c Online cache: `online_cache` table keyed by content path (not URL), LRU over 50 MB (keep at least 200 chapters), size setting, clear action.
 - [x] M1-9d Stale-while-revalidate when the content build changes; in-place UI update.
 - [x] M1-9e Prefetch of neighbouring chapters (±1, next 3 on Wi-Fi); data-saver setting for mobile data.
-- [ ] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action. Built (banner, "Not now" remembered per version, download button on the offline error); on-device check pending.
-- [ ] M1-9g Downloads screen shows packs and the online cache separately.
+- [x] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action. Built (banner, "Not now" remembered per version, download button on the offline error); checked on the Pixel 9 (offer after ten online chapters, prefetched chapters counted).
+- [x] M1-9g Downloads screen shows packs and the online cache separately (its own row, size, Clear).
 
 **Reader**
 - [x] M1-10 `ChapterRepository`: load chapter JSON, parse, LRU cache, neighbour prefetch.
@@ -237,7 +237,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M5-5 Player bar (compact) and rail-footer player (medium+); tabletop posture controls.
 - [x] M5-6 Verse sync: highlight current verse, follow-audio scrolling, "play from here".
 - [x] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
-- [ ] M5-8 Audio downloads per book and per version; storage display; delete. Built: Downloads › Audio Bible, a book at a time (MP3s at their CDN paths plus verse timings), played from the device when present; on-device check pending.
+- [x] M5-8 Audio downloads per book and per version; storage display; delete. Built: Downloads › Audio Bible, a book at a time (MP3s at their CDN paths plus verse timings), played from the device when present; checked on the Pixel 9 (a book downloaded, played in airplane mode).
 - [ ] M5-9 Android Auto browse tree (versions → books → chapters). Built: PlaybackService is a MediaLibraryService with that tree, a chosen chapter queueing its book; not yet tried in a car or the Desktop Head Unit.
 - [x] M5-10 `audio` stats events with seconds listened and offline flag. Done with the player (play, jump, next, end, time).
 
@@ -292,8 +292,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
 - [x] M7-3 Community plans from `reading_plans` (published only), cached offline. Anon PostgREST as the website does; `fromRow` ported with tests.
 - [x] M7-4 Progress local when signed out; joined with the account on first sign-in (earlier start, readings from both), then synced with `plan_progress`.
-- [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine). Built (Settings › Daily reminder; today's plan passages or the verse of the day); on-device check pending.
-- [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; on-device check pending.
+- [x] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine). Built (Settings › Daily reminder; today's plan passages or the verse of the day); checked on the Pixel 9.
+- [x] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; checked on the Pixel 9 and the Galaxy Tab S11.
 - [x] M7-7 `plan` stats events. Done (`plan` events on ticking a passage).
 - [ ] M7-8 Release prep: store listing in Tamil and English, screenshots for phone, tablet and ALOS, Data safety form, privacy policy update on the website.
 - [ ] M7-9 Staged production rollout 10% → 50% → 100% with crash-free ≥ 99.5%.
@@ -313,8 +313,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 ### Tasks
 - [ ] M8-0 Atlas renderer test (about 2 days): build option A (Compose) and option B (MapLibre + Android-drawn label images) behind `AtlasRenderer` with real map data; measure against the pass marks in [design §11.5](design.md#115-rendering-decided-by-a-test-in-m8-adr-12); record the result in ADR-12. Decided for option A (Compose): the native map renderer draws the website's chapter maps and the atlas from its GeoJSON, verified by Roborazzi screenshots (overview, journey, focused place; light/dark; Tamil/English). Record in ADR-12.
 - [x] M8-1 **[web]** Study packs: Strong's (lexicon, occurrences, original words), persons, places, dictionary; `study.maps` (projected geometry at three detail levels, places, journeys, polities, church) and `study.maps.chapters` (static chapter maps) ([design §11.2](design.md#112-data)). Live: study.words 6.4 MB, study.people 1.7, study.dictionary 9.6, study.maps 2.4; each keeps the website's entities/ files under their paths.
-- [ ] M8-2 Original-words view per verse; Strong's page listing every verse in the current version. Built: verse card and menu → Original words sheet → Strong's page with every verse; Study › Root words browses the Strong's index. On-device check pending.
-- [ ] M8-3 Person, place and dictionary article screens with provenance badges; search sections. Built: person, place and dictionary article screens (Tamil paragraphs where drafted), Study › Dictionary. On-device check pending.
+- [x] M8-2 Original-words view per verse; Strong's page listing every verse in the current version. Built: verse card and menu → Original words sheet → Strong's page with every verse; Study › Root words browses the Strong's index. Checked on the Pixel 9 and the Galaxy Tab S11.
+- [x] M8-3 Person, place and dictionary article screens with provenance badges; search sections. Built: person, place and dictionary article screens (Tamil paragraphs where drafted), Study › Dictionary. Checked on the Pixel 9 and the Galaxy Tab S11.
 - [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names. People and places sheet per chapter and verse with the chapter map (the website's SVG maps drawn natively, tap a place); place pages show their map. On wide windows the same lists open in the study pane.
 - [ ] M8-5 Atlas screen with the chosen renderer: base map, Places layer, rank-based labels with collision, Tamil labels in the reader's typeface ([design §11](design.md#11-atlas-and-maps)). Built: base map, places ranked by mentions with collision-free labels in the reader's language, journeys with numbered stops, tap for a place card; pinch, pan, double-tap and wheel zoom. Screenshot-tested; on-device check pending.
 - [ ] M8-5a Camera: pinch, pan with fling, double-tap and two-finger-tap zoom, zoom and pan limits, animated fit-to-journey and centre-on-place, state saved across resize and fold.
