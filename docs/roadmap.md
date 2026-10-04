@@ -87,8 +87,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 **Packs and catalogue**
 - [x] M1-1 **[web]** `pack-build` for all Bible versions (IRVTAM, TCV, TOV, BSB, WEB, KJV) and the cross-reference pack.
-- [ ] M1-2 **[web]** CI workflow `packs.yml`: build, sign, upload to R2 under immutable paths, catalogue last.
-- [ ] M1-3 **[web]** R2 bucket and custom domain for packs; CORS not needed (no browser access).
+- [x] M1-2 **[web]** CI workflow `packs.yml`: build, sign, upload to R2 under immutable paths, catalogue last. Done in the website's deploy.yml ("Build and publish app packs").
+- [x] M1-3 **[web]** R2 bucket and custom domain for packs; CORS not needed (no browser access). Bucket ts-packs behind packs.tamilaudiobible.com.
 - [x] M1-4 `CatalogueRepository`: fetch, verify signature, cache; remote config values; all locations as paths.
 - [x] M1-4a `OriginResolver`: signed `bootstrap.json` from two providers, last-good copy in DataStore, built-in fallback, ordered origins with one-retry failover and 10-minute down marking.
 - [ ] M1-4b **[web]** Publish scripts with targets `vercel`, `r2` or both, writing identical path layouts; `bootstrap.json` published to both providers.
@@ -184,11 +184,11 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M3-1 Romanised-Tamil search ("anbu" → அன்பு): the website's converter (`lib/search/romanised.ts`, TypeScript, not Rust) ported to Kotlin as `Romanised`, with the same rule: the Tamil reading is used when the words as typed find nothing, otherwise offered as a chip. Website `/search?q=` and `/irvtam+kjv/…` dual links open in the app.
 - [x] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
 - [ ] M3-3 Trigram fallback when fewer than 5 hits.
-- [ ] M3-4 Match highlighting by token normalisation.
+- [x] M3-4 Match highlighting by token normalisation.
 - [ ] M3-5 Results grouped by book with counts; testament/book filters; multi-version search in parallel.
 - [ ] M3-6 Autocomplete (book names, recent searches); common searches cached from Supabase.
-- [ ] M3-6a Online search through the website's `/api/search` for versions that are not downloaded, mapped to the same result model with an "online results" label.
-- [ ] M3-7 `search` stats events; queries also feed `search_log` server-side.
+- [x] M3-6a Online search through the website's `/api/search` for versions that are not downloaded, mapped to the same result model with an "online results" label.
+- [x] M3-7 `search` stats events; queries also feed `search_log` server-side.
 - [x] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.
 - [x] M3-9 Study Bible format: one verse per item, inline cross-references.
 - [x] M3-10 Dual view: alignment by verse number (as the website), two-column rows with a pinned version header (600 dp+), stacked cards (compact), shared selection, missing-verse cells. A versification table is still to come (design §6.5).
@@ -215,7 +215,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.
 - [x] M4-5 Commentary text renderer: anchors, verse labels, footnotes, references as links.
 - [ ] M4-6 Attribution and licence strip per commentary.
-- [ ] M4-7 `commentary` stats events.
+- [x] M4-7 `commentary` stats events.
 
 ### Exit criteria
 - Matthew Henry on John 3 opens offline in < 150 ms, and online in < 1 s on 4G when not downloaded.

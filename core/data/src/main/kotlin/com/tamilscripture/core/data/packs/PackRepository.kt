@@ -203,6 +203,23 @@ class PackRepository(
             return parts.takeIf { it.isNotEmpty() }?.joinToString(" ")
         }
 
+        private val WORD = Regex("[\\p{L}\\p{M}\\p{N}]+")
+
+        /**
+         * The words of [text] that [query] matches, compared the way the index compares them
+         * (M3-4): each word normalised, then matched against the normalised terms, by prefix
+         * for terms of three or more letters as in [ftsExpression]. அன்பு marks அன்பாக too.
+         */
+        fun matchRanges(text: String, query: String): List<IntRange> {
+            val terms = normalize(query.replace(Regex("[\"“”]"), " ")).split(' ').filter { it.isNotBlank() }
+            if (terms.isEmpty()) return emptyList()
+            return WORD.findAll(text).filter { m ->
+                normalize(m.value).split(' ').any { n ->
+                    n.isNotBlank() && terms.any { t -> if (t.codePointCount(0, t.length) >= 3) n.startsWith(t) else n == t }
+                }
+            }.map { it.range }.toList()
+        }
+
         /** Daily catalogue check that updates installed packs on Wi-Fi (DL-6, design §7.10). */
         fun scheduleUpdates(context: Context) {
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(

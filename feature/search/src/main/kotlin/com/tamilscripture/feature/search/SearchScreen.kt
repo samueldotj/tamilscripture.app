@@ -39,10 +39,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -207,7 +207,8 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             Text(book?.label(lang, vid.chapter, vid.verse) ?: h.verseId, style = Ts.type.labelSmall, color = c.accent)
-                            Text(highlight(h.text, shown, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
+                            val ranges = remember(h.text, shown) { PackRepository.matchRanges(h.text, shown) }
+                            Text(highlight(h.text, ranges, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
                         }
                         HDivider(Modifier.padding(horizontal = 20.dp))
                     }
@@ -217,14 +218,8 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     }
 }
 
-private fun highlight(text: String, q: String, bg: androidx.compose.ui.graphics.Color) = buildAnnotatedString {
-    val terms = q.split(' ').filter { it.length >= 2 }
-    var i = 0
-    while (i < text.length) {
-        val hit = terms.mapNotNull { t -> text.indexOf(t, i, ignoreCase = true).takeIf { it >= 0 }?.let { it to t } }.minByOrNull { it.first }
-        if (hit == null) { append(text.substring(i)); break }
-        append(text.substring(i, hit.first))
-        withStyle(SpanStyle(background = bg)) { append(text.substring(hit.first, hit.first + hit.second.length)) }
-        i = hit.first + hit.second.length
-    }
+/** Marks the words the search matched, stems included (M3-4). */
+private fun highlight(text: String, ranges: List<IntRange>, bg: androidx.compose.ui.graphics.Color) = buildAnnotatedString {
+    append(text)
+    ranges.forEach { r -> addStyle(SpanStyle(background = bg), r.first, r.last + 1) }
 }
