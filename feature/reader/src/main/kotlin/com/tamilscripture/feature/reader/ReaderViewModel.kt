@@ -39,6 +39,8 @@ data class ReaderState(
     /** Dual view (A-3.3): the second version's code and its copy of the chapter. */
     val compare: String? = null,
     val second: Chapter? = null,
+    /** M8-7: community heat bucket (1..4) by verse; empty when off or offline. */
+    val heat: Map<Int, Int> = emptyMap(),
     /** M1-9f: after 10 chapters read online, offer this version's pack (id, size in bytes). */
     val offer: Pair<String, Long>? = null,
 ) {
@@ -74,7 +76,12 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
             var lastSource: String? = null
             var lastOn: Boolean? = null
             var lastCompare: String? = null
+            var lastHeat = false
             settings.collect { s ->
+                if (s.heat != lastHeat) {
+                    lastHeat = s.heat
+                    loadHeat()
+                }
                 if (s.compare != lastCompare) {
                     lastCompare = s.compare
                     loadSecond(state.value.passage)
@@ -122,6 +129,23 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
         }
         loadCommentary()
         loadSecond(p)
+        loadHeat()
+    }
+
+    private var heatJob: Job? = null
+
+    private fun loadHeat() {
+        heatJob?.cancel()
+        mutable.update { it.copy(heat = emptyMap()) }
+        if (!settings.value.heat) return
+        val p = state.value.passage
+        heatJob = viewModelScope.launch {
+            val slug = graph.content.manifest.value?.book(p.book)?.slug ?: return@launch
+            val book = graph.heat.book(slug) ?: return@launch
+            val all = book.values.flatMap { it.values }
+            val chapter = book[p.chapter].orEmpty().mapValues { (_, n) -> com.tamilscripture.core.data.content.HeatRepository.bucket(n, all) }
+            mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(heat = chapter) else s }
+        }
     }
 
     private fun loadSecond(p: Passage) {

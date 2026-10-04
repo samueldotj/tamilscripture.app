@@ -146,6 +146,8 @@ private class VerseActions(
     val onShareImage: () -> Unit,
     val onOriginal: () -> Unit,
     val onPeople: () -> Unit,
+    /** M6-9c: the same passage on tamilscripture.com, in the browser. */
+    val onWebsite: () -> Unit,
 )
 
 @Composable
@@ -261,6 +263,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         },
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
         onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
+        onWebsite = { vm.recordVerseAction("website"); openInBrowser(context, shareUrl(state.passage, book, state.selection)) },
     )
 
     // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
@@ -579,7 +582,7 @@ private fun ActionCardOverlay(
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
-            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage,
+            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
         )
@@ -640,7 +643,7 @@ private fun ChapterBody(
                 dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
                 textLocale = state.manifest?.version(state.passage.version)?.lang?.let(::LocaleList),
                 secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
-                marks = marks, onOpenNote = onOpenNote,
+                marks = marks, onOpenNote = onOpenNote, heat = state.heat,
             )
         }
     }
@@ -838,6 +841,17 @@ private fun shareUrl(p: Passage, book: Book?, sel: List<Int>): String {
         else -> sel.firstOrNull()?.toString()
     }
     return "https://www.tamilscripture.com/${p.version.lowercase()}/$slug/${p.chapter}" + (range?.let { ".$it" } ?: "")
+}
+
+/**
+ * Opens [url] in the browser, never in this app: tamilscripture.com links are the app's own
+ * App Links, so a plain VIEW intent would come straight back here.
+ */
+private fun openInBrowser(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
+    intent.selector = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)
+    runCatching { context.startActivity(intent) }
+        .onFailure { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } }
 }
 
 private fun copyVerses(context: Context, ref: String?, texts: List<String>) {

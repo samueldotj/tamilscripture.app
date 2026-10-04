@@ -61,6 +61,8 @@ import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
 import kotlinx.coroutines.delay
 
+private val HEAT_ALPHA = floatArrayOf(0f, 0.08f, 0.16f, 0.26f, 0.38f)
+
 /** A verse's text with its superscript number, in the design's 1B style. */
 @Composable
 fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean): AnnotatedString {
@@ -114,6 +116,8 @@ fun ReaderTextList(
     secondLocale: LocaleList? = null,
     /** The reader's highlights, notes and bookmarks (M6), by verse. */
     marks: Map<Int, VerseMarks> = emptyMap(),
+    /** Community heat bucket by verse (M8-7), drawn as the website does: accent at 8–38%. */
+    heat: Map<Int, Int> = emptyMap(),
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
 ) {
     val c = Ts.colors
@@ -163,6 +167,7 @@ fun ReaderTextList(
                                         selected -> c.verseSelected
                                         playing -> c.accentWash
                                         mark?.color != null -> c.highlight(mark.color)
+                                        (heat[item.verse] ?: 0) > 0 -> c.accent.copy(alpha = HEAT_ALPHA[heat.getValue(item.verse)])
                                         else -> androidx.compose.ui.graphics.Color.Transparent
                                     },
                                 )

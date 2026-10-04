@@ -68,7 +68,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection.
 - [ ] M0-15 Roborazzi screenshot setup with the width-class × theme × language × font-scale matrix. Started: Roborazzi + Robolectric in :core:designsystem (maps, light/dark, Tamil/English); baselines in src/test/screenshots.
 - [ ] M0-16 Gradle Managed Devices (API 26 low-RAM, API 35) and a `nightly.yml` workflow for instrumented tests.
-- [ ] M0-17 Network guard interceptor for tests and StrictMode in debug builds.
+- [x] M0-17 Network guard (`Http.guard`, `Supabase.guard`) for tests and StrictMode (logging) in debug builds.
 
 ### Exit criteria
 - Every PR produces a debug APK artifact; a test tag produces a signed APK on a GitHub Release and an AAB on the internal track.
@@ -269,7 +269,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M6-9 Settings sync through `profiles.settings` with the website's keys; per-device overrides kept local.
 - [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.
 - [x] M6-9b Sign-out sends what is pending, then wipes the account's local data; a dead session (refresh refused) signs the app out.
-- [ ] M6-9c "Open on website" action for the current passage.
+- [x] M6-9c "Open on website" action on the verse card, always in the browser (never back into the app).
 - [x] M6-10 Export my data (`export_my_data`, saved as a JSON file) and delete account (`delete_my_account`).
 - [ ] M6-11 Sync tests: two devices + website, offline edits for 7 days, conflicting edits, deletes, clear history, both sign-in orders reaching one account, export from either side.
 
@@ -324,7 +324,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M8-5e Static chapter maps in the Study pane, opening the atlas focused on the chapter.
 - [ ] M8-5f Accessibility: place semantics in rank order, list view, timeline and zoom controls; screenshot, gesture and Macrobenchmark tests.
 - [ ] M8-6 Large single-verse view and share as image. Share as image built: a 4:5 card (cross, verse in Mukta Malar shrunk to fit, reference, site) from the verse card and menu, through a FileProvider; screenshot-tested. The large single-verse view is still to do.
-- [ ] M8-7 Community highlight counts, book heatmap, heat overlay (from `/api/heat/{book}.json`, cached). Waits for accounts (M6): the website's /api/heat is empty until people can highlight.
+- [~] M8-7 Community highlight counts, book heatmap, heat overlay (from `/api/heat/{book}.json`, cached). Built: the heat overlay in the reader (Study settings toggle, the website's quartiles and tints, an hour in memory). The book heatmap is open; the API stays empty until readers highlight.
 - [ ] M8-8 Present mode: full screen, keyboard navigation, external display via `Presentation` on tablets and ALOS. Built: a passage verse by verse, full screen, sized to fill; clicker keys, taps, P from the reader; on a second display the verses go there through Presentation and the device shows now/next. Screenshot-tested; untested with a real second display.
 - [ ] M8-9 Stylus highlighting.
 

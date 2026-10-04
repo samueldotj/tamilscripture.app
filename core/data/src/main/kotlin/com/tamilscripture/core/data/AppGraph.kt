@@ -44,6 +44,7 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val content = ContentRepository(http, onlineCache, packs, json, appScope, localTimings = audio::timings)
     val commentary = CommentaryRepository(http, onlineCache, json, packs)
     val search = SearchRepository(http, packs, json)
+    val heat = com.tamilscripture.core.data.content.HeatRepository(http, json)
     val study = StudyRepository(http, onlineCache, packs, content, json)
     val settings = SettingsRepository(context)
     val plans = PlanRepository(context, http)

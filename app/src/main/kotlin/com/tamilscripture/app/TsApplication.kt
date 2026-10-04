@@ -3,6 +3,7 @@ package com.tamilscripture.app
 import android.app.Application
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.StrictMode
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -27,6 +28,12 @@ class TsApplication : Application(), GraphHost {
 
     override fun onCreate() {
         super.onCreate()
+        // M0-17: debug builds log disk and network work on the main thread, and leaks.
+        // Logged, not fatal: the one deliberate read before the first frame (MainActivity) stays.
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
+            StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())
+        }
         val graph = AppGraph(this, packsBaseOverride = BuildConfig.DEV_PACKS_BASE.ifBlank { null })
         val audio = AudioController(this, graph.content, graph.origins, graph.stats, graph.appScope, graph.audio)
         services = AppServices(graph, audio)

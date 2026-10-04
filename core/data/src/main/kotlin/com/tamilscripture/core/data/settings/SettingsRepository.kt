@@ -28,6 +28,8 @@ data class Settings(
     val typeface: Typeface = Typeface.MuktaMalar,
     val headings: Boolean = true,
     val footnotes: Boolean = false,
+    /** Community highlight heat behind verses (M8-7), as the website's setting. */
+    val heat: Boolean = false,
     val crossRefs: Boolean = true,
     val dictionaryWords: Boolean = true,
     val commentary: Boolean = false,
@@ -61,6 +63,7 @@ class SettingsRepository(private val context: Context) {
         val typeface = stringPreferencesKey("typeface")
         val headings = booleanPreferencesKey("headings")
         val footnotes = booleanPreferencesKey("footnotes")
+        val heat = booleanPreferencesKey("heat")
         val crossRefs = booleanPreferencesKey("crossRefs")
         val dictionaryWords = booleanPreferencesKey("dictionaryWords")
         val commentary = booleanPreferencesKey("commentary")
@@ -85,6 +88,7 @@ class SettingsRepository(private val context: Context) {
             typeface = p[K.typeface]?.let { runCatching { Typeface.valueOf(it) }.getOrNull() } ?: d.typeface,
             headings = p[K.headings] ?: d.headings,
             footnotes = p[K.footnotes] ?: d.footnotes,
+            heat = p[K.heat] ?: d.heat,
             crossRefs = p[K.crossRefs] ?: d.crossRefs,
             dictionaryWords = p[K.dictionaryWords] ?: d.dictionaryWords,
             commentary = p[K.commentary] ?: d.commentary,
@@ -115,6 +119,7 @@ class SettingsRepository(private val context: Context) {
             p[K.typeface] = n.typeface.name
             p[K.headings] = n.headings
             p[K.footnotes] = n.footnotes
+            p[K.heat] = n.heat
             p[K.crossRefs] = n.crossRefs
             p[K.dictionaryWords] = n.dictionaryWords
             p[K.commentary] = n.commentary

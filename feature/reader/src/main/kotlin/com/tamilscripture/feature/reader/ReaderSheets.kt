@@ -109,6 +109,11 @@ fun StudySettingsSheet(
                 trailing = { TsToggle(settings.footnotes, { v -> onChange { it.copy(footnotes = v) } }) },
             )
             HDivider()
+            TsListRow(
+                tr("சமூக அடிக்கோட்டு வெப்பம்", "Community highlight heat"), subtitle = tr("பலர் முனைப்பிட்ட வசனங்கள் ஒளிரும் (இணைப்பு தேவை)", "Verses many readers highlighted glow (needs a connection)"),
+                trailing = { TsToggle(settings.heat, { v -> onChange { it.copy(heat = v) } }) },
+            )
+            HDivider()
             Column(Modifier.background(c.surface2).padding(bottom = 18.dp)) {
                 TsListRow(
                     tr("விளக்கவுரை", "Commentary"), subtitle = tr("வசனக் குழுவின் கீழ் மடிந்து", "Folded under each group of verses"),
