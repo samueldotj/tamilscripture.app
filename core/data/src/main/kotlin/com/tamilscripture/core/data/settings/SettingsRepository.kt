@@ -1,0 +1,106 @@
+package com.tamilscripture.core.data.settings
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.tamilscripture.core.model.Passage
+import com.tamilscripture.core.model.UiLang
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore("settings")
+
+enum class Appearance { System, Dark, Light }
+enum class Typeface { MuktaMalar, NotoSansTamil, NotoSerifTamil }
+
+/** Reader and app settings (A-2.6, A-2.7, design 1D). Key names follow the website's settings. */
+data class Settings(
+    val appearance: Appearance = Appearance.System,
+    val uiLang: UiLang = UiLang.Tamil,
+    val version: String = "IRVTAM",
+    /** Scripture size in sp. The design's default is 21. */
+    val fontSize: Int = 21,
+    val typeface: Typeface = Typeface.MuktaMalar,
+    val headings: Boolean = true,
+    val footnotes: Boolean = false,
+    val crossRefs: Boolean = true,
+    val dictionaryWords: Boolean = true,
+    val commentary: Boolean = false,
+    val commentarySource: String = "henry",
+    val lastRead: Passage? = null,
+    val shareStats: Boolean = true,
+)
+
+class SettingsRepository(private val context: Context) {
+    private object K {
+        val appearance = stringPreferencesKey("appearance")
+        val uiLang = stringPreferencesKey("uiLang")
+        val version = stringPreferencesKey("version")
+        val fontSize = intPreferencesKey("fontSize")
+        val typeface = stringPreferencesKey("typeface")
+        val headings = booleanPreferencesKey("headings")
+        val footnotes = booleanPreferencesKey("footnotes")
+        val crossRefs = booleanPreferencesKey("crossRefs")
+        val dictionaryWords = booleanPreferencesKey("dictionaryWords")
+        val commentary = booleanPreferencesKey("commentary")
+        val commentarySource = stringPreferencesKey("commentarySource")
+        val lastRead = stringPreferencesKey("lastRead")
+        val shareStats = booleanPreferencesKey("shareStats")
+    }
+
+    private fun read(p: Preferences): Settings {
+        val d = Settings()
+        return Settings(
+            appearance = p[K.appearance]?.let { runCatching { Appearance.valueOf(it) }.getOrNull() } ?: d.appearance,
+            uiLang = if (p[K.uiLang] == "en") UiLang.English else UiLang.Tamil,
+            version = p[K.version] ?: d.version,
+            fontSize = p[K.fontSize] ?: d.fontSize,
+            typeface = p[K.typeface]?.let { runCatching { Typeface.valueOf(it) }.getOrNull() } ?: d.typeface,
+            headings = p[K.headings] ?: d.headings,
+            footnotes = p[K.footnotes] ?: d.footnotes,
+            crossRefs = p[K.crossRefs] ?: d.crossRefs,
+            dictionaryWords = p[K.dictionaryWords] ?: d.dictionaryWords,
+            commentary = p[K.commentary] ?: d.commentary,
+            commentarySource = p[K.commentarySource] ?: d.commentarySource,
+            lastRead = p[K.lastRead]?.let(::parsePassage),
+            shareStats = p[K.shareStats] ?: d.shareStats,
+        )
+    }
+
+    val settings: Flow<Settings> = context.settingsStore.data.map(::read)
+
+    suspend fun update(transform: (Settings) -> Settings) {
+        context.settingsStore.edit { p ->
+            val cur = read(p)
+            val n = transform(cur)
+            p[K.appearance] = n.appearance.name
+            p[K.uiLang] = n.uiLang.code
+            p[K.version] = n.version
+            p[K.fontSize] = n.fontSize
+            p[K.typeface] = n.typeface.name
+            p[K.headings] = n.headings
+            p[K.footnotes] = n.footnotes
+            p[K.crossRefs] = n.crossRefs
+            p[K.dictionaryWords] = n.dictionaryWords
+            p[K.commentary] = n.commentary
+            p[K.commentarySource] = n.commentarySource
+            n.lastRead?.let { p[K.lastRead] = formatPassage(it) }
+            p[K.shareStats] = n.shareStats
+        }
+    }
+
+    private fun formatPassage(p: Passage) = listOf(p.version, p.book, p.chapter, p.verse ?: 0).joinToString("/")
+
+    private fun parsePassage(s: String): Passage? {
+        val parts = s.split('/')
+        if (parts.size < 3) return null
+        val ch = parts[2].toIntOrNull() ?: return null
+        val v = parts.getOrNull(3)?.toIntOrNull()?.takeIf { it > 0 }
+        return Passage(parts[0], parts[1], ch, v)
+    }
+}

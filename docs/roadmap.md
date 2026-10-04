@@ -1,0 +1,357 @@
+# Tamil Scripture Android App — Roadmap
+
+| | |
+|---|---|
+| Version | 0.1 draft, 3 October 2026 |
+| Requirements | [requirements.md](requirements.md) |
+| Design | [design.md](design.md) |
+
+Ship a fast offline reader first, then add study tools, audio and sync. Every milestone ends with a build on a Play testing track that is usable on its own.
+
+Estimates assume **one full-time Android developer**, with server work (Rust packs, Supabase migrations) done by the same person in the website repository. They are effort in weeks, not calendar dates. Work in the website repository is marked **[web]**.
+
+## Overview
+
+| Milestone | Theme | Estimate | Play track | Depends on |
+|---|---|---|---|---|
+| M0 | Foundations | 2 weeks | — | — |
+| M1 | Offline and online reader | 6 weeks | Internal | M0 |
+| M2 | Every screen size | 3 weeks | Closed testing | M1 |
+| M3 | Search and study | 4 weeks | Closed testing | M1 |
+| M4 | Commentaries | 2 weeks | Closed testing | M3 |
+| M5 | Audio Bible | 3 weeks | Open testing | M1 |
+| M6 | Accounts and sync (app + website parity) | 5 weeks | Open testing | M1 |
+| M7 | Reading plans and widget | 2 weeks | Production 1.0 | M6 |
+| M8 | Study data, atlas, community, present mode | 6 weeks | 1.x updates | M3, M6 |
+| | **Total to 1.0 (M0–M7)** | **~27 weeks** | | |
+
+Moving the website's own content to R2 is deferred (owner, 3 Oct 2026). Two small preparations in the website repo keep that a configuration change later: `PUBLIC_CONTENT_BASE` in `contentUrl()` and an origin-agnostic service-worker match ([design §7.11.5](design.md#7115-website-side-prepared-not-migrated)). They can be done at any point and are not on the critical path.
+
+Stats collection is not a separate milestone. It starts in M1 with `view` and `read` events, and each later milestone adds its own events.
+
+M2 to M6 can overlap when there is more than one developer. With two developers, a practical split is: one on M2 + M5, the other on M3 + M4, joining for M6.
+
+---
+
+## M0 · Foundations (2 weeks)
+
+**Goal:** an empty app that builds, tests and ships to the internal track, with the Rust bridge and the pack pipeline proven end to end on one tiny pack.
+
+### Tasks
+
+**Project setup**
+- [ ] M0-1 Create the Gradle project: version catalog, Kotlin DSL, `build-logic` convention plugins, module skeletons from [design §3.2](design.md#32-modules).
+- [ ] M0-2 Hilt, Navigation Compose with typed routes, `MainActivity` with edge-to-edge, `TsApplication`.
+- [ ] M0-3 Flavors `dev`, `staging`, `prod`; `BuildConfig` for Supabase URL, anon key and the two bootstrap addresses (one per provider). No content host is compiled in ([design §7.11](design.md#711-changing-hosts-r2--vercel)).
+- [ ] M0-4 GitHub Actions `android.yml`: Rust job building `ts-mobile` from the pinned website commit, then lint, detekt, unit tests and a debug APK artifact on every PR ([design §16.3](design.md#163-build-workflow-githubworkflowsandroidyml)).
+- [ ] M0-4a `rust/website.ref` pin, read-only deploy key `WEBSITE_REPO_KEY`, and `scripts/build-rust.sh` for local builds.
+- [ ] M0-4b `release.yml`: on a `v*` tag, signed universal and per-ABI APKs on a GitHub Release and the AAB on the Play internal track ([design §16.4](design.md#164-release-workflow-githubworkflowsreleaseyml)); upload keystore and Play service account in repository secrets.
+- [ ] M0-5 Play Console app, package name, Play App Signing, internal track; upload a first build from CI.
+
+**Rust bridge**
+- [ ] M0-6 **[web]** Create `crates/ts-mobile` with UniFFI exports for `bible-ref` and `tamil-norm` ([design §9](design.md#9-shared-rust-code)).
+- [ ] M0-7 `:core:rust`: `cargo-ndk` Gradle task for arm64-v8a, armeabi-v7a, x86_64; generated Kotlin bindings; size check < 1 MB per ABI.
+- [ ] M0-8 Instrumented test running the website's reference fixture list through the Android build.
+
+**Pack pipeline (thin slice)**
+- [ ] M0-9 **[web]** Create `crates/pack-build`; build a Bible pack for one book with the schema in [design §7.3](design.md#73-bible-pack-schema), including `verse_fts` and `verse_tri`.
+- [ ] M0-10 **[web]** zstd compression, SHA-256, `catalogue.json` with Ed25519 signature; determinism test.
+- [ ] M0-11 Local pack server for `dev` (static file server) and a script to publish to it.
+- [ ] M0-12 `:core:data`: `BundledSQLiteDriver`, `PackRegistry` opening a pack read-only, a smoke test that reads John 3 and runs an FTS5 query.
+
+**Design system base**
+- [ ] M0-13 `:core:design`: colour tokens light/dark, bundled subset fonts, typography scale, shapes ([design §5](design.md#5-design-system)).
+
+**Test infrastructure** ([design §15](design.md#15-testing))
+- [ ] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection.
+- [ ] M0-15 Roborazzi screenshot setup with the width-class × theme × language × font-scale matrix.
+- [ ] M0-16 Gradle Managed Devices (API 26 low-RAM, API 35) and a `nightly.yml` workflow for instrumented tests.
+- [ ] M0-17 Network guard interceptor for tests and StrictMode in debug builds.
+
+### Exit criteria
+- Every PR produces a debug APK artifact; a test tag produces a signed APK on a GitHub Release and an AAB on the internal track.
+- A device test reads a verse from a downloaded pack and finds it with a Tamil FTS5 query normalised by Rust.
+- Reference fixtures pass on Android.
+
+---
+
+## M1 · Offline reader (5 weeks)
+
+**Goal:** a user installs the app and reads any chapter at once, online or from downloaded packs, fast, on a phone. Downloads and updates happen automatically in the background. Stats for chapters viewed and verses read reach Supabase with city-level location.
+
+**Requirements:** A-1.1–A-1.4, A-2.1–A-2.8, A-3.1 (Reader and Standard), DL-1–DL-10, ON-1–ON-8, ST-1–ST-9, NF-1–NF-3, NF-5–NF-7, NF-9, NF-10, NF-13.
+
+### Tasks
+
+**Packs and catalogue**
+- [ ] M1-1 **[web]** `pack-build` for all Bible versions (IRVTAM, TCV, TOV, BSB, WEB, KJV) and the cross-reference pack.
+- [ ] M1-2 **[web]** CI workflow `packs.yml`: build, sign, upload to R2 under immutable paths, catalogue last.
+- [ ] M1-3 **[web]** R2 bucket and custom domain for packs; CORS not needed (no browser access).
+- [ ] M1-4 `CatalogueRepository`: fetch, verify signature, cache; remote config values; all locations as paths.
+- [ ] M1-4a `OriginResolver`: signed `bootstrap.json` from two providers, last-good copy in DataStore, built-in fallback, ordered origins with one-retry failover and 10-minute down marking.
+- [ ] M1-4b **[web]** Publish scripts with targets `vercel`, `r2` or both, writing identical path layouts; `bootstrap.json` published to both providers.
+- [ ] M1-4c `scripts/check-origin.sh` conformance test (Range, cache headers, content types, SHA-256), run nightly against every configured origin.
+- [ ] M1-5 `PackDownloadWorker`: foreground `dataSync` service, progress notification, Range resume, Wi-Fi-only option, pause/cancel ([design §7.7](design.md#77-download-and-install)).
+- [ ] M1-6 Verify → decompress → integrity check → atomic install; `installed_pack` table; space check.
+- [ ] M1-7 Automatic pack updates: `CatalogueRefreshWorker` (daily and on app start), updates on unmetered networks by default, setting for mobile data or off, side-by-side install and atomic swap, "Recently updated" list ([design §7.10](design.md#710-keeping-content-up-to-date)).
+- [ ] M1-8 Downloads screen: catalogue list, sizes, install state, update badges, delete, storage total.
+- [ ] M1-9 Onboarding: interface language, starter set, reader opens at once using online reading and switches to the pack when installed; "Skip downloads"; offline first-run retry screen.
+
+**Online reading** ([design §7.9](design.md#79-online-reading))
+- [ ] M1-9a `ContentSource`: pack → online cache → network resolution for chapters, cross-references and audio timings.
+- [ ] M1-9b Content manifest client (`/content/manifest.json`) and chapter fetcher with timeouts, retry and request coalescing.
+- [ ] M1-9c Online cache: `online_cache` table keyed by content path (not URL), LRU over 50 MB (keep at least 200 chapters), size setting, clear action.
+- [ ] M1-9d Stale-while-revalidate when the content build changes; in-place UI update.
+- [ ] M1-9e Prefetch of neighbouring chapters (±1, next 3 on Wi-Fi); data-saver setting for mobile data.
+- [ ] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action.
+- [ ] M1-9g Downloads screen shows packs and the online cache separately.
+
+**Reader**
+- [ ] M1-10 `ChapterRepository`: load chapter JSON, parse, LRU cache, neighbour prefetch.
+- [ ] M1-11 `ChapterUi` builder: blocks → `AnnotatedString`s with verse links, footnote callers, `wj` spans, headings, poetry indents.
+- [ ] M1-12 Reader screen: `LazyColumn` of blocks, `HorizontalPager` across all 1,189 chapters, prev/next buttons.
+- [ ] M1-13 Reader and Standard formats; paratext toggles (intros, headings, footnotes, cross-reference markers).
+- [ ] M1-14 Footnote popover/sheet; licence footer per version; About screen with all licences.
+- [ ] M1-15 Book/chapter/verse picker with Tamil and English names; current position marked.
+- [ ] M1-16 Reference box using `bible-ref` with suggestions; Tamil numerals.
+- [ ] M1-17 Verse selection and action bar: copy, share (text + website link); multi-verse selection.
+- [ ] M1-18 Position anchor, back stack with restored scroll, predictive back; continue reading on launch.
+- [ ] M1-19 Reader settings sheet: font size steps, line height, Tamil typeface, theme; DataStore persistence.
+- [ ] M1-20 Interface strings in Tamil and English; per-app language switch.
+
+**Stats**
+- [ ] M1-21 **[web]** Migration: `source`, `event_id`, `app`, `window`, `offline` columns; widen `kind`; `track_app_batch(jsonb, uuid, text, text, text)` executable by the service role only; pgTAP tests ([design §12.4](design.md#124-server-side-new-migration-in-the-website-repo)).
+- [ ] M1-21a **[web]** `/api/t/app` Vercel route: size limits, optional JWT verification via JWKS, Vercel geo headers, bot and rate checks, calls `track_app_batch` with the service role ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)).
+- [ ] M1-22 `StatsRecorder` channel → Room `pending_event`; retention cap; opt-out setting.
+- [ ] M1-23 `StatsSyncWorker`: batching, back-off, delete on confirmation, expedited run on background.
+- [ ] M1-24 `VisibleVerseTracker` for `read` events (60% visible for 2 s, confirmed) ([design §6.6](design.md#66-verse-read-tracking-for-stats)); `view` events with `source` pack/cache/online.
+- [ ] M1-25 Debug stats screen.
+
+**Performance**
+- [ ] M1-26 `:benchmark` module: startup and chapter-swipe Macrobenchmarks; Baseline Profile generation in CI.
+- [ ] M1-27 Airplane-mode integration test (fails on any network call while reading downloaded content).
+- [ ] M1-28 Online-reading tests: no packs installed, cache hit with the server stopped, revalidation on a new build ([design §15.4](design.md#154-what-specific-requirements-need)).
+- [ ] M1-29 Download fault tests: dropped connections, wrong checksum, process kill during install, automatic update constraints.
+
+### Exit criteria
+- Cold start to the last chapter < 1.0 s at p90 on a Pixel 6a; chapter change < 100 ms.
+- With the network off, every downloaded chapter opens, and the airplane-mode test passes.
+- With nothing downloaded, any chapter opens online in < 1 s on 4G, and opens again offline from the cache.
+- A pack published with a new version updates itself on Wi-Fi with no user action.
+- A killed download resumes and never leaves a broken pack.
+- `view` and `read` events from a test device appear in `analytics_events` with `source = 'android'` and a city, once each.
+
+---
+
+## M2 · Every screen size (3 weeks)
+
+**Goal:** the reader is excellent on foldables, tablets and ALOS, with keyboard and mouse, and passes Play's large-screen quality checks.
+
+**Requirements:** FF-1–FF-10, A-2.10, NF-8.
+
+### Tasks
+- [ ] M2-1 `NavigationSuiteScaffold` with top-level destinations (Read, Search, Plans, Library, Settings).
+- [ ] M2-2 Reader in `SupportingPaneScaffold`; book rail list pane on large windows; max text width.
+- [ ] M2-3 `PaneDivider`: drag, keyboard adjust, snap points, hinge snapping.
+- [ ] M2-4 Fold postures: tabletop and book layouts via `WindowInfoTracker`.
+- [ ] M2-5 `ShortcutRegistry`: all shortcuts in FF-5; `onProvideKeyboardShortcuts`; Ctrl+/ overlay.
+- [ ] M2-6 Focus order and arrow-key verse navigation; visible focus indicators.
+- [ ] M2-7 Right-click context menu on verses; hover states; Ctrl+scroll font size.
+- [ ] M2-8 Drag selected verses out as text.
+- [ ] M2-9 Open in new window (multi-instance); per-window state.
+- [ ] M2-10 State survives rotation, fold, resize and window moves (tests for each).
+- [ ] M2-11 **[web]** `/.well-known/assetlinks.json`; App Links for chapter, verse and shorthand URLs.
+- [ ] M2-12 Accessibility pass: TalkBack verse labels, Tamil/English locale spans, 200% font scale, contrast on highlight colours, Accessibility Scanner clean.
+- [ ] M2-13 Screenshot tests at compact, medium, expanded, large; light/dark; Tamil/English.
+- [ ] M2-14 Device runs: Pixel Fold, Pixel Tablet, an ALOS/ChromeOS device with keyboard and mouse, a 2 GB Android 8 phone.
+
+### Exit criteria
+- Play large-screen quality checklist Tier 2 passes on tablet and ALOS.
+- Every FF requirement demonstrated on a real device.
+- No layout breaks between 320 dp and 2,560 dp width while resizing live.
+
+---
+
+## M3 · Search and study (4 weeks)
+
+**Goal:** fast offline search in Tamil and English, cross-references, dual view and the Study Bible format.
+
+**Requirements:** A-3.1 (Study Bible), A-3.3–A-3.5, A-4.1–A-4.5, A-4.7, A-4.8, A-5.1, NF-4.
+
+### Tasks
+- [ ] M3-1 **[web]** Port romanised-Tamil conversion to `ts-mobile` with the website's fixtures.
+- [ ] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
+- [ ] M3-3 Trigram fallback when fewer than 5 hits.
+- [ ] M3-4 Match highlighting by token normalisation.
+- [ ] M3-5 Results grouped by book with counts; testament/book filters; multi-version search in parallel.
+- [ ] M3-6 Autocomplete (book names, recent searches); common searches cached from Supabase.
+- [ ] M3-6a Online search through the website's `/api/search` for versions that are not downloaded, mapped to the same result model with an "online results" label.
+- [ ] M3-7 `search` stats events; queries also feed `search_log` server-side.
+- [ ] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.
+- [ ] M3-9 Study Bible format: one verse per item, inline cross-references.
+- [ ] M3-10 Dual view: versification alignment, two-column rows (medium+), interleaved (compact), shared selection, missing-verse cells.
+- [ ] M3-11 Version switcher and "compare with" control.
+- [ ] M3-12 Search benchmark in `:benchmark` (Tamil and English queries from the website's search log).
+
+### Exit criteria
+- Search first results < 300 ms on a Pixel 6a for the 50 most common queries.
+- Tamil search results equal the website's for a fixture set of 100 queries (same verse set, order may differ).
+- Dual view scrolls in step at 60 fps.
+
+---
+
+## M4 · Commentaries (2 weeks)
+
+**Goal:** five commentaries (Henry, Calvin, Geneva, Poole, Trapp) readable online or downloaded, and shown beside or under the text. The Early Church Fathers are left out for now.
+
+**Requirements:** A-5.2–A-5.4.
+
+### Tasks
+- [ ] M4-1 **[web]** `pack-build` commentary packs from `bible-commentaries/dist/commentary/{version}` for the five commentaries, with Tamil drafts and provenance.
+- [ ] M4-2 `CommentaryRepository` through `ContentSource`: pack, then cache, then the existing commentary CDN (`latest.json`); Tamil when available and the UI is Tamil, else English with the "translation coming" label.
+- [ ] M4-3 Commentary focus pane (expanded+) with source tabs and "also in" previews from other installed commentaries.
+- [ ] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.
+- [ ] M4-5 Commentary text renderer: anchors, verse labels, footnotes, references as links.
+- [ ] M4-6 Attribution and licence strip per commentary.
+- [ ] M4-7 `commentary` stats events.
+
+### Exit criteria
+- Matthew Henry on John 3 opens offline in < 150 ms, and online in < 1 s on 4G when not downloaded.
+- Pane and inline layouts switch correctly on resize.
+
+---
+
+## M5 · Audio Bible (3 weeks)
+
+**Goal:** listen to any chapter, in the background, streamed or offline, with the verse being read highlighted.
+
+**Requirements:** A-6.1–A-6.9.
+
+### Tasks
+- [ ] M5-1 **[web]** Audio index packs per version/recording from `chapters.tsv` and `timings/*.tsv`.
+- [ ] M5-2 `PlaybackService` (`MediaLibraryService`), ExoPlayer, media notification, lock screen, headphone and Bluetooth controls.
+- [ ] M5-3 Queue per book with auto-continue across chapters and books.
+- [ ] M5-4 URI resolution local → `audio` origin; `SimpleCache` with a path-only `CacheKeyFactory`; verse timings through `ContentSource` when the audio index is not downloaded.
+- [ ] M5-5 Player bar (compact) and rail-footer player (medium+); tabletop posture controls.
+- [ ] M5-6 Verse sync: highlight current verse, follow-audio scrolling, "play from here".
+- [ ] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
+- [ ] M5-8 Audio downloads per book and per version; storage display; delete.
+- [ ] M5-9 Android Auto browse tree (versions → books → chapters).
+- [ ] M5-10 `audio` stats events with seconds listened and offline flag.
+
+### Exit criteria
+- One hour of background playback with the screen off, across chapter boundaries, without stalls.
+- Offline playback works in airplane mode.
+- Listening minutes from a test device appear correctly in `/mod/traffic`.
+
+---
+
+## M6 · Accounts and sync, one account with the website (5 weeks)
+
+**Goal:** signed-in users get highlights, notes, bookmarks, history and settings on every device and on the website.
+
+**Requirements:** A-2.11, A-7.1–A-7.8, X-1–X-9, NF-12.
+
+### Tasks
+- [ ] M6-1 **[web]** Migrations: `bookmarks`, `deleted_rows` with triggers, `updated_at` triggers verified; pgTAP RLS tests.
+- [ ] M6-2 **[web]** `/auth/app-callback` route for magic links.
+- [ ] M6-2a Google Cloud: Android OAuth client in the website's existing project (package name, SHA-1 of the Play app-signing and debug keys); confirm Supabase automatic identity linking by verified email ([design §13.1](design.md#131-sign-in)).
+- [ ] M6-2b **[web]** Bookmarks on the website: verse-action-bar action and `/me/bookmarks`; bookmarks in `export_my_data()`.
+- [ ] M6-2c **[web]** Website refetches personal data on tab focus and every 60 s while visible; "Continue reading" uses the account's latest history when signed in; "Open in app" banner on Android ([design §13.5](design.md#135-app-and-website-parity)).
+- [ ] M6-3 Google sign-in via Credential Manager + `signInWithIdToken`; email magic link via App Link.
+- [ ] M6-4 Room tables for highlights, notes, bookmarks, history, plan progress, sync cursors.
+- [ ] M6-5 Highlights: whole-verse and word-range, four colours, change/remove; highlights list by colour and book.
+- [ ] M6-6 Notes: editor with autosave, markers, margin notes on wide windows, notes list with search.
+- [ ] M6-7 Bookmarks and history screens; pause and clear history.
+- [ ] M6-8 `UserDataSyncWorker`: push dirty, pull by cursor, apply deletes, full re-pull on stale cursor ([design §13.3](design.md#133-sync-protocol)).
+- [ ] M6-9 Settings sync through `profiles.settings` with the website's keys; per-device overrides kept local.
+- [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.
+- [ ] M6-9b Sign-out wipes the account's local data; account deletion from the website detected on next sync and wiped locally.
+- [ ] M6-9c "Open on website" action for the current passage.
+- [ ] M6-10 Export my data (share JSON) and delete account.
+- [ ] M6-11 Sync tests: two devices + website, offline edits for 7 days, conflicting edits, deletes, clear history, both sign-in orders reaching one account, export from either side.
+
+### Exit criteria
+- Signing in with Google in the app reaches the same account and data as signing in on the website, and so does an email link.
+- A highlight, note, bookmark, history entry or plan tick made in either place appears in the other within 1 minute while both are open.
+- Offline edits made over 7 days merge correctly.
+- RLS tests prove one user cannot read another's rows through the API.
+
+---
+
+## M7 · Reading plans and widget → 1.0 (2 weeks)
+
+**Goal:** reading plans at parity with the website; release 1.0 to production.
+
+**Requirements:** A-8.1–A-8.3, NF-11.
+
+### Tasks
+- [ ] M7-1 Port `schedule.ts` (built-in plans, rest days, Psalm 119 stanzas) to Kotlin; test against the website's outputs for every day of every plan.
+- [ ] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
+- [ ] M7-3 Community plans from `reading_plans` (published only), cached offline.
+- [ ] M7-4 Progress local when signed out; moved to the account on first sign-in, as the website does.
+- [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine).
+- [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open.
+- [ ] M7-7 `plan` stats events.
+- [ ] M7-8 Release prep: store listing in Tamil and English, screenshots for phone, tablet and ALOS, Data safety form, privacy policy update on the website.
+- [ ] M7-9 Staged production rollout 10% → 50% → 100% with crash-free ≥ 99.5%.
+
+### Exit criteria
+- Plan schedules match the website exactly.
+- 1.0 live on Play at 100% rollout.
+
+---
+
+## M8 · Study data, atlas, community and present mode (6 weeks, after 1.0)
+
+**Goal:** the rest of the website's study features.
+
+**Requirements:** A-2.9, A-3.2, A-4.6, A-5.5–A-5.7, A-8.4, A-8.5, FF-7.
+
+### Tasks
+- [ ] M8-0 Atlas renderer test (about 2 days): build option A (Compose) and option B (MapLibre + Android-drawn label images) behind `AtlasRenderer` with real map data; measure against the pass marks in [design §11.5](design.md#115-rendering-decided-by-a-test-in-m8-adr-12); record the result in ADR-12.
+- [ ] M8-1 **[web]** Study packs: Strong's (lexicon, occurrences, original words), persons, places, dictionary; `study.maps` (projected geometry at three detail levels, places, journeys, polities, church) and `study.maps.chapters` (static chapter maps) ([design §11.2](design.md#112-data)).
+- [ ] M8-2 Original-words view per verse; Strong's page listing every verse in the current version.
+- [ ] M8-3 Person, place and dictionary article screens with provenance badges; search sections.
+- [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names.
+- [ ] M8-5 Atlas screen with the chosen renderer: base map, Places layer, rank-based labels with collision, Tamil labels in the reader's typeface ([design §11](design.md#11-atlas-and-maps)).
+- [ ] M8-5a Camera: pinch, pan with fling, double-tap and two-finger-tap zoom, zoom and pan limits, animated fit-to-journey and centre-on-place, state saved across resize and fold.
+- [ ] M8-5b Selection: tap within 24 dp, details in a bottom sheet (compact), side sheet (medium) or right pane (expanded+); verses open the reader in the other pane or a new window.
+- [ ] M8-5c Journeys layer and list (grouped by period, colour plus dash legend, hover emphasis on large windows); Kingdoms timeline; Early church layer.
+- [ ] M8-5d Mouse, keyboard and context menu on ALOS; place search on the map; App Links for `/atlas/explore`, `/atlas/{journey}`, `/place/{slug}`.
+- [ ] M8-5e Static chapter maps in the Study pane, opening the atlas focused on the chapter.
+- [ ] M8-5f Accessibility: place semantics in rank order, list view, timeline and zoom controls; screenshot, gesture and Macrobenchmark tests.
+- [ ] M8-6 Large single-verse view and share as image.
+- [ ] M8-7 Community highlight counts, book heatmap, heat overlay (from `/api/heat/{book}.json`, cached).
+- [ ] M8-8 Present mode: full screen, keyboard navigation, external display via `Presentation` on tablets and ALOS.
+- [ ] M8-9 Stylus highlighting.
+
+### Exit criteria
+- Acts 13 shows its places on a map offline; "தமஸ்கு" in search opens Damascus.
+- Tamil map labels (கொரிந்து, தமஸ்கு, ஸ்ரீ) render exactly as in the reader.
+- Pan and zoom with Kingdoms on hold 60 fps on a Pixel 6a and at least 45 fps on a 2 GB Android 8 phone.
+- A presentation runs from a tablet to an external display with keyboard control.
+
+---
+
+## Cross-cutting work in every milestone
+
+- [ ] Add stats events for new features, with tests that they never block the UI.
+- [ ] New content types go through `ContentSource`, so they work online and offline from the start.
+- [ ] No host names in code, stored data or caches: only origin names and paths.
+- [ ] Screenshot tests for new screens at all four width classes.
+- [ ] Update the Baseline Profile when a new critical path is added.
+- [ ] Tamil and English strings for every new string.
+- [ ] Keep [requirements.md](requirements.md) and [design.md](design.md) current; record decisions as ADRs.
+
+## Risks
+
+| Risk | Effect | Mitigation |
+|---|---|---|
+| A licence changes for a text, commentary or recording | A pack must be withdrawn | The catalogue can hide a pack without an app release; audio can fall back to streaming |
+| Vercel bandwidth from online reading and stats | Hosting cost | Content base URL is in the catalogue: mirror `/content` to R2 if needed; stats are batched to about one request per session |
+| Tamil rendering differences on old Android versions | Broken conjuncts | Bundled fonts; screenshot tests on API 26 |
+| ALOS device availability for testing | Desktop issues found late | Test on ChromeOS with Android apps as a proxy from M2; resizable emulator |
+| Pack sizes grow (Tamil commentary drafts) | Slow downloads | Split large commentaries by testament; delta updates later |
+| Supabase schema changes collide with website work | Broken web or app | All migrations in the website repo, reviewed together, pgTAP in CI |
+| One developer | Slower delivery | Milestones are independently shippable; M8 can slip without blocking 1.0 |

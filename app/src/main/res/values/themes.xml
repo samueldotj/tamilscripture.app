@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shown until the first chapter or home screen is composed (NF-2). -->
+    <style name="Theme.TamilScripture.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ts_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.TamilScripture</item>
+    </style>
+
+    <style name="Theme.TamilScripture" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ts_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The gold cross from the design's "தமிழ் வேதாகமம்" mark, centred in the 108 dp adaptive-icon canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="@color/ts_gold" android:pathData="M50,32h8v44h-8z" />
+    <path android:fillColor="@color/ts_gold" android:pathData="M38,44h32v8h-32z" />
+</vector>
