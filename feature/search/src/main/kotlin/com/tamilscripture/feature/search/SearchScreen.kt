@@ -94,6 +94,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     var perBook by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
     // M3-5: every version at once, merged in canonical order.
     var allVersions by rememberSaveable { mutableStateOf(false) }
+    var widened by remember { mutableStateOf(false) }
     val scopeRange = remember(scope, manifest) {
         val books = manifest?.books.orEmpty()
         when (val sc = scope) {
@@ -129,11 +130,20 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
         loading = true
         try {
             val versions = manifest?.versions.orEmpty().sortedBy { it.order }.map { it.code }
-            val r = if (allVersions && versions.size > 1) {
+            val everyVersion = listOf(settings.version) + (versions - settings.version)
+            val isTamil = { v: String -> manifest?.version(v)?.lang == "ta" }
+            widened = false
+            var r = if (allVersions && versions.size > 1) {
                 // The reader's version first, so its hits lead within each verse.
-                graph.search.searchVersions(query.trim(), listOf(settings.version) + (versions - settings.version), { v -> manifest?.version(v)?.lang == "ta" }, scopeRange)
+                graph.search.searchVersions(query.trim(), everyVersion, isTamil, scopeRange)
             } else {
-                graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta", books = scopeRange)
+                graph.search.search(query.trim(), settings.version, tamil = isTamil(settings.version), books = scopeRange)
+            }
+            // Nothing in the reader's version ("shepherd" in a Tamil Bible): try every version,
+            // as the website's search does, and say so.
+            if (r.response.total == 0 && !allVersions && versions.size > 1) {
+                runCatching { graph.search.searchVersions(query.trim(), everyVersion, isTamil, scopeRange) }.getOrNull()
+                    ?.takeIf { it.response.total > 0 }?.let { r = it; widened = true }
             }
             hits = r.response.hits; total = r.response.total; offline = r.offline; shown = r.shown; romanOffer = r.romanOffer
             perBook = r.perBook
@@ -242,6 +252,13 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                     ScopeRow(null, emptyList(), manifest?.books.orEmpty(), lang, true, { allVersions = false }) { }
                 }
                 if (hits.isNotEmpty()) {
+                    if (widened) item {
+                        Text(
+                            tr("${manifest?.version(settings.version)?.short ?: settings.version} இல் இல்லை; மற்ற மொழிபெயர்ப்புகளில்:",
+                                "Not in ${manifest?.version(settings.version)?.short ?: settings.version}; found in other versions:"),
+                            style = Ts.type.body, color = c.ink2, modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
+                        )
+                    }
                     if (shown != query.trim()) item {
                         Text(
                             tr("“$shown” என்பதற்கான முடிவுகள்", "Showing results for “$shown”"),
@@ -271,7 +288,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                         ) {
                             Text(
                                 (book?.label(lang, vid.chapter, vid.verse) ?: h.verseId) +
-                                    if (allVersions) " · " + (manifest?.version(h.version)?.short ?: h.version) else "",
+                                    if (allVersions || widened) " · " + (manifest?.version(h.version)?.short ?: h.version) else "",
                                 style = Ts.type.labelSmall, color = c.accent,
                             )
                             val ranges = remember(h.text, shown) { PackRepository.matchRanges(h.text, shown) }
