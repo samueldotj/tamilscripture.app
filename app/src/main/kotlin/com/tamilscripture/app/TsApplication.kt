@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.tamilscripture.app.widget.TodayWidget
 import com.tamilscripture.core.data.AppGraph
 import com.tamilscripture.core.data.GraphHost
 import com.tamilscripture.core.data.packs.PackRepository
@@ -42,9 +43,13 @@ class TsApplication : Application(), GraphHost {
             }
         }
 
-        // ST-2: send what is queued when the app goes to the background.
+        // ST-2: send what is queued when the app goes to the background; and bring the
+        // widget's "Continue reading" up to date for the home screen the reader returns to.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStop(owner: LifecycleOwner) = StatsRecorder.syncSoon(this@TsApplication)
+            override fun onStop(owner: LifecycleOwner) {
+                StatsRecorder.syncSoon(this@TsApplication)
+                graph.appScope.launch { runCatching { TodayWidget.refresh(this@TsApplication) } }
+            }
         })
     }
 

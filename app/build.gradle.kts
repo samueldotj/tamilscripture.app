@@ -70,6 +70,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(libs.androidx.glance.appwidget)
     implementation(project(":core:media"))
     implementation(project(":feature:home"))
     implementation(project(":feature:reader"))

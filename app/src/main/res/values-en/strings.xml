@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tamil Scripture</string>
+    <string name="widget_today_description">The verse of the day and where you left off</string>
 </resources>

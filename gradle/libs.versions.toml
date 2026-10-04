@@ -4,6 +4,7 @@ kotlin = "2.4.10"
 ksp = "2.3.11"
 coreKtx = "1.19.0"
 lifecycle = "2.11.0"
+glance = "1.2.0"
 activityCompose = "1.13.0"
 composeBom = "2026.08.00"
 navigation3 = "1.2.0"
@@ -24,6 +25,7 @@ androidxTestRunner = "1.7.0"
 espresso = "3.7.0"
 
 [libraries]
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">தமிழ் வேதாகமம்</string>
+    <string name="widget_today_description">இன்றைய வசனமும் நீங்கள் நிறுத்திய இடமும்</string>
 </resources>

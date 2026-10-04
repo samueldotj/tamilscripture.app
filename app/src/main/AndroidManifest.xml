@@ -43,5 +43,18 @@
             android:name=".ReaderWindowActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- M7-6: verse of the day and "continue reading" on the home screen. -->
+        <receiver
+            android:name=".widget.TodayWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/today_widget_info" />
+        </receiver>
     </application>
 </manifest>

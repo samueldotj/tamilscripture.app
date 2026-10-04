@@ -239,7 +239,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
 - [ ] M5-8 Audio downloads per book and per version; storage display; delete.
 - [ ] M5-9 Android Auto browse tree (versions → books → chapters).
-- [ ] M5-10 `audio` stats events with seconds listened and offline flag.
+- [x] M5-10 `audio` stats events with seconds listened and offline flag. Done with the player (play, jump, next, end, time).
 
 ### Exit criteria
 - One hour of background playback with the screen off, across chapter boundaries, without stalls.
@@ -293,8 +293,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M7-3 Community plans from `reading_plans` (published only), cached offline.
 - [ ] M7-4 Progress local when signed out; moved to the account on first sign-in, as the website does.
 - [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine).
-- [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open.
-- [ ] M7-7 `plan` stats events.
+- [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; on-device check pending.
+- [x] M7-7 `plan` stats events. Done (`plan` events on ticking a passage).
 - [ ] M7-8 Release prep: store listing in Tamil and English, screenshots for phone, tablet and ALOS, Data safety form, privacy policy update on the website.
 - [ ] M7-9 Staged production rollout 10% → 50% → 100% with crash-free ≥ 99.5%.
 
