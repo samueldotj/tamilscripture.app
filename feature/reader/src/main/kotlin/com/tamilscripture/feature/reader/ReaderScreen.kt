@@ -356,7 +356,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                                    marks = marks, onOpenNote = { n -> editingNote = n.id },
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null,
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -615,6 +615,7 @@ private fun ChapterBody(
     interactions: VerseInteractions? = null,
     marks: Map<Int, VerseMarks> = emptyMap(),
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
+    notesInMargin: Boolean = false,
 ) {
     val c = Ts.colors
     when {
@@ -643,7 +644,7 @@ private fun ChapterBody(
                 dualLabels = dualLabels, dualColumns = dualColumns, interactions = interactions,
                 textLocale = state.manifest?.version(state.passage.version)?.lang?.let(::LocaleList),
                 secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
-                marks = marks, onOpenNote = onOpenNote, heat = state.heat,
+                marks = marks, onOpenNote = onOpenNote, heat = state.heat, notesInMargin = notesInMargin && !state.dual,
             )
         }
     }

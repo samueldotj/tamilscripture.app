@@ -61,6 +61,8 @@ import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
 import kotlinx.coroutines.delay
 
+private val MARGIN_WIDTH = 220.dp
+
 private val HEAT_ALPHA = floatArrayOf(0f, 0.08f, 0.16f, 0.26f, 0.38f)
 
 /** A verse's text with its superscript number, in the design's 1B style. */
@@ -118,6 +120,8 @@ fun ReaderTextList(
     marks: Map<Int, VerseMarks> = emptyMap(),
     /** Community heat bucket by verse (M8-7), drawn as the website does: accent at 8–38%. */
     heat: Map<Int, Int> = emptyMap(),
+    /** Notes in a margin column beside the text instead of under each verse. */
+    notesInMargin: Boolean = false,
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
 ) {
     val c = Ts.colors
@@ -150,7 +154,7 @@ fun ReaderTextList(
                         color = c.muted,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
-                    is ReaderItem.Verse -> Column {
+                    is ReaderItem.Verse -> Row { Column(Modifier.weight(1f)) {
                         val selected = item.verse in selection
                         val playing = item.verse == playingVerse
                         val mark = marks[item.verse]
@@ -186,10 +190,17 @@ fun ReaderTextList(
                                 }
                             }
                         }
-                        mark?.notes?.forEach { n -> NoteChip(n) { onOpenNote(n) } }
+                        if (!notesInMargin) mark?.notes?.forEach { n -> NoteChip(n) { onOpenNote(n) } }
                         unitsAfter[item.verse]?.forEach { unit ->
                             InlineCommentaryCard(unit, commentaryName ?: "", preferTamil = lang == UiLang.Tamil, onOpen = onOpenCommentary)
                         }
+                    }
+                    // M6-6: on wide windows a note sits in the margin beside its verse, as on the website.
+                    if (notesInMargin) {
+                        Column(Modifier.width(MARGIN_WIDTH).padding(start = 12.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            marks[item.verse]?.notes?.forEach { n -> MarginNote(n) { onOpenNote(n) } }
+                        }
+                    }
                     }
                 }
             }

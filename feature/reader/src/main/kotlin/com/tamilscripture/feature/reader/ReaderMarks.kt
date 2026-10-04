@@ -111,7 +111,8 @@ fun NoteSheet(reference: String, note: UserNote?, onSave: (String) -> Unit, onDe
     var text by rememberSaveable(note?.id) { mutableStateOf(note?.body.orEmpty()) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    TsSheet(onDismiss) {
+    // Closing the sheet keeps what was written (M6-6): nothing typed is lost to a swipe.
+    TsSheet({ if (text.isNotBlank() && text.trim() != note?.body) onSave(text.trim()) else onDismiss() }) {
         Column(Modifier.imePadding().padding(start = 22.dp, end = 22.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Kicker(tr("குறிப்பு", "Note") + " · " + reference)
             Box(
@@ -144,5 +145,15 @@ fun NoteChip(note: UserNote, onOpen: () -> Unit) {
     ) {
         Icon(TsIcons.Note, null, Modifier.size(16.dp).padding(top = 2.dp), tint = c.accent)
         Text(note.body, style = Ts.type.caption, color = c.ink2, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** A note in the margin on wide windows: the start of it, with a rule on its left. */
+@Composable
+fun MarginNote(note: UserNote, onOpen: () -> Unit) {
+    val c = Ts.colors
+    Row(Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.size(width = 2.dp, height = 40.dp).background(c.accent))
+        Text(note.body, style = Ts.type.caption, color = c.ink2, maxLines = 6, overflow = TextOverflow.Ellipsis)
     }
 }
