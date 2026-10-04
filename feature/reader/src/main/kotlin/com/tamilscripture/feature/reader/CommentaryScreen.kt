@@ -193,6 +193,24 @@ fun CommentaryScreen(passage: Passage, onBack: () -> Unit, onReadWithVerses: (Pa
                             )
                         }
                     }
+                    // M4-6: whose text this is and on what terms, under every chapter.
+                    state.sources.firstOrNull { it.id == state.source }?.let { src ->
+                        item(key = "attribution") {
+                            Column(Modifier.fillMaxWidth().padding(top = 18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                HDivider()
+                                Text(
+                                    listOf(src.attribution.ifBlank { src.name }, src.licence).filter { it.isNotBlank() }.joinToString(" · "),
+                                    style = Ts.type.captionSmall, color = c.muted, modifier = Modifier.padding(top = 8.dp),
+                                )
+                                if (tamil) {
+                                    Text(
+                                        "தமிழ்: வரைவு மொழிபெயர்ப்பு; திருத்தங்கள் வரவேற்கப்படுகின்றன.",
+                                        style = Ts.type.captionSmall, color = c.muted,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -214,7 +214,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M4-3 Commentary focus pane (expanded+) with source tabs and "also in" previews from other installed commentaries.
 - [x] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.
 - [x] M4-5 Commentary text renderer: anchors, verse labels, footnotes, references as links.
-- [ ] M4-6 Attribution and licence strip per commentary.
+- [x] M4-6 Attribution and licence strip per commentary (under each chapter, with a note that the Tamil is a draft).
 - [x] M4-7 `commentary` stats events.
 
 ### Exit criteria
