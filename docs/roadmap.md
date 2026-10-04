@@ -266,7 +266,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [~] M6-6 Notes: editor sheet, notes under their verse, notes list with search. Autosave and margin notes on wide windows are open.
 - [x] M6-7 Bookmarks (device only until M6-1) and history screens; pause and clear history.
 - [~] M6-8 `SyncWorker`: push dirty rows (upsert), deletes, visits via `record_visit`, then a full pull per table (soon after a change, on sign-in, every 12 h). Pull by cursor waits for `deleted_rows` (M6-1).
-- [ ] M6-9 Settings sync through `profiles.settings` with the website's keys; per-device overrides kept local.
+- [x] M6-9 Settings sync through `profiles.settings` with the website's keys (language, version, Tamil font, headings, footnotes, xrefs, heat, commentary and its source); appearance and text size stay per device. Three-way: a local change since the last send goes up, otherwise the account's values come down. The website itself does not read them yet.
 - [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.
 - [x] M6-9b Sign-out sends what is pending, then wipes the account's local data; a dead session (refresh refused) signs the app out.
 - [x] M6-9c "Open on website" action on the verse card, always in the browser (never back into the app).

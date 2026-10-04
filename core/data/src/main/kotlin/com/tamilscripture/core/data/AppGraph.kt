@@ -53,12 +53,15 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val account = AccountRepository(File(context.filesDir, "account"), supabase, json)
     val userData = UserDataRepository(File(context.filesDir, "user"), supabase, account, json)
 
+    val settingsSync = com.tamilscripture.core.data.account.SettingsSync(File(context.filesDir, "account"), supabase, settings, json)
+
     /** Everything that follows the account (M6, M7-4); false when signed out. */
     suspend fun syncAccount(): Boolean {
         if (!userData.sync()) return false
         val token = account.accessToken() ?: return false
         val user = account.session.value?.userId ?: return false
         plans.sync(supabase, token, user)
+        settingsSync.sync(token, user) { code -> content.manifest.value?.version(code) != null }
         return true
     }
 }

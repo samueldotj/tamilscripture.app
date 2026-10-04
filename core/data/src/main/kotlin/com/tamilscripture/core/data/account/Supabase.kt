@@ -11,11 +11,11 @@ import java.net.URL
  * The few Supabase REST calls the app makes (auth and PostgREST under RLS), on plain
  * HttpURLConnection like the rest of the app (NF-1): no SDK is shipped.
  */
-class Supabase {
+open class Supabase {
     /** Set by tests to prove the read path makes no calls (NF-6). */
     @Volatile var guard: ((String) -> Unit)? = null
 
-    suspend fun request(
+    open suspend fun request(
         method: String,
         path: String,
         body: String? = null,

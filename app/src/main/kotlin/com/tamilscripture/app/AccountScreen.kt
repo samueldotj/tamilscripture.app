@@ -220,7 +220,7 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                     confirm = null
                     scope.launch {
                         if (delete) {
-                            runCatching { graph.userData.deleteAccount(); graph.plans.clear() }
+                            runCatching { graph.userData.deleteAccount(); graph.plans.clear(); graph.settingsSync.forget() }
                                 .onSuccess { toast(t("கணக்கு நீக்கப்பட்டது", "Account deleted")) }
                                 .onFailure { toast(t("நீக்க முடியவில்லை", "Could not delete")) }
                         } else {
@@ -228,6 +228,7 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                             runCatching { graph.syncAccount() }
                             graph.userData.signOutAndWipe()
                             graph.plans.clear()
+                            graph.settingsSync.forget()
                         }
                     }
                 }) { Text(if (delete) t("நீக்கு", "Delete") else t("வெளியேறு", "Sign out"), color = if (delete) c.amber else c.accent) }

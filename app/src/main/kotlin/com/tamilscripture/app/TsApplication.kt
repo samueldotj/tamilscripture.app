@@ -71,6 +71,13 @@ class TsApplication : Application(), GraphHost {
         }
 
         graph.appScope.launch {
+            // The settings the account keeps (M6-9): a change there is sent soon.
+            launch {
+                graph.settings.settings
+                    .distinctUntilChangedBy { listOf(it.uiLang, it.version, it.typeface, it.headings, it.footnotes, it.crossRefs, it.heat, it.commentary, it.commentarySource) }
+                    .drop(1)
+                    .collect { if (graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication) }
+            }
             graph.plans.pending.drop(1).collect { pending ->
                 if (pending && graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication)
             }
