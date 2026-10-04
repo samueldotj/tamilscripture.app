@@ -26,10 +26,22 @@ class AtlasScreenshotTest {
 
     private val data = runBlocking { loadAtlas { path -> javaClass.getResource("/entities/$path")?.readText() } }
 
-    private fun shot(file: String, mode: ThemeMode, tamil: Boolean, journey: String? = null, focus: String? = null) {
+    private val kingdoms = runBlocking { loadKingdoms { path -> javaClass.getResource("/entities/$path")?.readText() } }!!
+    private val church = runBlocking { loadChurch { path -> javaClass.getResource("/entities/$path")?.readText() } }
+
+    private fun shot(
+        file: String, mode: ThemeMode, tamil: Boolean, journey: String? = null, focus: String? = null,
+        year: Int? = null, withChurch: Boolean = false,
+    ) {
         compose.setContent {
             TsTheme(mode) {
-                Box(Modifier.size(411.dp, 600.dp)) { AtlasCanvas(data, tamil, journey, focus, focus) {} }
+                Box(Modifier.size(411.dp, 600.dp)) {
+                    AtlasCanvas(
+                        data, tamil, journey, focus, focus,
+                        kingdoms = year?.let { y -> kingdoms.shapes.filter { y in it.from..it.to } }.orEmpty(),
+                        church = if (withChurch) church else emptyList(),
+                    ) {}
+                }
             }
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
@@ -42,4 +54,10 @@ class AtlasScreenshotTest {
     @Test fun journeyTamil() = shot("atlas_journey_paul1_ta", ThemeMode.Light, tamil = true, journey = "paul-1")
 
     @Test fun focusedPlace() = shot("atlas_focus_jerusalem_en", ThemeMode.Light, tamil = false, focus = "jerusalem")
+
+    @Test fun kingdoms1000BC() = shot("atlas_kingdoms_1000bce_ta", ThemeMode.Light, tamil = true, year = -1000)
+
+    @Test fun kingdomsAD30Dark() = shot("atlas_kingdoms_ad30_dark_en", ThemeMode.Dark, tamil = false, year = 30)
+
+    @Test fun earlyChurch() = shot("atlas_church_en", ThemeMode.Light, tamil = false, withChurch = true)
 }

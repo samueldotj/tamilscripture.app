@@ -21,11 +21,14 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -65,13 +68,13 @@ import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.GeoFeature
 import com.tamilscripture.core.model.GeoJson
 import com.tamilscripture.core.model.Journey
-import com.tamilscripture.core.model.Mercator
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
 import kotlinx.serialization.json.Json
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.min
 
 /** Everything the atlas draws, read once (base map, places, journeys). */
@@ -86,9 +89,6 @@ internal class AtlasData(
 )
 
 internal class AtlasPlace(val id: String, val nameEn: String, val nameTa: String, val type: String, val mentions: Int, val x: Float, val y: Float)
-
-/** World coordinates: x is longitude, y is the Mercator latitude flipped so north is up. */
-private fun wy(lat: Double) = -Mercator.y(lat).toFloat()
 
 private fun path(features: List<GeoFeature>, close: Boolean): Path = Path().apply {
     fillType = PathFillType.EvenOdd
@@ -120,6 +120,15 @@ fun AtlasScreen(focus: String?, links: StudyLinks) {
     val tamil = lang == UiLang.Tamil
     val data by produceState<AtlasData?>(null, Unit) { value = loadAtlas { graph.study.file(it) } }
     var journey by rememberSaveable { mutableStateOf<String?>(null) }
+    // M8-5c: "places", "kingdoms" (a year on the timeline) or "church".
+    var layer by rememberSaveable { mutableStateOf("places") }
+    val kingdoms by produceState<Kingdoms?>(null, layer == "kingdoms") {
+        if (layer == "kingdoms" && value == null) value = loadKingdoms { graph.study.file(it) }
+    }
+    val church by produceState<List<ChurchPoint>>(emptyList(), layer == "church") {
+        if (layer == "church" && value.isEmpty()) value = loadChurch { graph.study.file(it) }
+    }
+    var yearIndex by rememberSaveable { mutableIntStateOf(-1) }
     var selected by rememberSaveable { mutableStateOf(focus) }
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
@@ -141,11 +150,39 @@ fun AtlasScreen(focus: String?, links: StudyLinks) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
-            TsChip(tr("இடங்கள்", "Places"), journey == null, { journey = null }, contentPadding = pad)
-            d.journeys.forEach { j -> TsChip(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, journey == j.id, { journey = j.id; selected = null }, contentPadding = pad) }
+            TsChip(tr("இடங்கள்", "Places"), layer == "places" && journey == null, { layer = "places"; journey = null }, contentPadding = pad)
+            TsChip(tr("அரசுகள்", "Kingdoms"), layer == "kingdoms", { layer = "kingdoms"; journey = null; selected = null }, contentPadding = pad)
+            TsChip(tr("ஆதித் திருச்சபை", "Early church"), layer == "church", { layer = "church"; journey = null; selected = null }, contentPadding = pad)
+            d.journeys.forEach { j ->
+                TsChip(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, journey == j.id, { layer = "places"; journey = j.id; selected = null }, contentPadding = pad)
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
-            AtlasCanvas(d, tamil, journey, selected, focus) { selected = it }
+            val k = kingdoms
+            val year = k?.years?.let { ys ->
+                if (yearIndex !in ys.indices) yearIndex = ys.indexOfFirst { it >= -1000 }.coerceAtLeast(0)
+                ys[yearIndex]
+            }
+            AtlasCanvas(
+                d, tamil, journey, selected, focus,
+                kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
+                church = if (layer == "church") church else emptyList(),
+            ) { selected = it }
+            if (layer == "kingdoms") {
+                InfoCard(Modifier.align(Alignment.BottomCenter)) {
+                    if (k == null || year == null) {
+                        CircularProgressIndicator(color = c.accent)
+                    } else {
+                        Text(yearLabel(year, tamil), style = Ts.type.cardTitle, color = c.ink)
+                        Slider(
+                            value = yearIndex.toFloat(), onValueChange = { yearIndex = it.roundToInt() },
+                            valueRange = 0f..(k.years.size - 1).toFloat(), steps = (k.years.size - 2).coerceAtLeast(0),
+                            colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.line2),
+                        )
+                        Text("Cliopatria (CC BY 4.0)", style = Ts.type.captionSmall, color = c.muted)
+                    }
+                }
+            }
             val place = d.places.firstOrNull { it.id == selected }
             val j = d.journeys.firstOrNull { it.id == journey }
             if (place != null) {
@@ -203,7 +240,16 @@ private fun InfoCard(modifier: Modifier, content: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun AtlasCanvas(d: AtlasData, tamil: Boolean, journey: String?, selected: String?, focus: String?, onSelect: (String?) -> Unit) {
+internal fun AtlasCanvas(
+    d: AtlasData,
+    tamil: Boolean,
+    journey: String?,
+    selected: String?,
+    focus: String?,
+    kingdoms: List<PolityShape> = emptyList(),
+    church: List<ChurchPoint> = emptyList(),
+    onSelect: (String?) -> Unit,
+) {
     val c = Ts.colors
     val measurer = rememberTextMeasurer()
     val family = if (tamil) Ts.type.scripture else Ts.type.label.fontFamily
@@ -292,6 +338,12 @@ internal fun AtlasCanvas(d: AtlasData, tamil: Boolean, journey: String?, selecte
                 drawPath(coast, c.mapCoast, style = Stroke(1f * px, join = StrokeJoin.Round))
                 drawPath(lakes, c.mapLake, style = Fill)
                 drawPath(rivers, c.mapRiver, style = Stroke(1.1f * px, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                // Kingdoms of the chosen year, each in its own colour (M8-5c).
+                kingdoms.forEach { k ->
+                    val col = polityColor(k.id, c.isDark)
+                    drawPath(k.path, col.copy(alpha = 0.16f), style = Fill)
+                    drawPath(k.path, col.copy(alpha = 0.7f), style = Stroke(1.2f * px, join = StrokeJoin.Round))
+                }
                 route?.let {
                     drawPath(
                         it, c.accent.copy(alpha = 0.85f),
@@ -303,12 +355,15 @@ internal fun AtlasCanvas(d: AtlasData, tamil: Boolean, journey: String?, selecte
             val labelStyle = TextStyle(fontFamily = family, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
             val placed = ArrayList<Rect>()
             /** Where a label would go, or null when it would overlap one already placed. */
-            fun place(key: String, text: String, at: Offset, ink: androidx.compose.ui.graphics.Color = c.ink, force: Boolean = false): Pair<Rect, Pair<TextLayoutResult, TextLayoutResult>>? {
+            fun place(
+                key: String, text: String, at: Offset, ink: androidx.compose.ui.graphics.Color = c.ink, force: Boolean = false, centred: Boolean = false,
+            ): Pair<Rect, Pair<TextLayoutResult, TextLayoutResult>>? {
                 val layouts = labels.getOrPut(key) {
                     measurer.measure(text, labelStyle.copy(color = ink)) to measurer.measure(text, labelStyle.copy(color = c.mapLand))
                 }
                 val (layout, _) = layouts
-                val r = Rect(at.x + dot + 4f, at.y - layout.size.height / 2f, at.x + dot + 4f + layout.size.width, at.y + layout.size.height / 2f)
+                val left = if (centred) at.x - layout.size.width / 2f else at.x + dot + 4f
+                val r = Rect(left, at.y - layout.size.height / 2f, left + layout.size.width, at.y + layout.size.height / 2f)
                 if (!force && placed.any { it.overlaps(r) }) return null
                 placed += r
                 return r to layouts
@@ -320,8 +375,23 @@ internal fun AtlasCanvas(d: AtlasData, tamil: Boolean, journey: String?, selecte
                 for (dx in -1..1) for (dy in -1..1) if (dx != 0 || dy != 0) drawText(layouts.second, topLeft = r.topLeft + Offset(dx * k, dy * k))
                 drawText(layouts.first, topLeft = r.topLeft)
             }
-            fun label(key: String, text: String, at: Offset) = place(key, text, at)?.let(::drawLabel) != null
-            if (stops.isEmpty()) {
+            fun label(key: String, text: String, at: Offset, centred: Boolean = false) = place(key, text, at, centred = centred)?.let(::drawLabel) != null
+            if (kingdoms.isNotEmpty() || church.isNotEmpty()) {
+                // Kingdom names, the widest first; or the early church's people and places.
+                kingdoms.sortedByDescending { it.span }.forEach { k ->
+                    val s = toScreen(k.x, k.y)
+                    if (s.x in -40f..(w + 40f) && s.y in -40f..(h + 40f)) {
+                        label("k-" + k.id + k.from, if (tamil) k.nameTa.ifBlank { k.nameEn } else k.nameEn, s, centred = true)
+                    }
+                }
+                // Every marker first, then the names, so no marker covers a name.
+                church.forEach { p ->
+                    val s = toScreen(p.x, p.y)
+                    drawRect(c.surface, topLeft = s - Offset(dot + 1.5f, dot + 1.5f), size = androidx.compose.ui.geometry.Size(2 * dot + 3f, 2 * dot + 3f))
+                    drawRect(c.amber, topLeft = s - Offset(dot, dot), size = androidx.compose.ui.geometry.Size(2 * dot, 2 * dot))
+                }
+                church.forEach { p -> label("c-" + p.id, if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, toScreen(p.x, p.y)) }
+            } else if (stops.isEmpty()) {
                 // Places in order of how often they are named: the selected one first, then a
                 // label wherever there is room; drawn as small dots, labelled dots, labels.
                 val sel = d.places.firstOrNull { it.id == selected }

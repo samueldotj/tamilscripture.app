@@ -319,7 +319,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M8-5 Atlas screen with the chosen renderer: base map, Places layer, rank-based labels with collision, Tamil labels in the reader's typeface ([design §11](design.md#11-atlas-and-maps)). Built: base map, places ranked by mentions with collision-free labels in the reader's language, journeys with numbered stops, tap for a place card; pinch, pan, double-tap and wheel zoom. Screenshot-tested; on-device check pending.
 - [ ] M8-5a Camera: pinch, pan with fling, double-tap and two-finger-tap zoom, zoom and pan limits, animated fit-to-journey and centre-on-place, state saved across resize and fold.
 - [ ] M8-5b Selection: tap within 24 dp, details in a bottom sheet (compact), side sheet (medium) or right pane (expanded+); verses open the reader in the other pane or a new window.
-- [ ] M8-5c Journeys layer and list (grouped by period, colour plus dash legend, hover emphasis on large windows); Kingdoms timeline; Early church layer.
+- [ ] M8-5c Journeys layer and list (grouped by period, colour plus dash legend, hover emphasis on large windows); Kingdoms timeline; Early church layer. Built: journeys as chips; Kingdoms timeline (Cliopatria rows, the website's year steps and hues, outlines thinned to 0.05°); Early church layer. Screenshot-tested; frame rate on a low-end phone still to measure.
 - [ ] M8-5d Mouse, keyboard and context menu on ALOS; place search on the map; App Links for `/atlas/explore`, `/atlas/{journey}`, `/place/{slug}`.
 - [ ] M8-5e Static chapter maps in the Study pane, opening the atlas focused on the chapter.
 - [ ] M8-5f Accessibility: place semantics in rank order, list view, timeline and zoom controls; screenshot, gesture and Macrobenchmark tests.
