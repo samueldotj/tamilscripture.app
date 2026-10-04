@@ -80,6 +80,7 @@ fun DownloadsScreen(onBack: () -> Unit) {
 
     val biblesTitle = tr("வேதாகமங்கள்", "Bibles")
     val studyTitle = tr("ஆய்வு", "Study")
+    val commentaryTitle = tr("விளக்கவுரைகள்", "Commentaries")
     val loadingText = tr("பட்டியலைப் பெறுகிறது…", "Fetching the list…")
     val failedText = tr("பதிவிறக்கப் பட்டியலைப் பெற முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயலுங்கள்.",
         "Couldn't fetch the download list. Check the connection and try again.")
@@ -116,7 +117,8 @@ fun DownloadsScreen(onBack: () -> Unit) {
             } else {
                 val groups = listOf(
                     biblesTitle to cat.packs.filter { it.type == "bible" },
-                    studyTitle to cat.packs.filter { it.type != "bible" },
+                    commentaryTitle to cat.packs.filter { it.type == "commentary" },
+                    studyTitle to cat.packs.filter { it.type != "bible" && it.type != "commentary" },
                 )
                 groups.forEach { (title, list) ->
                     if (list.isNotEmpty()) {

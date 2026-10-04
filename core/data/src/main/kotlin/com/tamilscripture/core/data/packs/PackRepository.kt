@@ -140,6 +140,30 @@ class PackRepository(
 
     fun hasBible(version: String) = store.isInstalled("bible.$version")
 
+    fun hasCommentary(source: String) = store.isInstalled("commentary.$source")
+
+    /** A chapter of a downloaded commentary, as the JSON the commentary CDN serves (chapter 0: the book's introduction). */
+    suspend fun commentaryChapter(source: String, book: String, chapter: Int): ByteArray? =
+        store.query("commentary.$source") { c ->
+            c.prepare("SELECT body FROM chapter WHERE book = ? AND chapter = ?").use { st ->
+                st.bindText(1, book)
+                st.bindLong(2, chapter.toLong())
+                if (st.step()) st.getText(0).encodeToByteArray() else null
+            }
+        }
+
+    /** What a downloaded commentary covers, and its `index.json` entry, for reading it offline. */
+    suspend fun commentaryCoverage(source: String): Pair<String, Map<String, List<Int>>>? =
+        store.query("commentary.$source") { c ->
+            val meta = c.prepare("SELECT value FROM meta WHERE key = 'source'").use { st -> if (st.step()) st.getText(0) else null }
+                ?: return@query null
+            val chapters = LinkedHashMap<String, MutableList<Int>>()
+            c.prepare("SELECT book, chapter FROM chapter").use { st ->
+                while (st.step()) chapters.getOrPut(st.getText(0)) { mutableListOf() } += st.getLong(1).toInt()
+            }
+            meta to chapters
+        }
+
     /** Cross-references for a chapter from the `xref` pack, best first per verse. */
     suspend fun crossRefs(book: String, chapter: Int): Map<String, List<CrossRef>>? =
         store.query("xref") { c ->
