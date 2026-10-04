@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tamilscripture.core.data.content.References
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -127,6 +128,7 @@ fun PeoplePlacesContent(
     val c = Ts.colors
     val tamil = LocalUiLang.current == UiLang.Tamil
     val state by produceState<Pair<Boolean, ChapterMentions?>>(true to null, book, chapter) { value = false to graph.study.mentions(book, chapter) }
+    val manifest by graph.content.manifest.collectAsStateWithLifecycle()
     // The chapter's map, when the website drew one (mentions.map).
     val map by produceState<MapDrawing?>(null, state.second) {
         value = state.second?.takeIf { it.map }?.let { graph.study.file("maps/$book/$chapter.svg") }?.let(MapSvg::parse)
@@ -165,7 +167,7 @@ fun PeoplePlacesContent(
                     // English: the start of their description. Tamil: where they are first named
                     // (the website's qualifier, "Mat 3:1"), as a Tamil reference; descriptions are English.
                     val hint = if (tamil) {
-                        p.qualifier?.let { q -> References.parse(q, graph.content.manifest.value) }?.let { r -> r.book.label(UiLang.Tamil, r.chapter, r.verse) }.orEmpty()
+                        p.qualifier?.let { q -> References.parse(q, manifest) }?.let { r -> r.book.label(UiLang.Tamil, r.chapter, r.verse) }.orEmpty()
                     } else {
                         p.brief.substringBefore(',').removePrefix("The ").take(28).trim()
                     }
