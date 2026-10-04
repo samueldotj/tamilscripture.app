@@ -51,6 +51,15 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val supabase = Supabase()
     val account = AccountRepository(File(context.filesDir, "account"), supabase, json)
     val userData = UserDataRepository(File(context.filesDir, "user"), supabase, account, json)
+
+    /** Everything that follows the account (M6, M7-4); false when signed out. */
+    suspend fun syncAccount(): Boolean {
+        if (!userData.sync()) return false
+        val token = account.accessToken() ?: return false
+        val user = account.session.value?.userId ?: return false
+        plans.sync(supabase, token, user)
+        return true
+    }
 }
 
 /** Implemented by the Application so WorkManager workers reach the single graph. */

@@ -23,7 +23,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val graph = (applicationContext as? GraphHost)?.graph ?: return Result.failure()
         return try {
-            graph.userData.sync()
+            graph.syncAccount()
             Result.success()
         } catch (e: HttpException) {
             // 401/403: the session is gone; the account screen shows it. Others retry.

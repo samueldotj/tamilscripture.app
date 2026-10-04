@@ -172,7 +172,7 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                                 busy = true
                                 status = t("ஒத்திசைகிறது…", "Syncing…")
                                 scope.launch {
-                                    status = runCatching { graph.userData.sync() }.fold(
+                                    status = runCatching { graph.syncAccount() }.fold(
                                         { t("ஒத்திசைந்தது", "Up to date") },
                                         { t("ஒத்திசைக்க முடியவில்லை", "Could not sync") },
                                     )
@@ -220,13 +220,14 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                     confirm = null
                     scope.launch {
                         if (delete) {
-                            runCatching { graph.userData.deleteAccount() }
+                            runCatching { graph.userData.deleteAccount(); graph.plans.clear() }
                                 .onSuccess { toast(t("கணக்கு நீக்கப்பட்டது", "Account deleted")) }
                                 .onFailure { toast(t("நீக்க முடியவில்லை", "Could not delete")) }
                         } else {
                             // What has not reached the account yet goes first.
-                            runCatching { graph.userData.sync() }
+                            runCatching { graph.syncAccount() }
                             graph.userData.signOutAndWipe()
+                            graph.plans.clear()
                         }
                     }
                 }) { Text(if (delete) t("நீக்கு", "Delete") else t("வெளியேறு", "Sign out"), color = if (delete) c.amber else c.accent) }

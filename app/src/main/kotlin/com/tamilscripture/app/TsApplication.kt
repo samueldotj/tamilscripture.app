@@ -63,6 +63,12 @@ class TsApplication : Application(), GraphHost {
             }
         }
 
+        graph.appScope.launch {
+            graph.plans.pending.drop(1).collect { pending ->
+                if (pending && graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication)
+            }
+        }
+
         // ST-2: send what is queued when the app goes to the background; and bring the
         // widget's "Continue reading" up to date for the home screen the reader returns to.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
