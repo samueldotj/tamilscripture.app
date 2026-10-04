@@ -271,7 +271,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M6-9b Sign-out sends what is pending, then wipes the account's local data; a dead session (refresh refused) signs the app out.
 - [x] M6-9c "Open on website" action on the verse card, always in the browser (never back into the app).
 - [x] M6-10 Export my data (`export_my_data`, saved as a JSON file) and delete account (`delete_my_account`).
-- [ ] M6-11 Sync tests: two devices + website, offline edits for 7 days, conflicting edits, deletes, clear history, both sign-in orders reaching one account, export from either side.
+- [~] M6-11 Sync tests: two devices + website, offline edits for 7 days, conflicting edits, deletes, clear history, both sign-in orders reaching one account, export from either side. Started: `SyncTest` runs two devices and the website against `FakeSupabase` (offline edits, deletes both ways, website edits and word-range rows, signing in after working signed out, clearing history, uniform upsert batches). A run against the real project with two devices is open.
 
 ### Exit criteria
 - Signing in with Google in the app reaches the same account and data as signing in on the website, and so does an email link.
