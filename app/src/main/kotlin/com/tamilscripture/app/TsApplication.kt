@@ -86,6 +86,11 @@ class TsApplication : Application(), GraphHost {
         // ST-2: send what is queued when the app goes to the background; and bring the
         // widget's "Continue reading" up to date for the home screen the reader returns to.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            // M6-9a: what changed on the website meanwhile comes down when the app is opened.
+            override fun onStart(owner: LifecycleOwner) {
+                if (graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication, delaySeconds = 0)
+            }
+
             override fun onStop(owner: LifecycleOwner) {
                 StatsRecorder.syncSoon(this@TsApplication)
                 graph.appScope.launch { runCatching { TodayWidget.refresh(this@TsApplication) } }

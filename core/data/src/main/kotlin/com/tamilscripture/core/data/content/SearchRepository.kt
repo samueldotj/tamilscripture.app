@@ -87,18 +87,38 @@ class SearchRepository(private val http: Http, private val packs: PackRepository
 
     private suspend fun searchAs(query: String, version: String, offset: Int, books: IntRange?): Result {
         val local = if (packs.hasBible(version)) packs.search(version, query, offset = offset, books = books) else null
-        if (local != null && (local.total > 0 || local.perBook.isNotEmpty())) {
+        // Enough here, a later page, or nothing in this scope but hits elsewhere (the scope row shows where).
+        if (local != null && (local.total >= FEW || (offset > 0 && local.total > 0) || (local.total == 0 && local.perBook.isNotEmpty()))) {
             return Result(SearchResponse(query = query, hits = local.hits, total = local.total), offline = true, shown = query, perBook = local.perBook)
         }
         return try {
-            val bytes = http.get(Origin.Api, "api/search", buildMap {
-                put("q", query); put("v", version); put("offset", offset.toString())
-                // The website filters by canonical book order too (R-5.8).
-                books?.let { put("bmin", it.first.toString()); put("bmax", it.last.toString()) }
-            })
-            Result(json.decodeFromString(bytes.decodeToString()), offline = false, shown = query)
+            val online: SearchResponse = json.decodeFromString(online(query, version, offset, books).decodeToString())
+            if (local == null || local.total == 0) return Result(online, offline = false, shown = query)
+            // M3-3: a few exact hits on the device; the website adds near spellings (trigram
+            // similarity, which packs leave out to stay small). The device's hits come first.
+            val seen = local.hits.map { it.verseId }.toSet()
+            val extra = online.hits.filter { it.verseId !in seen }
+            Result(
+                SearchResponse(query = query, hits = local.hits + extra, total = local.total + extra.size),
+                offline = false, shown = query, perBook = local.perBook,
+            )
         } catch (e: IOException) {
+            if (local != null && local.total > 0) {
+                return Result(SearchResponse(query = query, hits = local.hits, total = local.total), offline = true, shown = query, perBook = local.perBook)
+            }
             if (local != null) Result(SearchResponse(query = query), offline = true, shown = query) else throw e
         }
+    }
+
+    private suspend fun online(query: String, version: String, offset: Int, books: IntRange?): ByteArray =
+        http.get(Origin.Api, "api/search", buildMap {
+            put("q", query); put("v", version); put("offset", offset.toString())
+            // The website filters by canonical book order too (R-5.8).
+            books?.let { put("bmin", it.first.toString()); put("bmax", it.last.toString()) }
+        })
+
+    private companion object {
+        /** Fewer device hits than this also ask the website (M3-3). */
+        const val FEW = 5
     }
 }

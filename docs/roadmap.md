@@ -183,7 +183,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 ### Tasks
 - [x] M3-1 Romanised-Tamil search ("anbu" → அன்பு): the website's converter (`lib/search/romanised.ts`, TypeScript, not Rust) ported to Kotlin as `Romanised`, with the same rule: the Tamil reading is used when the words as typed find nothing, otherwise offered as a chip. Website `/search?q=` and `/irvtam+kjv/…` dual links open in the app.
 - [x] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
-- [ ] M3-3 Trigram fallback when fewer than 5 hits.
+- [x] M3-3 Fewer than 5 hits on the device: the website's search (trigram similarity) adds near spellings after them when online. Packs carry no trigram index (design §8.3).
 - [x] M3-4 Match highlighting by token normalisation.
 - [ ] M3-5 Results grouped by book with counts; testament/book filters; multi-version search in parallel. Scope row done (whole Bible, testaments, books with counts on device; testaments online via `bmin`/`bmax`); "All versions" searches every version in parallel and merges in canonical order. On-device check pending.
 - [x] M3-6 Autocomplete (book names, recent searches); common searches from the website's `/api/common-searches` (once per session).
