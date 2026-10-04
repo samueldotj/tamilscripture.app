@@ -41,12 +41,15 @@ import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
+import com.tamilscripture.core.designsystem.component.SchematicMap
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.ArticleIndexEntry
 import com.tamilscripture.core.model.ContentManifest
 import com.tamilscripture.core.model.EmbeddedArticle
+import com.tamilscripture.core.model.MapDrawing
+import com.tamilscripture.core.model.MapSvg
 import com.tamilscripture.core.model.Passage
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.model.VerseId
@@ -231,10 +234,12 @@ fun PlaceScreen(id: String, links: StudyLinks) {
     val manifest by graph.content.manifest.collectAsStateWithLifecycle()
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
     val state by produceState<Pair<Boolean, com.tamilscripture.core.model.Place?>>(true to null, id) { value = false to graph.study.place(id) }
+    val map by produceState<MapDrawing?>(null, id) { value = graph.study.file("maps/place/$id.svg")?.let(MapSvg::parse) }
     val p = state.second
     val name = p?.let { if (lang == UiLang.Tamil) it.tamilName?.label?.ifBlank { null } ?: it.nameEn else it.nameEn } ?: ""
     StudyPage(name, p?.let { listOfNotNull(it.placeType, it.modern?.takeIf { m -> m != it.nameEn }).joinToString(" · ") }, links, state.first, !state.first && p == null) {
         if (p == null) return@StudyPage
+        map?.let { d -> item { SchematicMap(d, lang == UiLang.Tamil, selected = id, description = name, onPlace = { other -> if (other != id) links.place(other) }) } }
         paragraph(p.description?.brief, big = true)
         paragraph(p.description?.article ?: p.description?.short)
         p.geo?.lat?.let { lat ->

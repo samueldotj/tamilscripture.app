@@ -25,9 +25,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
+import com.tamilscripture.core.designsystem.component.SchematicMap
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.ChapterMentions
+import com.tamilscripture.core.model.MapDrawing
+import com.tamilscripture.core.model.MapSvg
 import com.tamilscripture.core.model.OriginalChapter
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalAppServices
@@ -99,6 +102,10 @@ fun PeoplePlacesSheet(
     val c = Ts.colors
     val tamil = LocalUiLang.current == UiLang.Tamil
     val state by produceState<Pair<Boolean, ChapterMentions?>>(true to null, book, chapter) { value = false to graph.study.mentions(book, chapter) }
+    // The chapter's map, when the website drew one (mentions.map).
+    val map by produceState<MapDrawing?>(null, state.second) {
+        value = state.second?.takeIf { it.map }?.let { graph.study.file("maps/$book/$chapter.svg") }?.let(MapSvg::parse)
+    }
     TsSheet(onDismiss) {
         Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState()).padding(start = 22.dp, end = 22.dp, bottom = 16.dp)) {
             Text(tr("நபர்கள் · இடங்கள்", "People and places") + " · " + title, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
@@ -114,6 +121,9 @@ fun PeoplePlacesSheet(
                     style = Ts.type.body, color = c.muted,
                 )
                 return@Column
+            }
+            map?.let { d ->
+                SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), description = title, onPlace = onPlace)
             }
             val here = verse?.let { v -> m.verses.firstOrNull { it.verse == "$book.$chapter.$v" } }
             val pad = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

@@ -46,6 +46,8 @@ data class TsColors(
     val mapSea: Color,
     val mapLand: Color,
     val mapLake: Color,
+    val mapCoast: Color,
+    val mapRiver: Color,
     val scrim: Color,
 ) {
     /** Selected verse background: gold at 14% at night (design), the website's warm --hl by day. */
@@ -84,6 +86,8 @@ val DarkTsColors = TsColors(
     mapSea = Color(0xFF1E2A33),
     mapLand = Color(0xFF2A3B3A),
     mapLake = Color(0xFF1A2430),
+    mapCoast = Color(0xFF3D4554),
+    mapRiver = Color(0xFF3E5D78),
     scrim = Color(0x80000000),
 )
 
@@ -112,6 +116,8 @@ val LightTsColors = TsColors(
     mapSea = Color(0xFFDCE6EC),
     mapLand = Color(0xFFF1EBDF),
     mapLake = Color(0xFFC9D9E4),
+    mapCoast = Color(0xFFC9BFB1),
+    mapRiver = Color(0xFF9FBFDA),
     scrim = Color(0x47000000),
 )
 

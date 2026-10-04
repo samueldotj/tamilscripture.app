@@ -66,7 +66,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 **Test infrastructure** ([design §15](design.md#15-testing))
 - [ ] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection.
-- [ ] M0-15 Roborazzi screenshot setup with the width-class × theme × language × font-scale matrix.
+- [ ] M0-15 Roborazzi screenshot setup with the width-class × theme × language × font-scale matrix. Started: Roborazzi + Robolectric in :core:designsystem (maps, light/dark, Tamil/English); baselines in src/test/screenshots.
 - [ ] M0-16 Gradle Managed Devices (API 26 low-RAM, API 35) and a `nightly.yml` workflow for instrumented tests.
 - [ ] M0-17 Network guard interceptor for tests and StrictMode in debug builds.
 
@@ -315,7 +315,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M8-1 **[web]** Study packs: Strong's (lexicon, occurrences, original words), persons, places, dictionary; `study.maps` (projected geometry at three detail levels, places, journeys, polities, church) and `study.maps.chapters` (static chapter maps) ([design §11.2](design.md#112-data)). Live: study.words 6.4 MB, study.people 1.7, study.dictionary 9.6, study.maps 2.4; each keeps the website's entities/ files under their paths.
 - [ ] M8-2 Original-words view per verse; Strong's page listing every verse in the current version. Built: verse card and menu → Original words sheet → Strong's page with every verse; Study › Root words browses the Strong's index. On-device check pending.
 - [ ] M8-3 Person, place and dictionary article screens with provenance badges; search sections. Built: person, place and dictionary article screens (Tamil paragraphs where drafted), Study › Dictionary. On-device check pending.
-- [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names. Started: People and places sheet per chapter and verse; chapter map and Study pane to come.
+- [ ] M8-4 Study Bible side pane: places, persons, chapter map, original-language names. People and places sheet per chapter and verse with the chapter map (the website's SVG maps drawn natively, tap a place); place pages show their map. Study side pane on wide windows to come.
 - [ ] M8-5 Atlas screen with the chosen renderer: base map, Places layer, rank-based labels with collision, Tamil labels in the reader's typeface ([design §11](design.md#11-atlas-and-maps)).
 - [ ] M8-5a Camera: pinch, pan with fling, double-tap and two-finger-tap zoom, zoom and pan limits, animated fit-to-journey and centre-on-place, state saved across resize and fold.
 - [ ] M8-5b Selection: tap within 24 dp, details in a bottom sheet (compact), side sheet (medium) or right pane (expanded+); verses open the reader in the other pane or a new window.

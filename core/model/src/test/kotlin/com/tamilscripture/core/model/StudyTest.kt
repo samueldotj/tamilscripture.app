@@ -46,4 +46,17 @@ class StudyTest {
         assertEquals("eastons", a.source)
         assertTrue(a.paragraphs.isNotEmpty())
     }
+
+    @Test
+    fun chapterAndJourneyMaps() {
+        val m = MapSvg.parse(fixture("map-JHN-1.svg"))!!
+        assertEquals(360f, m.width)
+        assertTrue(m.paths.any { it.first == "land" } && m.paths.any { it.first == "river" })
+        val jerusalem = m.places.first { it.id == "jerusalem" }
+        assertEquals("எருசலேம்", jerusalem.ta?.text)
+        assertEquals("start", jerusalem.en?.anchor)
+        val j = MapSvg.parse(fixture("map-paul-1.svg"))!!
+        assertTrue(j.paths.any { it.first == "route" })
+        assertTrue(j.places.all { it.em } && j.places.first().number == "1")
+    }
 }
