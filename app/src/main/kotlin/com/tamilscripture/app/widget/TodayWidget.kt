@@ -28,7 +28,7 @@ import androidx.glance.layout.padding
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.tamilscripture.app.MainActivity
+import com.tamilscripture.app.LinkActivity
 import com.tamilscripture.core.data.GraphHost
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.theme.DarkTsColors
@@ -105,7 +105,7 @@ class TodayWidget : GlanceAppWidget() {
         /** Opens the passage the way a website link does, so MainActivity has one way in. */
         private fun open(context: Context, m: ContentManifest?, p: Passage) = actionStartActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(link(m, p)))
-                .setComponent(ComponentName(context, MainActivity::class.java))
+                .setComponent(ComponentName(context, LinkActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
 

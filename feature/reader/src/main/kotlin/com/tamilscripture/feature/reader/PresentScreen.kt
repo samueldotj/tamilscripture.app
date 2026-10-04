@@ -45,7 +45,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -142,9 +145,27 @@ private val PRESENT_GOLD = androidx.compose.ui.graphics.Color(0xFFD9B25C)
 /** A verse sized to fill the screen: larger when short, smaller when long. */
 @Composable
 internal fun SlideView(slide: Slide) {
-    BoxWithConstraints(Modifier.fillMaxSize().background(PRESENT_BG).padding(horizontal = 56.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
-        val area = maxWidth.value * maxHeight.value
-        val size = (kotlin.math.sqrt(area / (slide.text.length.coerceAtLeast(20) * 2.4f))).coerceIn(22f, 76f)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val type = Ts.type
+    BoxWithConstraints(Modifier.fillMaxSize().background(PRESENT_BG).padding(horizontal = 32.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+        val widthPx = constraints.maxWidth
+        val heightPx = constraints.maxHeight
+        // The largest size, from 76 sp down, at which the verse fits with room for its reference
+        // and no word is broken across lines (Tamil words are long; a narrow phone splits them).
+        val size = remember(slide.text, widthPx, heightPx) {
+            val longest = slide.text.split(' ').maxByOrNull { it.length }.orEmpty()
+            var sp = 76f
+            while (sp > 18f) {
+                val style = type.scripture(sp.sp, 1.45f)
+                val word = measurer.measure(longest, style, maxLines = 1, softWrap = false)
+                val all = measurer.measure(slide.text, style, constraints = Constraints(maxWidth = widthPx))
+                val reserve = with(density) { (sp * 0.45f * 2.2f + 28f).dp.roundToPx() }
+                if (word.size.width <= widthPx && all.size.height + reserve <= heightPx) break
+                sp -= 2f
+            }
+            sp
+        }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(28.dp)) {
             Text(
                 slide.text, color = PRESENT_INK, textAlign = TextAlign.Center,

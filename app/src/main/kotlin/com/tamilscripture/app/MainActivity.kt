@@ -41,6 +41,7 @@ open class MainActivity : ComponentActivity() {
 
     private var pendingLink by mutableStateOf<NavKey?>(null)
     private var pendingUri by mutableStateOf<Uri?>(null)
+    private var pendingId: String? = null
 
     /** The interface language, for the shortcut helper, which asks outside composition. */
     private var uiLang = UiLang.Tamil
@@ -53,10 +54,13 @@ open class MainActivity : ComponentActivity() {
         val initial = runBlocking { services.graph.settings.settings.first() }
         // A recreated activity (rotation, or a restore after the process was killed) carries an
         // intent that was already opened; new links arrive through onNewIntent. After a
-        // force-stop or reboot the system restarts the task with its first intent and no saved
-        // state, so the last link opened is remembered on disk and not opened a second time.
+        // force-stop the system restarts the task with its first intent and no saved state:
+        // that replay has the id LinkActivity gave it, which is remembered once opened.
         val links = getSharedPreferences("links", MODE_PRIVATE)
-        if (savedInstanceState == null) intent?.data?.takeIf { it.toString() != links.getString("handled", null) }?.let { pendingUri = it }
+        if (savedInstanceState == null) {
+            val id = intent?.getStringExtra(LINK_ID)
+            if (id == null || id != links.getString("handled", null)) intent?.data?.let { pendingUri = it; pendingId = id }
+        }
         val start = startStack()
 
         setContent {
@@ -73,7 +77,7 @@ open class MainActivity : ComponentActivity() {
                     // Not awaited: a manifest refresh must not cancel the navigation half-way.
                     link?.compare?.let { code -> lifecycleScope.launch { services.graph.settings.update { it.copy(compare = code) } } }
                     pendingLink = link?.route
-                    links.edit().putString("handled", uri.toString()).apply()
+                    pendingId?.let { links.edit().putString("handled", it).apply() }
                     pendingUri = null
                 }
             }
@@ -127,7 +131,12 @@ open class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { pendingUri = it }
+        intent.data?.let { pendingUri = it; pendingId = intent.getStringExtra(LINK_ID) }
+    }
+
+    companion object {
+        /** Set by [LinkActivity]: one id per time a link is opened. */
+        const val LINK_ID = "link_id"
     }
 }
 
