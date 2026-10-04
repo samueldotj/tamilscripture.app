@@ -1,5 +1,11 @@
 package com.tamilscripture.app
 
+import android.Manifest
+import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,8 +24,11 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tamilscripture.core.data.plans.ReminderWorker
 import com.tamilscripture.core.data.settings.Appearance
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
@@ -36,6 +45,8 @@ import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 /** Profile / settings / about: language, appearance, stats, cache, licences (A-1.4, ST-8, DL-7). */
@@ -46,6 +57,7 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
     val c = Ts.colors
     val lang = LocalUiLang.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val settings by graph.settings.settings.collectAsStateWithLifecycle(Settings())
     val manifest by graph.content.manifest.collectAsStateWithLifecycle()
     val cacheBytes by produceState(0L) { value = graph.onlineCache.sizeBytes() }
@@ -77,6 +89,11 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
                     height = 40.dp, fill = true, textStyle = Ts.type.labelSmall,
                     modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 16.dp).fillMaxWidth(),
                 )
+                HDivider()
+                ReminderRow(settings.reminderMinutes) { minutes ->
+                    scope.launch { graph.settings.update { it.copy(reminderMinutes = minutes) } }
+                    ReminderWorker.schedule(context, minutes)
+                }
                 HDivider()
                 TsListRow(
                     tr("அநாமதேயப் பயன்பாட்டுப் புள்ளிவிவரம்", "Share anonymous usage stats"),
@@ -123,4 +140,30 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
             }
         }
     }
+}
+
+/** M7-5: a daily reminder at a chosen time with today's reading. */
+@Composable
+private fun ReminderRow(minutes: Int?, onChange: (Int?) -> Unit) {
+    val context = LocalContext.current
+    val notify = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    fun pick(start: Int) {
+        TimePickerDialog(context, { _, h, m -> onChange(h * 60 + m) }, start / 60, start % 60, false).show()
+    }
+    TsListRow(
+        tr("தினசரி நினைவூட்டல்", "Daily reminder"),
+        subtitle = tr("இன்றைய வாசிப்புடன் ஒரு அறிவிப்பு", "A notification with today's reading"),
+        trailing = {
+            if (minutes != null) {
+                val time = LocalTime.of(minutes / 60, minutes % 60).format(DateTimeFormatter.ofPattern("h:mm a"))
+                TsPillButton(time, { pick(minutes) }, height = 36.dp, textStyle = Ts.type.labelSmall)
+            }
+            TsToggle(minutes != null, { on ->
+                if (on && Build.VERSION.SDK_INT >= 33 &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) notify.launch(Manifest.permission.POST_NOTIFICATIONS)
+                onChange(if (on) 7 * 60 else null)
+            })
+        },
+    )
 }

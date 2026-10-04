@@ -44,6 +44,8 @@ data class Settings(
     val onlineChapters: Map<String, Int> = emptyMap(),
     /** Versions whose download offer was turned down. */
     val offersDeclined: Set<String> = emptySet(),
+    /** Daily reading reminder, minutes past midnight; null when off (M7-5). */
+    val reminderMinutes: Int? = null,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -66,6 +68,7 @@ class SettingsRepository(private val context: Context) {
         val downloadWifiOnly = booleanPreferencesKey("downloadWifiOnly")
         val onlineChapters = stringPreferencesKey("onlineChapters")
         val offersDeclined = stringPreferencesKey("offersDeclined")
+        val reminderMinutes = intPreferencesKey("reminderMinutes")
     }
 
     private fun read(p: Preferences): Settings {
@@ -91,6 +94,7 @@ class SettingsRepository(private val context: Context) {
                 e.split('=').takeIf { it.size == 2 }?.let { (k, v) -> v.toIntOrNull()?.let { k to it } }
             }?.toMap().orEmpty(),
             offersDeclined = p[K.offersDeclined]?.split(',')?.filter { it.isNotBlank() }?.toSet().orEmpty(),
+            reminderMinutes = p[K.reminderMinutes],
         )
     }
 
@@ -118,6 +122,7 @@ class SettingsRepository(private val context: Context) {
             p[K.downloadWifiOnly] = n.downloadWifiOnly
             p[K.onlineChapters] = n.onlineChapters.entries.joinToString(",") { "${it.key}=${it.value}" }
             p[K.offersDeclined] = n.offersDeclined.joinToString(",")
+            if (n.reminderMinutes != null) p[K.reminderMinutes] = n.reminderMinutes else p.remove(K.reminderMinutes)
         }
     }
 

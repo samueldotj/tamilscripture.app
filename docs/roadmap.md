@@ -292,7 +292,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
 - [ ] M7-3 Community plans from `reading_plans` (published only), cached offline.
 - [ ] M7-4 Progress local when signed out; moved to the account on first sign-in, as the website does.
-- [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine).
+- [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine). Built (Settings › Daily reminder; today's plan passages or the verse of the day); on-device check pending.
 - [ ] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; on-device check pending.
 - [x] M7-7 `plan` stats events. Done (`plan` events on ticking a passage).
 - [ ] M7-8 Release prep: store listing in Tamil and English, screenshots for phone, tablet and ALOS, Data safety form, privacy policy update on the website.
