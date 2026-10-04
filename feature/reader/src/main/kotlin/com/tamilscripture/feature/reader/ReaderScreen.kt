@@ -123,6 +123,8 @@ class ReaderNav(
     val strongs: (String) -> Unit,
     val person: (String) -> Unit,
     val place: (String) -> Unit,
+    /** Present mode from a verse (M8-8). */
+    val present: (Passage) -> Unit,
 )
 
 private class VerseActions(
@@ -250,6 +252,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true }
             Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
+            Entry(tr("இங்கிருந்து காட்சிப்படுத்து", "Present from here")) { nav.present(state.passage.copy(verse = v)) }
             Entry(tr("படமாகப் பகிர்", "Share as image")) {
                 vm.recordVerseAction("share-image")
                 scope.launch { shareVerseImage(context, verseRef(v), verseText(v), shareUrl(state.passage, book, listOf(v))) }
@@ -283,6 +286,10 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown && !e.isCtrlPressed && e.key == Key.P) {
+                    nav.present(state.passage.copy(verse = state.selection.firstOrNull()))
+                    return@onPreviewKeyEvent true
+                }
                 if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.N) {
                     nav.newWindow(state.passage.copy(verse = state.selection.firstOrNull()))
                     return@onPreviewKeyEvent true

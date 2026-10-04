@@ -120,6 +120,7 @@ open class MainActivity : ComponentActivity() {
                 k(t("தேடல்", "Search"), KeyEvent.KEYCODE_SLASH),
                 k(t("தேர்வை நீக்கு", "Clear the selection"), KeyEvent.KEYCODE_ESCAPE),
                 k(t("புதிய சாளரம்", "New window"), KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON),
+                k(t("காட்சிப்படுத்து", "Present"), KeyEvent.KEYCODE_P),
             ),
         )
     }

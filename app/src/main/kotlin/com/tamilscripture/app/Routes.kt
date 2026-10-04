@@ -27,6 +27,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object DictionaryRoute : NavKey
 @Serializable data object RootWordsRoute : NavKey
 @Serializable data class AtlasRoute(val focus: String? = null) : NavKey
+@Serializable data class PresentRoute(val passage: Passage) : NavKey
 
 enum class Tab { Home, Plans, Study, Search }
 
