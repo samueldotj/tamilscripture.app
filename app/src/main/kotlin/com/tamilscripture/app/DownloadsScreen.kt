@@ -215,7 +215,7 @@ private fun AudioBookRow(
                         progress != null -> tr("பதிவிறக்குகிறது", "Downloading") + " · ${(progress * 100).toInt()}%"
                         have >= chapters -> tr("சாதனத்தில்", "On device")
                         have > 0 -> tr("$have / $chapters அதிகாரங்கள்", "$have of $chapters chapters")
-                        else -> tr("$chapters அதிகாரங்கள்", "$chapters chapters")
+                        else -> tr("$chapters அதிகாரங்கள்", if (chapters == 1) "1 chapter" else "$chapters chapters")
                     },
                     style = Ts.type.caption, color = c.muted,
                 )
@@ -256,9 +256,9 @@ private fun PackRow(
                 Text(status, style = Ts.type.caption, color = if (state is PackState.Failed) c.amber else c.muted)
             }
             when (state) {
-                is PackState.Installed -> if (state.updateAvailable) {
-                    TsPillButton(tr("புதுப்பி", "Update"), onDownload, style = PillStyle.Filled, height = 36.dp)
-                } else {
+                // An outdated pack can still be removed, not only updated.
+                is PackState.Installed -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (state.updateAvailable) TsPillButton(tr("புதுப்பி", "Update"), onDownload, style = PillStyle.Filled, height = 36.dp)
                     TsPillButton(tr("நீக்கு", "Delete"), onDelete, height = 36.dp)
                 }
                 is PackState.Downloading, is PackState.Queued, PackState.Installing ->

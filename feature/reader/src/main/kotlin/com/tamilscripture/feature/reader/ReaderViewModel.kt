@@ -102,7 +102,8 @@ class ReaderViewModel(private val services: AppServices, initial: Passage) : Vie
                 .catch { mutable.update { s -> s.copy(loading = false, error = true) } }
                 .collect { loaded ->
                     mutable.update { s -> s.copy(chapter = loaded.value, source = loaded.source, loading = false, error = false) }
-                    if (loaded.source == ContentSource.Online) countOnline(p.version)
+                    // Not from a pack: read online, now or when it was prefetched into the cache.
+                    if (loaded.source != ContentSource.Pack) countOnline(p.version)
                     graph.stats.record("view", version = p.version, book = p.book, chapter = p.chapter, source = loaded.source.name.lowercase(),
                         action = settings.value.compare?.takeIf { it != p.version }?.let { "dual:$it" })
                 }
