@@ -115,7 +115,7 @@ fun AppShell(start: List<NavKey>, pending: Passage?, onPendingHandled: () -> Uni
                 entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator(), rememberViewModelStoreNavEntryDecorator()),
                 entryProvider = entryProvider {
                     entry<HomeRoute> {
-                        HomeScreen(HomeNav(read = ::read, plans = { selectTab(Tab.Plans) }, study = { selectTab(Tab.Study) }, profile = { backStack.add(SettingsRoute) }))
+                        HomeScreen(HomeNav(read = ::read, plans = { selectTab(Tab.Plans) }, study = { selectTab(Tab.Study) }, profile = { backStack.add(SettingsRoute) }, downloads = { backStack.add(DownloadsRoute) }))
                     }
                     entry<PlansRoute> { PlansScreen(onRead = ::read) }
                     entry<StudyRoute> {
@@ -150,7 +150,10 @@ fun AppShell(start: List<NavKey>, pending: Passage?, onPendingHandled: () -> Uni
                             if (backStack.lastOrNull() !is ReaderRoute) backStack.add(ReaderRoute(p))
                         })
                     }
-                    entry<SettingsRoute> { SettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }
+                    entry<SettingsRoute> {
+                        SettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onDownloads = { backStack.add(DownloadsRoute) })
+                    }
+                    entry<DownloadsRoute> { DownloadsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }
                 },
             )
         }

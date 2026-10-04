@@ -200,15 +200,9 @@ class StatsRecorder(
     }
 }
 
-/** Implemented by the Application so workers can reach the app's single graph. */
-interface StatsHost {
-    val statsRecorder: StatsRecorder
-    val statsHttp: Http
-}
-
 class StatsSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val host = applicationContext as? StatsHost ?: return Result.failure()
-        return if (host.statsRecorder.upload(host.statsHttp, bearer = null)) Result.success() else Result.retry()
+        val graph = (applicationContext as? com.tamilscripture.core.data.GraphHost)?.graph ?: return Result.failure()
+        return if (graph.stats.upload(graph.http, bearer = null)) Result.success() else Result.retry()
     }
 }

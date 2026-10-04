@@ -1,8 +1,7 @@
 name: android
 
-# Every pull request and push to main: lint, unit tests, and a debug APK to download
-# (design §16.3). The Rust job joins once crates/ts-mobile exists in the website repo
-# (roadmap M0-6); until then the app has no native code.
+# Every pull request and push to main: native library from the website repo at the
+# commit pinned in rust/website.ref, then lint, unit tests and a debug APK (design §16.3).
 
 on:
   pull_request:
@@ -18,6 +17,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - id: pin
+        run: echo "ref=$(cat rust/website.ref)" >> "$GITHUB_OUTPUT"
+      - name: Website crates at the pinned commit
+        uses: actions/checkout@v4
+        with:
+          repository: samueldotj/tamilscripture.com
+          ref: ${{ steps.pin.outputs.ref }}
+          path: website
+          sparse-checkout: |
+            Cargo.toml
+            Cargo.lock
+            crates
+            data/books.toml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: website
+      - run: cargo install cargo-ndk --locked
+      - name: Native library and Kotlin bindings
+        run: ANDROID_NDK_HOME="$ANDROID_NDK_LATEST_HOME" scripts/build-rust.sh website
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

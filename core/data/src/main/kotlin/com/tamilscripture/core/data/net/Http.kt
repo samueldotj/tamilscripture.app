@@ -42,6 +42,55 @@ class Http(private val origins: OriginResolver) {
 
     suspend fun getAbsolute(url: String): ByteArray = withContext(Dispatchers.IO) { fetch(url) }
 
+    /**
+     * Downloads [path] into [dest], resuming from the bytes already there with an HTTP
+     * Range request (DL-4). Reports bytes on disk through [onProgress].
+     */
+    suspend fun download(origin: Origin, path: String, dest: java.io.File, onProgress: suspend (Long) -> Unit) =
+        withContext(Dispatchers.IO) {
+            val base = origins.bases(origin).first()
+            val url = buildUrl(base, path, emptyMap())
+            guard?.invoke(url)
+            var have = if (dest.exists()) dest.length() else 0L
+            val conn = URL(url).openConnection() as HttpURLConnection
+            try {
+                conn.connectTimeout = 8_000
+                conn.readTimeout = 20_000
+                conn.setRequestProperty("User-Agent", "TamilScriptureAndroid")
+                if (have > 0) conn.setRequestProperty("Range", "bytes=$have-")
+                val code = conn.responseCode
+                when {
+                    code == 416 -> return@withContext // already complete
+                    code == 200 -> have = 0 // server ignored Range: start over
+                    code == 206 -> Unit
+                    else -> {
+                        if (code >= 500) origins.markDown(base)
+                        throw HttpException(code, "HTTP $code for $url")
+                    }
+                }
+                java.io.FileOutputStream(dest, have > 0).use { out ->
+                    conn.inputStream.use { input ->
+                        val buf = ByteArray(64 * 1024)
+                        var sinceReport = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            have += n
+                            sinceReport += n
+                            if (sinceReport >= 256 * 1024) {
+                                onProgress(have)
+                                sinceReport = 0
+                            }
+                        }
+                    }
+                }
+                onProgress(have)
+            } finally {
+                conn.disconnect()
+            }
+        }
+
     /** POSTs a JSON body; used only by background workers (stats, sync), never the read path. */
     suspend fun postJson(origin: Origin, path: String, body: String, bearer: String? = null): ByteArray =
         withContext(Dispatchers.IO) {

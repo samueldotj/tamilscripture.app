@@ -399,8 +399,8 @@ CREATE TABLE versification (from_id INTEGER, to_id INTEGER);  -- to the shared m
 CREATE VIRTUAL TABLE verse_fts USING fts5(
   norm, content='', contentless_delete=1, tokenize='unicode61 remove_diacritics 0'
 );
--- misspelling fallback; rowid = verse.id
-CREATE VIRTUAL TABLE verse_tri USING fts5(norm, content='', tokenize='trigram');
+-- No trigram index: it would grow a Tamil pack from 4.7 MB to 12.4 MB (measured 3 Oct 2026);
+-- misspelling-tolerant search goes to the website when online (§8.3).
 ```
 
 Book names in both scripts, slugs and abbreviations are not in packs: they come from `books.toml`, compiled into the `bible-ref` crate.
@@ -652,7 +652,7 @@ One Bible is about 31,000 verses. An FTS5 inverted index answers word, prefix an
 2. Split quoted phrases from loose terms. Normalise each term.
 3. Build an FTS5 `MATCH` expression: phrases as `"…"`, loose terms ANDed, the last term as a prefix (`term*`) while typing.
 4. Query `verse_fts` in each selected pack, `ORDER BY rank LIMIT 50` per page, join to `verse` for text.
-5. If fewer than 5 hits, query `verse_tri` with the normalised terms (trigram similarity) and append those as "similar" results, as the website does.
+5. If the pack finds nothing and the device is online, the website's `/api/search` answers instead; it adds trigram similarity for misspellings. Packs carry no trigram index (it more than doubles their size).
 6. Group by book in canonical order with counts (`SELECT book, count(*) … GROUP BY book` on the match set).
 7. **Highlighting:** because the FTS tables are contentless, matched words are found in Kotlin: tokenise the original verse text, normalise each token with the same Rust function, and mark tokens equal to (or prefixed by) a query term.
 
@@ -1496,9 +1496,9 @@ Made while implementing the Claude Design handoff (3 Oct 2026); each has a roadm
 
 | Area | Interim | Replaced by |
 |---|---|---|
-| Content | Online reading only, through `ContentSource` (cache → network); no packs yet | Pack pipeline and downloads (M1-1 … M1-9) |
-| Reference parsing | Kotlin `ReferenceParser` using the manifest's book names | Rust `bible-ref` through `ts-mobile` (M0-6) |
-| Search | Website `/api/search`; romanised Tamil not yet converted | FTS5 in packs, romanised port (M3) |
+| Pack hosting | Packs, catalogue and bootstrap are built and signed, but not yet on R2; debug builds read them from `tools/serve-packs.py` | R2 bucket and upload job (M1-2, M1-3) |
+| Reference parsing | Kotlin `ReferenceParser` in the search box (search normalisation already uses `ts-mobile`) | Rust `bible-ref` through `ts-mobile` in the search box |
+| Search | On device from installed packs, else the website; romanised Tamil not yet converted | Romanised port (M3-1) |
 | Interface strings | In-code Tamil/English helper `tr()`, as the website does | String resources (NF-9) |
 | Stats | Queued on device; `/api/t/app` not deployed, so events wait | Collector route and migration (M1-21, M1-21a) |
 | Bookmark, note, highlight | Show "coming with sign-in" | Accounts and sync (M6) |

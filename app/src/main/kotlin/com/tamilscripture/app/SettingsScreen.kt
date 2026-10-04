@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
 
 /** Profile / settings / about: language, appearance, stats, cache, licences (A-1.4, ST-8, DL-7). */
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit) {
     val services = LocalAppServices.current
     val graph = services.graph
     val c = Ts.colors
@@ -81,6 +81,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     tr("அநாமதேயப் பயன்பாட்டுப் புள்ளிவிவரம்", "Share anonymous usage stats"),
                     subtitle = tr("வாசித்த வசனங்கள், கேட்ட நேரம் — பெயர் இல்லாமல். அனுப்பக் காத்திருப்பவை: $pending", "Verses read and time listened, never your name. Waiting to send: $pending"),
                     trailing = { TsToggle(settings.shareStats, { v -> scope.launch { graph.settings.update { it.copy(shareStats = v) } } }) },
+                )
+                HDivider()
+                TsListRow(
+                    tr("பதிவிறக்கங்கள்", "Downloads"),
+                    subtitle = tr("இணைப்பின்றி வாசிக்க வேதாகமங்களும் ஆய்வுப் பொதிகளும்", "Bibles and study packs for reading offline"),
+                    onClick = onDownloads,
+                    trailing = { androidx.compose.material3.Icon(TsIcons.ChevronRight, null, tint = c.muted) },
                 )
                 HDivider()
                 TsListRow(

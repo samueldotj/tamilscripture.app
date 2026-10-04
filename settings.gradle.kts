@@ -18,6 +18,7 @@ rootProject.name = "TamilScripture"
 include(":app")
 include(":core:model")
 include(":core:designsystem")
+include(":core:rust")
 include(":core:data")
 include(":core:media")
 include(":feature:home")

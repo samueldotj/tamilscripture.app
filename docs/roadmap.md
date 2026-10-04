@@ -12,6 +12,8 @@ Estimates assume **one full-time Android developer**, with server work (Rust pac
 
 ## Overview
 
+Status 3 Oct 2026: tasks marked [x] are built (some partly — see design §18 for interim choices).
+
 | Milestone | Theme | Estimate | Play track | Depends on |
 |---|---|---|---|---|
 | M0 | Foundations | 2 weeks | — | — |
@@ -40,27 +42,27 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 ### Tasks
 
 **Project setup**
-- [ ] M0-1 Create the Gradle project: version catalog, Kotlin DSL, `build-logic` convention plugins, module skeletons from [design §3.2](design.md#32-modules).
-- [ ] M0-2 Hilt, Navigation Compose with typed routes, `MainActivity` with edge-to-edge, `TsApplication`.
-- [ ] M0-3 Flavors `dev`, `staging`, `prod`; `BuildConfig` for Supabase URL, anon key and the two bootstrap addresses (one per provider). No content host is compiled in ([design §7.11](design.md#711-changing-hosts-r2--vercel)).
-- [ ] M0-4 GitHub Actions `android.yml`: Rust job building `ts-mobile` from the pinned website commit, then lint, detekt, unit tests and a debug APK artifact on every PR ([design §16.3](design.md#163-build-workflow-githubworkflowsandroidyml)).
-- [ ] M0-4a `rust/website.ref` pin, read-only deploy key `WEBSITE_REPO_KEY`, and `scripts/build-rust.sh` for local builds.
-- [ ] M0-4b `release.yml`: on a `v*` tag, signed universal and per-ABI APKs on a GitHub Release and the AAB on the Play internal track ([design §16.4](design.md#164-release-workflow-githubworkflowsreleaseyml)); upload keystore and Play service account in repository secrets.
+- [x] M0-1 Create the Gradle project: version catalog, Kotlin DSL, `build-logic` convention plugins, module skeletons from [design §3.2](design.md#32-modules).
+- [x] M0-2 Hilt, Navigation Compose with typed routes, `MainActivity` with edge-to-edge, `TsApplication`.
+- [x] M0-3 Flavors `dev`, `staging`, `prod`; `BuildConfig` for Supabase URL, anon key and the two bootstrap addresses (one per provider). No content host is compiled in ([design §7.11](design.md#711-changing-hosts-r2--vercel)).
+- [x] M0-4 GitHub Actions `android.yml`: Rust job building `ts-mobile` from the pinned website commit, then lint, detekt, unit tests and a debug APK artifact on every PR ([design §16.3](design.md#163-build-workflow-githubworkflowsandroidyml)).
+- [x] M0-4a `rust/website.ref` pin, read-only deploy key `WEBSITE_REPO_KEY`, and `scripts/build-rust.sh` for local builds.
+- [x] M0-4b `release.yml`: on a `v*` tag, signed universal and per-ABI APKs on a GitHub Release and the AAB on the Play internal track ([design §16.4](design.md#164-release-workflow-githubworkflowsreleaseyml)); upload keystore and Play service account in repository secrets.
 - [ ] M0-5 Play Console app, package name, Play App Signing, internal track; upload a first build from CI.
 
 **Rust bridge**
-- [ ] M0-6 **[web]** Create `crates/ts-mobile` with UniFFI exports for `bible-ref` and `tamil-norm` ([design §9](design.md#9-shared-rust-code)).
-- [ ] M0-7 `:core:rust`: `cargo-ndk` Gradle task for arm64-v8a, armeabi-v7a, x86_64; generated Kotlin bindings; size check < 1 MB per ABI.
+- [x] M0-6 **[web]** Create `crates/ts-mobile` with UniFFI exports for `bible-ref` and `tamil-norm` ([design §9](design.md#9-shared-rust-code)).
+- [x] M0-7 `:core:rust`: `cargo-ndk` Gradle task for arm64-v8a, armeabi-v7a, x86_64; generated Kotlin bindings; size check < 1 MB per ABI.
 - [ ] M0-8 Instrumented test running the website's reference fixture list through the Android build.
 
 **Pack pipeline (thin slice)**
-- [ ] M0-9 **[web]** Create `crates/pack-build`; build a Bible pack for one book with the schema in [design §7.3](design.md#73-bible-pack-schema), including `verse_fts` and `verse_tri`.
-- [ ] M0-10 **[web]** zstd compression, SHA-256, `catalogue.json` with Ed25519 signature; determinism test.
-- [ ] M0-11 Local pack server for `dev` (static file server) and a script to publish to it.
-- [ ] M0-12 `:core:data`: `BundledSQLiteDriver`, `PackRegistry` opening a pack read-only, a smoke test that reads John 3 and runs an FTS5 query.
+- [x] M0-9 **[web]** Create `crates/pack-build`; build a Bible pack for one book with the schema in [design §7.3](design.md#73-bible-pack-schema), including `verse_fts` and `verse_tri`.
+- [x] M0-10 **[web]** zstd compression, SHA-256, `catalogue.json` with Ed25519 signature; determinism test.
+- [x] M0-11 Local pack server for `dev` (static file server) and a script to publish to it.
+- [x] M0-12 `:core:data`: `BundledSQLiteDriver`, `PackRegistry` opening a pack read-only, a smoke test that reads John 3 and runs an FTS5 query.
 
 **Design system base**
-- [ ] M0-13 `:core:design`: colour tokens light/dark, bundled subset fonts, typography scale, shapes ([design §5](design.md#5-design-system)).
+- [x] M0-13 `:core:design`: colour tokens light/dark, bundled subset fonts, typography scale, shapes ([design §5](design.md#5-design-system)).
 
 **Test infrastructure** ([design §15](design.md#15-testing))
 - [ ] M0-14 `:core:testing`: fixture packs (Genesis, Psalms, John in IRVTAM, TCV, BSB) built by `pack-build`, fake CDN dispatcher on MockWebServer with Range support and fault injection.
@@ -84,48 +86,48 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 ### Tasks
 
 **Packs and catalogue**
-- [ ] M1-1 **[web]** `pack-build` for all Bible versions (IRVTAM, TCV, TOV, BSB, WEB, KJV) and the cross-reference pack.
+- [x] M1-1 **[web]** `pack-build` for all Bible versions (IRVTAM, TCV, TOV, BSB, WEB, KJV) and the cross-reference pack.
 - [ ] M1-2 **[web]** CI workflow `packs.yml`: build, sign, upload to R2 under immutable paths, catalogue last.
 - [ ] M1-3 **[web]** R2 bucket and custom domain for packs; CORS not needed (no browser access).
-- [ ] M1-4 `CatalogueRepository`: fetch, verify signature, cache; remote config values; all locations as paths.
-- [ ] M1-4a `OriginResolver`: signed `bootstrap.json` from two providers, last-good copy in DataStore, built-in fallback, ordered origins with one-retry failover and 10-minute down marking.
+- [x] M1-4 `CatalogueRepository`: fetch, verify signature, cache; remote config values; all locations as paths.
+- [x] M1-4a `OriginResolver`: signed `bootstrap.json` from two providers, last-good copy in DataStore, built-in fallback, ordered origins with one-retry failover and 10-minute down marking.
 - [ ] M1-4b **[web]** Publish scripts with targets `vercel`, `r2` or both, writing identical path layouts; `bootstrap.json` published to both providers.
 - [ ] M1-4c `scripts/check-origin.sh` conformance test (Range, cache headers, content types, SHA-256), run nightly against every configured origin.
-- [ ] M1-5 `PackDownloadWorker`: foreground `dataSync` service, progress notification, Range resume, Wi-Fi-only option, pause/cancel ([design §7.7](design.md#77-download-and-install)).
-- [ ] M1-6 Verify → decompress → integrity check → atomic install; `installed_pack` table; space check.
-- [ ] M1-7 Automatic pack updates: `CatalogueRefreshWorker` (daily and on app start), updates on unmetered networks by default, setting for mobile data or off, side-by-side install and atomic swap, "Recently updated" list ([design §7.10](design.md#710-keeping-content-up-to-date)).
-- [ ] M1-8 Downloads screen: catalogue list, sizes, install state, update badges, delete, storage total.
-- [ ] M1-9 Onboarding: interface language, starter set, reader opens at once using online reading and switches to the pack when installed; "Skip downloads"; offline first-run retry screen.
+- [x] M1-5 `PackDownloadWorker`: foreground `dataSync` service, progress notification, Range resume, Wi-Fi-only option, pause/cancel ([design §7.7](design.md#77-download-and-install)).
+- [x] M1-6 Verify → decompress → integrity check → atomic install; `installed_pack` table; space check.
+- [x] M1-7 Automatic pack updates: `CatalogueRefreshWorker` (daily and on app start), updates on unmetered networks by default, setting for mobile data or off, side-by-side install and atomic swap, "Recently updated" list ([design §7.10](design.md#710-keeping-content-up-to-date)).
+- [x] M1-8 Downloads screen: catalogue list, sizes, install state, update badges, delete, storage total.
+- [x] M1-9 Onboarding: interface language, starter set, reader opens at once using online reading and switches to the pack when installed; "Skip downloads"; offline first-run retry screen.
 
 **Online reading** ([design §7.9](design.md#79-online-reading))
-- [ ] M1-9a `ContentSource`: pack → online cache → network resolution for chapters, cross-references and audio timings.
-- [ ] M1-9b Content manifest client (`/content/manifest.json`) and chapter fetcher with timeouts, retry and request coalescing.
-- [ ] M1-9c Online cache: `online_cache` table keyed by content path (not URL), LRU over 50 MB (keep at least 200 chapters), size setting, clear action.
-- [ ] M1-9d Stale-while-revalidate when the content build changes; in-place UI update.
-- [ ] M1-9e Prefetch of neighbouring chapters (±1, next 3 on Wi-Fi); data-saver setting for mobile data.
+- [x] M1-9a `ContentSource`: pack → online cache → network resolution for chapters, cross-references and audio timings.
+- [x] M1-9b Content manifest client (`/content/manifest.json`) and chapter fetcher with timeouts, retry and request coalescing.
+- [x] M1-9c Online cache: `online_cache` table keyed by content path (not URL), LRU over 50 MB (keep at least 200 chapters), size setting, clear action.
+- [x] M1-9d Stale-while-revalidate when the content build changes; in-place UI update.
+- [x] M1-9e Prefetch of neighbouring chapters (±1, next 3 on Wi-Fi); data-saver setting for mobile data.
 - [ ] M1-9f "Download this Bible" suggestion after 10 online chapters; offline-and-uncached state with a download action.
 - [ ] M1-9g Downloads screen shows packs and the online cache separately.
 
 **Reader**
-- [ ] M1-10 `ChapterRepository`: load chapter JSON, parse, LRU cache, neighbour prefetch.
-- [ ] M1-11 `ChapterUi` builder: blocks → `AnnotatedString`s with verse links, footnote callers, `wj` spans, headings, poetry indents.
-- [ ] M1-12 Reader screen: `LazyColumn` of blocks, `HorizontalPager` across all 1,189 chapters, prev/next buttons.
-- [ ] M1-13 Reader and Standard formats; paratext toggles (intros, headings, footnotes, cross-reference markers).
-- [ ] M1-14 Footnote popover/sheet; licence footer per version; About screen with all licences.
-- [ ] M1-15 Book/chapter/verse picker with Tamil and English names; current position marked.
-- [ ] M1-16 Reference box using `bible-ref` with suggestions; Tamil numerals.
-- [ ] M1-17 Verse selection and action bar: copy, share (text + website link); multi-verse selection.
-- [ ] M1-18 Position anchor, back stack with restored scroll, predictive back; continue reading on launch.
-- [ ] M1-19 Reader settings sheet: font size steps, line height, Tamil typeface, theme; DataStore persistence.
-- [ ] M1-20 Interface strings in Tamil and English; per-app language switch.
+- [x] M1-10 `ChapterRepository`: load chapter JSON, parse, LRU cache, neighbour prefetch.
+- [x] M1-11 `ChapterUi` builder: blocks → `AnnotatedString`s with verse links, footnote callers, `wj` spans, headings, poetry indents.
+- [x] M1-12 Reader screen: `LazyColumn` of blocks, `HorizontalPager` across all 1,189 chapters, prev/next buttons.
+- [x] M1-13 Reader and Standard formats; paratext toggles (intros, headings, footnotes, cross-reference markers).
+- [x] M1-14 Footnote popover/sheet; licence footer per version; About screen with all licences.
+- [x] M1-15 Book/chapter/verse picker with Tamil and English names; current position marked.
+- [x] M1-16 Reference box using `bible-ref` with suggestions; Tamil numerals.
+- [x] M1-17 Verse selection and action bar: copy, share (text + website link); multi-verse selection.
+- [x] M1-18 Position anchor, back stack with restored scroll, predictive back; continue reading on launch.
+- [x] M1-19 Reader settings sheet: font size steps, line height, Tamil typeface, theme; DataStore persistence.
+- [x] M1-20 Interface strings in Tamil and English; per-app language switch.
 
 **Stats**
 - [ ] M1-21 **[web]** Migration: `source`, `event_id`, `app`, `window`, `offline` columns; widen `kind`; `track_app_batch(jsonb, uuid, text, text, text)` executable by the service role only; pgTAP tests ([design §12.4](design.md#124-server-side-new-migration-in-the-website-repo)).
 - [ ] M1-21a **[web]** `/api/t/app` Vercel route: size limits, optional JWT verification via JWKS, Vercel geo headers, bot and rate checks, calls `track_app_batch` with the service role ([design §12.3](design.md#123-collector-why-through-the-websites-vercel-function)).
-- [ ] M1-22 `StatsRecorder` channel → Room `pending_event`; retention cap; opt-out setting.
-- [ ] M1-23 `StatsSyncWorker`: batching, back-off, delete on confirmation, expedited run on background.
-- [ ] M1-24 `VisibleVerseTracker` for `read` events (60% visible for 2 s, confirmed) ([design §6.6](design.md#66-verse-read-tracking-for-stats)); `view` events with `source` pack/cache/online.
-- [ ] M1-25 Debug stats screen.
+- [x] M1-22 `StatsRecorder` channel → Room `pending_event`; retention cap; opt-out setting.
+- [x] M1-23 `StatsSyncWorker`: batching, back-off, delete on confirmation, expedited run on background.
+- [x] M1-24 `VisibleVerseTracker` for `read` events (60% visible for 2 s, confirmed) ([design §6.6](design.md#66-verse-read-tracking-for-stats)); `view` events with `source` pack/cache/online.
+- [x] M1-25 Debug stats screen.
 
 **Performance**
 - [ ] M1-26 `:benchmark` module: startup and chapter-swipe Macrobenchmarks; Baseline Profile generation in CI.
@@ -180,15 +182,15 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 ### Tasks
 - [ ] M3-1 **[web]** Port romanised-Tamil conversion to `ts-mobile` with the website's fixtures.
-- [ ] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
+- [x] M3-2 `SearchRepository`: reference detection, phrase/term parsing, normalisation, FTS5 `MATCH`, BM25 order, paging ([design §8.3](design.md#83-query-pipeline)).
 - [ ] M3-3 Trigram fallback when fewer than 5 hits.
 - [ ] M3-4 Match highlighting by token normalisation.
 - [ ] M3-5 Results grouped by book with counts; testament/book filters; multi-version search in parallel.
 - [ ] M3-6 Autocomplete (book names, recent searches); common searches cached from Supabase.
 - [ ] M3-6a Online search through the website's `/api/search` for versions that are not downloaded, mapped to the same result model with an "online results" label.
 - [ ] M3-7 `search` stats events; queries also feed `search_log` server-side.
-- [ ] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.
-- [ ] M3-9 Study Bible format: one verse per item, inline cross-references.
+- [x] M3-8 Cross-references: markers, pane/sheet list with verse text, top 10 + expand, back entry on follow, hover preview on large windows.
+- [x] M3-9 Study Bible format: one verse per item, inline cross-references.
 - [ ] M3-10 Dual view: versification alignment, two-column rows (medium+), interleaved (compact), shared selection, missing-verse cells.
 - [ ] M3-11 Version switcher and "compare with" control.
 - [ ] M3-12 Search benchmark in `:benchmark` (Tamil and English queries from the website's search log).
@@ -208,10 +210,10 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 ### Tasks
 - [ ] M4-1 **[web]** `pack-build` commentary packs from `bible-commentaries/dist/commentary/{version}` for the five commentaries, with Tamil drafts and provenance.
-- [ ] M4-2 `CommentaryRepository` through `ContentSource`: pack, then cache, then the existing commentary CDN (`latest.json`); Tamil when available and the UI is Tamil, else English with the "translation coming" label.
-- [ ] M4-3 Commentary focus pane (expanded+) with source tabs and "also in" previews from other installed commentaries.
-- [ ] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.
-- [ ] M4-5 Commentary text renderer: anchors, verse labels, footnotes, references as links.
+- [x] M4-2 `CommentaryRepository` through `ContentSource`: pack, then cache, then the existing commentary CDN (`latest.json`); Tamil when available and the UI is Tamil, else English with the "translation coming" label.
+- [x] M4-3 Commentary focus pane (expanded+) with source tabs and "also in" previews from other installed commentaries.
+- [x] M4-4 Inline commentary cards under verses (compact/medium); setting on/off and default source.
+- [x] M4-5 Commentary text renderer: anchors, verse labels, footnotes, references as links.
 - [ ] M4-6 Attribution and licence strip per commentary.
 - [ ] M4-7 `commentary` stats events.
 
@@ -229,12 +231,12 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 
 ### Tasks
 - [ ] M5-1 **[web]** Audio index packs per version/recording from `chapters.tsv` and `timings/*.tsv`.
-- [ ] M5-2 `PlaybackService` (`MediaLibraryService`), ExoPlayer, media notification, lock screen, headphone and Bluetooth controls.
-- [ ] M5-3 Queue per book with auto-continue across chapters and books.
-- [ ] M5-4 URI resolution local → `audio` origin; `SimpleCache` with a path-only `CacheKeyFactory`; verse timings through `ContentSource` when the audio index is not downloaded.
-- [ ] M5-5 Player bar (compact) and rail-footer player (medium+); tabletop posture controls.
-- [ ] M5-6 Verse sync: highlight current verse, follow-audio scrolling, "play from here".
-- [ ] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
+- [x] M5-2 `PlaybackService` (`MediaLibraryService`), ExoPlayer, media notification, lock screen, headphone and Bluetooth controls.
+- [x] M5-3 Queue per book with auto-continue across chapters and books.
+- [x] M5-4 URI resolution local → `audio` origin; `SimpleCache` with a path-only `CacheKeyFactory`; verse timings through `ContentSource` when the audio index is not downloaded.
+- [x] M5-5 Player bar (compact) and rail-footer player (medium+); tabletop posture controls.
+- [x] M5-6 Verse sync: highlight current verse, follow-audio scrolling, "play from here".
+- [x] M5-7 Speed control, sleep timer, "Listen in IRV" for versions without audio.
 - [ ] M5-8 Audio downloads per book and per version; storage display; delete.
 - [ ] M5-9 Android Auto browse tree (versions → books → chapters).
 - [ ] M5-10 `audio` stats events with seconds listened and offline flag.
@@ -286,8 +288,8 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 **Requirements:** A-8.1–A-8.3, NF-11.
 
 ### Tasks
-- [ ] M7-1 Port `schedule.ts` (built-in plans, rest days, Psalm 119 stanzas) to Kotlin; test against the website's outputs for every day of every plan.
-- [ ] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
+- [x] M7-1 Port `schedule.ts` (built-in plans, rest days, Psalm 119 stanzas) to Kotlin; test against the website's outputs for every day of every plan.
+- [x] M7-2 Plans Today, Browse and Stats (streak, calendar, list) screens.
 - [ ] M7-3 Community plans from `reading_plans` (published only), cached offline.
 - [ ] M7-4 Progress local when signed out; moved to the account on first sign-in, as the website does.
 - [ ] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine).

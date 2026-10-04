@@ -33,3 +33,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Built from the website repo by scripts/build-rust.sh (design §16.2)
+core/rust/src/main/jniLibs/
+core/rust/src/main/kotlin/uniffi/
+# Local pack builds for testing (tools/serve-packs.py)
+build-packs/

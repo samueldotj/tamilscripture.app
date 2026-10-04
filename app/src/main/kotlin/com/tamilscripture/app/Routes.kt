@@ -17,6 +17,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class PickerRoute(val passage: Passage) : NavKey
 @Serializable data class CommentaryRoute(val passage: Passage) : NavKey
 @Serializable data object SettingsRoute : NavKey
+@Serializable data object DownloadsRoute : NavKey
 
 enum class Tab { Home, Plans, Study, Search }
 

@@ -60,6 +60,7 @@ class HomeNav(
     val plans: () -> Unit,
     val study: () -> Unit,
     val profile: () -> Unit,
+    val downloads: () -> Unit,
 )
 
 /** Verses of the day, one per day of the year in turn. */
@@ -180,6 +181,27 @@ fun HomeScreen(nav: HomeNav) {
                     Kicker(tr("வாசிப்புத் திட்டம்", "Reading plan"))
                     Text(tr("ஒரு வருடத்தில் வேதாகமம் — இன்றே தொடங்குங்கள்", "Whole Bible in a year — start today"),
                         style = Ts.type.cardTitle, color = c.ink, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+            // DL-1: offer the starter set (IRV, BSB, cross-references) until something is installed.
+            val installed by graph.packs.store.installed.collectAsStateWithLifecycle()
+            val catalogue by graph.packs.catalogue.collectAsStateWithLifecycle()
+            val starter = catalogue?.packs?.filter { it.starter }.orEmpty()
+            if (installed.isEmpty() && starter.isNotEmpty()) {
+                TsCard(cardMod, raised = true) {
+                    Kicker(tr("இணைப்பின்றி வாசிக்க", "Read offline"), color = c.accent)
+                    Text(
+                        tr("IRV, BSB, தொடர்புள்ள வசனங்கள்", "IRV, BSB and cross-references") + " · " +
+                            "%.0f MB".format(starter.sumOf { it.size } / 1_048_576.0),
+                        style = Ts.type.cardTitle, color = c.ink, modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TsPillButton(tr("பதிவிறக்கு", "Download"), {
+                            starter.forEach { graph.packs.download(it.id, wifiOnly = false) }
+                            nav.downloads()
+                        }, style = PillStyle.Filled, height = 40.dp)
+                        TsPillButton(tr("மற்றவை", "More"), nav.downloads, height = 40.dp)
+                    }
                 }
             }
             // Verse of the day

@@ -3,6 +3,7 @@ package com.tamilscripture.core.data.content
 import com.tamilscripture.core.data.cache.OnlineCache
 import com.tamilscripture.core.data.net.Http
 import com.tamilscripture.core.data.net.Origin
+import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.model.AudioTimings
 import com.tamilscripture.core.model.Chapter
 import com.tamilscripture.core.model.ContentManifest
@@ -27,15 +28,15 @@ data class Loaded<T>(val value: T, val source: ContentSource, val stale: Boolean
 
 /**
  * The one way screens read scripture (design §7.9, ADR-10): installed pack → online
- * cache → network. Packs are not built yet (roadmap M1-1), so today this resolves cache →
- * network; the pack step slots in front without changing callers.
+ * cache → network. Reading from a pack never touches the network (NF-6).
  */
 class ContentRepository(
     private val http: Http,
     private val cache: OnlineCache,
+    private val packs: PackRepository,
+    val json: Json,
     private val scope: CoroutineScope,
 ) {
-    val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
 
     private val manifestState = MutableStateFlow<ContentManifest?>(null)
     val manifest: StateFlow<ContentManifest?> = manifestState
@@ -47,6 +48,10 @@ class ContentRepository(
 
     /** Loads the cached manifest at once, then refreshes it from the network. */
     fun start() {
+        // A pack installed, updated or removed: forget chapters parsed from the old file.
+        scope.launch {
+            packs.store.installed.collect { synchronized(memory) { memory.keys.removeAll { it.startsWith("pack/") } } }
+        }
         scope.launch {
             cache.get(MANIFEST_KEY)?.let { e ->
                 runCatching { json.decodeFromString<ContentManifest>(e.bytes.decodeToString()) }
@@ -77,6 +82,15 @@ class ContentRepository(
      */
     fun chapter(version: String, book: String, chapter: Int): Flow<Loaded<Chapter>> = flow {
         val key = "chapter/$version/$book/$chapter"
+        val packKey = "pack/$key"
+        synchronized(memory) { memory[packKey] }?.let { emit(Loaded(it, ContentSource.Pack)); return@flow }
+        packs.chapterBody(version, book, chapter)?.let { body ->
+            runCatching { json.decodeFromString<Chapter>(body) }.getOrNull()?.let { c ->
+                synchronized(memory) { memory[packKey] = c }
+                emit(Loaded(c, ContentSource.Pack))
+                return@flow
+            }
+        }
         val build = manifest.value?.build
         synchronized(memory) { memory[key] }?.let { mem ->
             if (build == null || mem.build == build) {
@@ -118,6 +132,7 @@ class ContentRepository(
 
     /** Fetches the neighbouring chapters after the current one paints (ON-4). */
     fun prefetch(version: String, book: String, chapter: Int) {
+        if (packs.hasBible(version)) return
         scope.launch {
             val m = manifest.value ?: return@launch
             val key = "chapter/$version/$book/$chapter"
@@ -129,7 +144,7 @@ class ContentRepository(
     }
 
     suspend fun crossRefs(book: String, chapter: Int): Map<String, List<CrossRef>> =
-        cachedJson("xref/$book/$chapter", { "content/$it/xref/$book/$chapter.json" }) ?: emptyMap()
+        packs.crossRefs(book, chapter) ?: cachedJson("xref/$book/$chapter", { "content/$it/xref/$book/$chapter.json" }) ?: emptyMap()
 
     suspend fun timings(version: String, book: String, chapter: Int): AudioTimings? =
         cachedJson("timing/$version/$book/$chapter", { "content/$it/$version/$book/$chapter.audio.json" })

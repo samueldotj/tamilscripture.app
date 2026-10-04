@@ -75,6 +75,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
     var total by remember { mutableStateOf(0) }
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var offline by remember { mutableStateOf(false) }
     val parser = remember(manifest) { manifest?.let { ReferenceParser(it.books) } }
     val ref = remember(query, parser) { parser?.parse(query) }
     val focus = remember { FocusRequester() }
@@ -90,8 +91,8 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
         loading = true
         try {
             val r = graph.search.search(query.trim(), settings.version)
-            hits = r.hits; total = r.total
-            graph.stats.record("search", query = query.trim(), amount = r.total.toLong(), version = settings.version)
+            hits = r.response.hits; total = r.response.total; offline = r.offline
+            graph.stats.record("search", query = query.trim(), amount = r.response.total.toLong(), version = settings.version, offline = r.offline)
         } catch (e: Exception) {
             failed = true
         }
@@ -159,7 +160,12 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false) {
                     )
                 }
                 if (hits.isNotEmpty()) {
-                    item { Kicker(tr("வசனங்கள்", "Verses") + " · $total", Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp)) }
+                    item {
+                        Kicker(
+                            tr("வசனங்கள்", "Verses") + " · $total" + if (offline) tr(" · சாதனத்தில்", " · on device") else tr(" · இணையத்தில்", " · online"),
+                            Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp),
+                        )
+                    }
                     items(hits, key = { it.verseId + it.version }) { h ->
                         val vid = VerseId.parse(h.verseId) ?: return@items
                         val book = manifest?.book(vid.book)

@@ -7,24 +7,23 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.tamilscripture.core.data.AppGraph
-import com.tamilscripture.core.data.net.Http
+import com.tamilscripture.core.data.GraphHost
+import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.data.stats.StatsContext
-import com.tamilscripture.core.data.stats.StatsHost
 import com.tamilscripture.core.data.stats.StatsRecorder
 import com.tamilscripture.core.media.AudioController
 import com.tamilscripture.core.services.AppServices
 import kotlinx.coroutines.launch
 
-class TsApplication : Application(), StatsHost {
+class TsApplication : Application(), GraphHost {
     lateinit var services: AppServices
         private set
 
-    override val statsRecorder: StatsRecorder get() = services.graph.stats
-    override val statsHttp: Http get() = services.graph.http
+    override val graph: AppGraph get() = services.graph
 
     override fun onCreate() {
         super.onCreate()
-        val graph = AppGraph(this)
+        val graph = AppGraph(this, packsBaseOverride = BuildConfig.DEV_PACKS_BASE.ifBlank { null })
         val audio = AudioController(this, graph.content, graph.origins, graph.stats, graph.appScope)
         services = AppServices(graph, audio)
 
@@ -32,6 +31,8 @@ class TsApplication : Application(), StatsHost {
         graph.stats.context = StatsContext(appVersion = BuildConfig.VERSION_NAME, device = deviceClass())
         graph.stats.start()
         StatsRecorder.schedule(this)
+        PackRepository.scheduleUpdates(this)
+        graph.appScope.launch { graph.packs.refreshCatalogue() }
 
         graph.appScope.launch {
             graph.settings.settings.collect { s ->

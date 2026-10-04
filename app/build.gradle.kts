@@ -19,6 +19,7 @@ android {
         versionCode = System.getenv("TS_VERSION_CODE")?.toIntOrNull() ?: 1
         versionName = System.getenv("TS_VERSION_NAME")?.removePrefix("v") ?: "0.1.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DEV_PACKS_BASE", "\"\"")
     }
 
     signingConfigs {
@@ -33,6 +34,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // ./gradlew installDebug -PdevPacksBase=http://127.0.0.1:8790/ with tools/serve-packs.py and adb reverse.
+            val devPacks = (project.findProperty("devPacksBase") as String?).orEmpty()
+            buildConfigField("String", "DEV_PACKS_BASE", "\"$devPacks\"")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
