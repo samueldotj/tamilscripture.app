@@ -4,9 +4,14 @@ import com.tamilscripture.core.data.net.Http
 import com.tamilscripture.core.data.net.Origin
 import com.tamilscripture.core.data.packs.PackRepository
 import com.tamilscripture.core.model.Romanised
+import com.tamilscripture.core.model.SearchHit
 import com.tamilscripture.core.model.SearchResponse
-import kotlinx.serialization.json.Json
+import com.tamilscripture.core.model.VerseId
 import java.io.IOException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.Json
 
 /**
  * Word search (A-4.2, A-4.9). With the version's pack installed, search runs on the
@@ -57,6 +62,28 @@ class SearchRepository(private val http: Http, private val packs: PackRepository
         val tamilResult = runCatching { searchAs(roman, version, offset, books) }.getOrNull()
         return if (tamilResult != null && tamilResult.response.total > 0) tamilResult else typed
     }
+
+    /**
+     * Several versions at once (M3-5): each searched in parallel, on the device where its
+     * pack is installed, and the hits merged in canonical order, versions in the order given.
+     */
+    suspend fun searchVersions(query: String, versions: List<String>, tamil: (String) -> Boolean, books: IntRange? = null): Result =
+        coroutineScope {
+            val results = versions.map { v -> async { runCatching { search(query, v, tamil(v), 0, books) }.getOrNull() } }.awaitAll()
+            val found = results.filterNotNull()
+            if (found.isEmpty()) throw IOException("no version could be searched")
+            val order = versions.withIndex().associate { (i, v) -> v to i }
+            val hits = found.flatMap { it.response.hits }.sortedWith(
+                compareBy<SearchHit>({ it.bookOrder }, { VerseId.parse(it.verseId)?.chapter ?: 0 }, { VerseId.parse(it.verseId)?.verse ?: 0 }, { order[it.version] ?: 0 }),
+            )
+            val perBook = found.flatMap { it.perBook }.groupBy({ it.first }, { it.second }).map { (o, n) -> o to n.sum() }.sortedBy { it.first }
+            Result(
+                SearchResponse(query = query, hits = hits, total = found.sumOf { it.response.total }),
+                offline = found.all { it.offline },
+                shown = found.firstOrNull { it.response.total > 0 }?.shown ?: query,
+                perBook = perBook,
+            )
+        }
 
     private suspend fun searchAs(query: String, version: String, offset: Int, books: IntRange?): Result {
         val local = if (packs.hasBible(version)) packs.search(version, query, offset = offset, books = books) else null

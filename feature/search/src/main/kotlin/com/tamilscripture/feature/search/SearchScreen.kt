@@ -92,6 +92,8 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     // M3-5: "OT", "NT" or a book code narrows the search; a new query starts over.
     var scope by rememberSaveable(query) { mutableStateOf<String?>(null) }
     var perBook by remember { mutableStateOf<List<Pair<Int, Int>>>(emptyList()) }
+    // M3-5: every version at once, merged in canonical order.
+    var allVersions by rememberSaveable { mutableStateOf(false) }
     val scopeRange = remember(scope, manifest) {
         val books = manifest?.books.orEmpty()
         when (val sc = scope) {
@@ -117,7 +119,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
     val focus = remember { FocusRequester() }
     LaunchedEffect(autoFocus) { if (autoFocus) runCatching { focus.requestFocus() } }
 
-    LaunchedEffect(query, settings.version, ref, scopeRange) {
+    LaunchedEffect(query, settings.version, ref, scopeRange, allVersions) {
         failed = false
         if (query.trim().length < 2 || ref != null) {
             hits = emptyList(); total = 0; loading = false; romanOffer = null; perBook = emptyList()
@@ -126,7 +128,13 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
         if (scopeRange == null) delay(350)
         loading = true
         try {
-            val r = graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta", books = scopeRange)
+            val versions = manifest?.versions.orEmpty().sortedBy { it.order }.map { it.code }
+            val r = if (allVersions && versions.size > 1) {
+                // The reader's version first, so its hits lead within each verse.
+                graph.search.searchVersions(query.trim(), listOf(settings.version) + (versions - settings.version), { v -> manifest?.version(v)?.lang == "ta" }, scopeRange)
+            } else {
+                graph.search.search(query.trim(), settings.version, tamil = manifest?.version(settings.version)?.lang == "ta", books = scopeRange)
+            }
             hits = r.response.hits; total = r.response.total; offline = r.offline; shown = r.shown; romanOffer = r.romanOffer
             perBook = r.perBook
             if (scopeRange == null) graph.stats.record("search", query = query.trim(), amount = r.response.total.toLong(), version = settings.version, offline = r.offline)
@@ -227,8 +235,11 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                 }
                 if (hits.isNotEmpty() || scope != null) {
                     item {
-                        ScopeRow(scope, perBook, manifest?.books.orEmpty(), lang) { scope = it }
+                        ScopeRow(scope, perBook, manifest?.books.orEmpty(), lang, allVersions, { allVersions = !allVersions }) { scope = it }
                     }
+                }
+                if (hits.isEmpty() && allVersions && scope == null && !loading && query.trim().length >= 2 && ref == null) item {
+                    ScopeRow(null, emptyList(), manifest?.books.orEmpty(), lang, true, { allVersions = false }) { }
                 }
                 if (hits.isNotEmpty()) {
                     if (shown != query.trim()) item {
@@ -258,7 +269,11 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                             Modifier.fillMaxWidth().clickable { openHit(Passage(h.version, vid.book, vid.chapter, vid.verse)) }.padding(horizontal = 20.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Text(book?.label(lang, vid.chapter, vid.verse) ?: h.verseId, style = Ts.type.labelSmall, color = c.accent)
+                            Text(
+                                (book?.label(lang, vid.chapter, vid.verse) ?: h.verseId) +
+                                    if (allVersions) " · " + (manifest?.version(h.version)?.short ?: h.version) else "",
+                                style = Ts.type.labelSmall, color = c.accent,
+                            )
                             val ranges = remember(h.text, shown) { PackRepository.matchRanges(h.text, shown) }
                             Text(highlight(h.text, ranges, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
                         }
@@ -281,7 +296,15 @@ private fun highlight(text: String, ranges: List<IntRange>, bg: androidx.compose
  * downloaded Bible each book shows how many verses matched; online, only the testaments.
  */
 @Composable
-private fun ScopeRow(scope: String?, perBook: List<Pair<Int, Int>>, books: List<Book>, lang: UiLang, onScope: (String?) -> Unit) {
+private fun ScopeRow(
+    scope: String?,
+    perBook: List<Pair<Int, Int>>,
+    books: List<Book>,
+    lang: UiLang,
+    allVersions: Boolean,
+    onToggleVersions: () -> Unit,
+    onScope: (String?) -> Unit,
+) {
     val byOrder = remember(books) { books.associateBy { it.order } }
     fun count(t: String) = perBook.filter { (o, _) -> byOrder[o]?.testament == t }.sumOf { it.second }
     val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
@@ -289,6 +312,7 @@ private fun ScopeRow(scope: String?, perBook: List<Pair<Int, Int>>, books: List<
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        TsChip(tr("எல்லா மொழிபெயர்ப்புகளும்", "All versions"), allVersions, onToggleVersions, contentPadding = pad)
         TsChip(tr("முழு வேதம்", "Whole Bible"), scope == null, { onScope(null) }, contentPadding = pad)
         listOf("OT" to tr("பழைய ஏற்பாடு", "Old Testament"), "NT" to tr("புதிய ஏற்பாடு", "New Testament")).forEach { (t, label) ->
             val n = count(t)
