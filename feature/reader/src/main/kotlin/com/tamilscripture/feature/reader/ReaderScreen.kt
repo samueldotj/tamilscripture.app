@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -49,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -79,6 +81,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tamilscripture.core.data.settings.Settings
@@ -89,6 +92,7 @@ import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.component.VDivider
+import com.tamilscripture.core.designsystem.component.VerseImage
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.media.AudioController
@@ -100,7 +104,11 @@ import com.tamilscripture.core.model.label
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
+import java.io.File
 import kotlin.math.abs
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Callbacks into the app's navigation; the reader never navigates by itself. */
 class ReaderNav(
@@ -125,6 +133,7 @@ private class VerseActions(
     val onShare: () -> Unit,
     /** Bookmark, note and highlight arrive with sign-in (roadmap M6). */
     val onSignInFeature: () -> Unit,
+    val onShareImage: () -> Unit,
     val onOriginal: () -> Unit,
     val onPeople: () -> Unit,
 )
@@ -139,6 +148,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     val audio by services.audio.state.collectAsStateWithLifecycle()
     val lang = LocalUiLang.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val c = Ts.colors
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -213,6 +223,13 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         onSignInFeature = {
             Toast.makeText(context, if (lang == UiLang.Tamil) "உள்நுழைவுடன் விரைவில் வருகிறது" else "Coming with sign-in", Toast.LENGTH_SHORT).show()
         },
+        onShareImage = {
+            vm.recordVerseAction("share-image")
+            val ref = selectedRef ?: ""
+            val text = state.selection.joinToString(" ") { chapter?.verseText(it).orEmpty() }
+            val url = shareUrl(state.passage, book, state.selection)
+            scope.launch { shareVerseImage(context, ref, text, url) }
+        },
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
         onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
     )
@@ -233,6 +250,10 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true }
             Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
+            Entry(tr("படமாகப் பகிர்", "Share as image")) {
+                vm.recordVerseAction("share-image")
+                scope.launch { shareVerseImage(context, verseRef(v), verseText(v), shareUrl(state.passage, book, listOf(v))) }
+            }
             Entry(tr("புதிய சாளரத்தில் திற", "Open in new window")) { nav.newWindow(state.passage.copy(verse = v)) }
             Entry(tr("பகிர்", "Share")) {
                 vm.recordVerseAction("share")
@@ -499,7 +520,7 @@ private fun ActionCardOverlay(
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onSignInFeature, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onSignInFeature, onHighlight = a.onSignInFeature,
-            onOriginal = a.onOriginal, onPeople = a.onPeople,
+            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage,
         )
     }
 }
@@ -756,6 +777,23 @@ private fun shareUrl(p: Passage, book: Book?, sel: List<Int>): String {
 private fun copyVerses(context: Context, ref: String?, texts: List<String>) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(ref, texts.joinToString(" ") + "\n— " + (ref ?: "")))
+}
+
+/** M8-6: the verse as a picture, made off the main thread, then the share sheet. */
+private suspend fun shareVerseImage(context: Context, ref: String, text: String, url: String) {
+    val uri = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = File(dir, "verse.png")
+        val bitmap = VerseImage.render(context, text, ref)
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        FileProvider.getUriForFile(context, context.packageName + ".share", file)
+    }
+    val send = Intent(Intent.ACTION_SEND).setType("image/png")
+        .putExtra(Intent.EXTRA_STREAM, uri)
+        .putExtra(Intent.EXTRA_TEXT, "$ref\n$url")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    context.startActivity(Intent.createChooser(send, ref))
 }
 
 private fun shareVerses(context: Context, ref: String?, texts: List<String>, url: String) {

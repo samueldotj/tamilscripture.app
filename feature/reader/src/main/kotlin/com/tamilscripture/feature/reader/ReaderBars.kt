@@ -175,6 +175,7 @@ fun VerseActionCard(
     onHighlight: () -> Unit,
     onOriginal: () -> Unit,
     onPeople: () -> Unit,
+    onShareImage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
@@ -208,6 +209,7 @@ fun VerseActionCard(
         Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallAction(tr("மூல மொழி", "Original words"), onOriginal, Modifier.weight(1f))
             SmallAction(tr("நபர்கள் · இடங்கள்", "People · places"), onPeople, Modifier.weight(1f))
+            SmallAction(tr("படமாக", "As image"), onShareImage, Modifier.weight(1f))
         }
     }
 }
