@@ -44,9 +44,11 @@ open class MainActivity : ComponentActivity() {
         // One DataStore read before the first frame so the theme and language never flash (NF-2).
         val initial = runBlocking { services.graph.settings.settings.first() }
         // A recreated activity (rotation, or a restore after the process was killed) carries an
-        // intent that was already opened, possibly the task's first one; new links arrive
-        // through onNewIntent.
-        if (savedInstanceState == null) pendingUri = intent?.data
+        // intent that was already opened; new links arrive through onNewIntent. After a
+        // force-stop or reboot the system restarts the task with its first intent and no saved
+        // state, so the last link opened is remembered on disk and not opened a second time.
+        val links = getSharedPreferences("links", MODE_PRIVATE)
+        if (savedInstanceState == null) intent?.data?.takeIf { it.toString() != links.getString("handled", null) }?.let { pendingUri = it }
         val start = startStack()
 
         setContent {
@@ -62,6 +64,7 @@ open class MainActivity : ComponentActivity() {
                     // Not awaited: a manifest refresh must not cancel the navigation half-way.
                     link?.compare?.let { code -> lifecycleScope.launch { services.graph.settings.update { it.copy(compare = code) } } }
                     pendingLink = link?.route
+                    links.edit().putString("handled", uri.toString()).apply()
                     pendingUri = null
                 }
             }

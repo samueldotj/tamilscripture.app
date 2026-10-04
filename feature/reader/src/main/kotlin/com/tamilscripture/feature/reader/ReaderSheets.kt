@@ -137,14 +137,15 @@ fun StudySettingsSheet(
                 }
             })
             HDivider()
-            TsListRow(tr("தோற்றம்", "Appearance"), trailing = {
-                TsSegmented(
-                    listOf(tr("இருள்", "Dark"), tr("ஒளி", "Light"), tr("தானியங்கி", "Auto")),
-                    when (settings.appearance) { Appearance.Dark -> 0; Appearance.Light -> 1; Appearance.System -> 2 },
-                    { i -> onChange { it.copy(appearance = listOf(Appearance.Dark, Appearance.Light, Appearance.System)[i]) } },
-                    height = 36.dp, textStyle = Ts.type.labelSmall,
-                )
-            })
+            // Under its title, as in Settings: beside it the Tamil title had no room.
+            TsListRow(tr("தோற்றம்", "Appearance"))
+            TsSegmented(
+                listOf(tr("இருள்", "Dark"), tr("ஒளி", "Light"), tr("தானியங்கி", "Auto")),
+                when (settings.appearance) { Appearance.Dark -> 0; Appearance.Light -> 1; Appearance.System -> 2 },
+                { i -> onChange { it.copy(appearance = listOf(Appearance.Dark, Appearance.Light, Appearance.System)[i]) } },
+                height = 40.dp, fill = true, textStyle = Ts.type.labelSmall,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 18.dp).fillMaxWidth(),
+            )
         }
     }
 }
