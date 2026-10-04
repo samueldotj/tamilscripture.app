@@ -41,7 +41,7 @@ import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.services.tr
 
-class StudyNav(val commentary: () -> Unit, val soon: (String) -> Unit)
+class StudyNav(val commentary: () -> Unit, val dictionary: () -> Unit, val rootWords: () -> Unit, val soon: (String) -> Unit)
 
 /** ஆய்வு · Study hub (design 1G). */
 @Composable
@@ -61,12 +61,12 @@ fun StudyHubScreen(nav: StudyNav) {
             AtlasCard(mod) { nav.soon(atlas) }
             Row(mod, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val dict = tr("அகராதி", "Dictionary")
-                Tile(dict, tr("ஈஸ்டன் · ஸ்மித் · அக்வைஃபர்", "Easton · Smith · Aquifer"), Modifier.weight(1f), soon = true) { nav.soon(dict) }
+                Tile(dict, tr("ஈஸ்டன் · ஸ்மித் · அக்வைஃபர்", "Easton · Smith · Aquifer"), Modifier.weight(1f), onClick = nav.dictionary)
                 Tile(tr("விளக்கவுரை", "Commentary"), "M. Henry · Calvin · Geneva", Modifier.weight(1f), onClick = nav.commentary)
             }
             Row(mod, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val roots = tr("மூலச்சொல்", "Root words")
-                Tile(roots, tr("எபிரெயம் · கிரேக்கம்", "Hebrew · Greek"), Modifier.weight(1f), soon = true) { nav.soon(roots) }
+                Tile(roots, tr("எபிரெயம் · கிரேக்கம்", "Hebrew · Greek"), Modifier.weight(1f), onClick = nav.rootWords)
                 val contrib = tr("என் பங்களிப்புகள்", "My contributions")
                 Tile(contrib, tr("உள்நுழைவுடன்", "With sign-in"), Modifier.weight(1f), soon = true) { nav.soon(contrib) }
             }

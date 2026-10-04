@@ -173,6 +173,8 @@ fun VerseActionCard(
     onShare: () -> Unit,
     onNote: () -> Unit,
     onHighlight: () -> Unit,
+    onOriginal: () -> Unit,
+    onPeople: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
@@ -201,6 +203,11 @@ fun VerseActionCard(
             SmallAction(tr("பகிர்", "Share"), onShare, Modifier.weight(1f))
             SmallAction(tr("குறிப்பு", "Note"), onNote, Modifier.weight(1f))
             SmallAction(tr("முனைப்பு", "Highlight"), onHighlight, Modifier.weight(1f))
+        }
+        // M8-2, M8-4: the verse in Hebrew or Greek; who and where it names.
+        Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SmallAction(tr("மூல மொழி", "Original words"), onOriginal, Modifier.weight(1f))
+            SmallAction(tr("நபர்கள் · இடங்கள்", "People · places"), onPeople, Modifier.weight(1f))
         }
     }
 }

@@ -39,9 +39,9 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.tamilscripture.core.data.settings.Settings
+import com.tamilscripture.core.designsystem.component.CrossMark
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Pill
-import com.tamilscripture.core.designsystem.component.CrossMark
 import com.tamilscripture.core.designsystem.component.VDivider
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
@@ -58,7 +58,14 @@ import com.tamilscripture.feature.reader.CommentaryScreen
 import com.tamilscripture.feature.reader.ReaderNav
 import com.tamilscripture.feature.reader.ReaderScreen
 import com.tamilscripture.feature.search.SearchScreen
+import com.tamilscripture.feature.study.ArticleScreen
+import com.tamilscripture.feature.study.DictionaryScreen
+import com.tamilscripture.feature.study.PersonScreen
+import com.tamilscripture.feature.study.PlaceScreen
+import com.tamilscripture.feature.study.RootWordsScreen
+import com.tamilscripture.feature.study.StrongsScreen
 import com.tamilscripture.feature.study.StudyHubScreen
+import com.tamilscripture.feature.study.StudyLinks
 import com.tamilscripture.feature.study.StudyNav
 
 /**
@@ -102,6 +109,15 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
         backStack.add(key)
     }
 
+    val studyLinks = StudyLinks(
+        back = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) },
+        read = { p -> read(p) },
+        strongs = { n -> backStack.add(StrongsRoute(n)) },
+        person = { id -> backStack.add(PersonRoute(id)) },
+        place = { id -> backStack.add(PlaceRoute(id)) },
+        article = { id -> backStack.add(ArticleRoute(id)) },
+    )
+
     val soon: (String) -> Unit = { name ->
         Toast.makeText(context, if (lang == UiLang.Tamil) "$name — விரைவில் வருகிறது" else "$name — coming soon", Toast.LENGTH_SHORT).show()
     }
@@ -125,7 +141,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                         StudyHubScreen(StudyNav(commentary = {
                             val last = settings.lastRead ?: Passage(settings.version, "JHN", 3)
                             backStack.add(CommentaryRoute(last))
-                        }, soon = soon))
+                        }, dictionary = { backStack.add(DictionaryRoute) }, rootWords = { backStack.add(RootWordsRoute) }, soon = soon))
                     }
                     entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
@@ -138,6 +154,9 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                                 search = { backStack.add(SearchRoute(focus = true)) },
                                 home = { selectTab(Tab.Home) },
                                 newWindow = { p -> ReaderWindowActivity.open(context, p) },
+                                strongs = studyLinks.strongs,
+                                person = studyLinks.person,
+                                place = studyLinks.place,
                             ),
                         )
                     }
@@ -157,6 +176,12 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<SettingsRoute> {
                         SettingsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onDownloads = { backStack.add(DownloadsRoute) })
                     }
+                    entry<StrongsRoute> { r -> StrongsScreen(r.number, studyLinks) }
+                    entry<PersonRoute> { r -> PersonScreen(r.id, studyLinks) }
+                    entry<PlaceRoute> { r -> PlaceScreen(r.id, studyLinks) }
+                    entry<ArticleRoute> { r -> ArticleScreen(r.id, studyLinks) }
+                    entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
+                    entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
                     entry<DownloadsRoute> { DownloadsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }
                 },
             )

@@ -98,6 +98,10 @@ class ReaderNav(
     val home: () -> Unit,
     /** Opens the passage in another window (FF-9). */
     val newWindow: (Passage) -> Unit,
+    /** Study pages (M8): a Strong's number, a person, a place. */
+    val strongs: (String) -> Unit,
+    val person: (String) -> Unit,
+    val place: (String) -> Unit,
 )
 
 private class VerseActions(
@@ -108,6 +112,8 @@ private class VerseActions(
     val onShare: () -> Unit,
     /** Bookmark, note and highlight arrive with sign-in (roadmap M6). */
     val onSignInFeature: () -> Unit,
+    val onOriginal: () -> Unit,
+    val onPeople: () -> Unit,
 )
 
 @Composable
@@ -125,6 +131,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showCrossRefs by rememberSaveable { mutableStateOf(false) }
     var showVersions by rememberSaveable { mutableStateOf(false) }
+    var showOriginal by rememberSaveable { mutableStateOf(false) }
+    var showPeople by rememberSaveable { mutableStateOf(false) }
 
     val book = state.book
     val chapter = state.chapter
@@ -183,6 +191,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
         onSignInFeature = {
             Toast.makeText(context, if (lang == UiLang.Tamil) "உள்நுழைவுடன் விரைவில் வருகிறது" else "Coming with sign-in", Toast.LENGTH_SHORT).show()
         },
+        onOriginal = { vm.recordVerseAction("original"); showOriginal = true },
+        onPeople = { vm.recordVerseAction("people"); showPeople = true },
     )
 
     // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
@@ -198,6 +208,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             if (hasAudio) Entry(tr("இங்கிருந்து கேள்", "Listen from here")) { vm.recordVerseAction("listen"); play(v) }
             Entry(tr("விளக்கவுரை", "Commentary")) { vm.recordVerseAction("commentary"); nav.commentary(state.passage.copy(verse = v)) }
             Entry(tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { vm.recordVerseAction("xref"); showCrossRefs = true }
+            Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); showOriginal = true }
+            Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); showPeople = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
             Entry(tr("புதிய சாளரத்தில் திற", "Open in new window")) { nav.newWindow(state.passage.copy(verse = v)) }
             Entry(tr("பகிர்", "Share")) {
@@ -328,6 +340,20 @@ fun ReaderScreen(passage: Passage, wide: Boolean, nav: ReaderNav) {
             vm.open(Passage(state.passage.version, vid.book, vid.chapter, vid.verse))
         }) { showCrossRefs = false }
     }
+    if (showOriginal) {
+        val v = state.selection.firstOrNull() ?: 1
+        OriginalWordsSheet(
+            book?.label(lang, state.passage.chapter, v) ?: "", state.passage.book, state.passage.chapter, v,
+            onStrongs = { n -> showOriginal = false; nav.strongs(n) },
+        ) { showOriginal = false }
+    }
+    if (showPeople) {
+        PeoplePlacesSheet(
+            title, state.passage.book, state.passage.chapter, state.selection.firstOrNull(),
+            onPerson = { id -> showPeople = false; nav.person(id) },
+            onPlace = { id -> showPeople = false; nav.place(id) },
+        ) { showPeople = false }
+    }
     if (showVersions) {
         VersionSheet(
             state.manifest?.versions.orEmpty(), state.passage.version, { code -> showVersions = false; vm.setVersion(code) },
@@ -352,6 +378,7 @@ private fun ActionCardOverlay(
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onSignInFeature, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onSignInFeature, onHighlight = a.onSignInFeature,
+            onOriginal = a.onOriginal, onPeople = a.onPeople,
         )
     }
 }

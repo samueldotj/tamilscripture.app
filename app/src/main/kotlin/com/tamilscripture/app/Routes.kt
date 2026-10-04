@@ -19,6 +19,14 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute : NavKey
 @Serializable data object DownloadsRoute : NavKey
 
+/** Study pages (roadmap M8). */
+@Serializable data class StrongsRoute(val number: String) : NavKey
+@Serializable data class PersonRoute(val id: String) : NavKey
+@Serializable data class PlaceRoute(val id: String) : NavKey
+@Serializable data class ArticleRoute(val id: String) : NavKey
+@Serializable data object DictionaryRoute : NavKey
+@Serializable data object RootWordsRoute : NavKey
+
 enum class Tab { Home, Plans, Study, Search }
 
 fun NavKey.tab(): Tab? = when (this) {

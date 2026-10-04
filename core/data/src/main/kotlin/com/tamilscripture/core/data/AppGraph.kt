@@ -6,6 +6,7 @@ import com.tamilscripture.core.data.cache.OnlineCache
 import com.tamilscripture.core.data.content.CommentaryRepository
 import com.tamilscripture.core.data.content.ContentRepository
 import com.tamilscripture.core.data.content.SearchRepository
+import com.tamilscripture.core.data.content.StudyRepository
 import com.tamilscripture.core.data.net.BuiltInBootstrap
 import com.tamilscripture.core.data.net.Http
 import com.tamilscripture.core.data.net.OriginResolver
@@ -40,6 +41,7 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val content = ContentRepository(http, onlineCache, packs, json, appScope, localTimings = audio::timings)
     val commentary = CommentaryRepository(http, onlineCache, json, packs)
     val search = SearchRepository(http, packs, json)
+    val study = StudyRepository(http, onlineCache, packs, content, json)
     val settings = SettingsRepository(context)
     val plans = PlanRepository(context, http)
     val stats = StatsRecorder(File(context.filesDir, "stats"), appScope, json)

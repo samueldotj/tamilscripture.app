@@ -142,6 +142,15 @@ class PackRepository(
 
     fun hasCommentary(source: String) = store.isInstalled("commentary.$source")
 
+    /** A file kept under its entities/ path in a study pack (M8-1). */
+    suspend fun studyFile(pack: String, path: String): String? =
+        store.query(pack) { c ->
+            c.prepare("SELECT body FROM file WHERE path = ?").use { st ->
+                st.bindText(1, path)
+                if (st.step()) st.getText(0) else null
+            }
+        }
+
     /** A chapter of a downloaded commentary, as the JSON the commentary CDN serves (chapter 0: the book's introduction). */
     suspend fun commentaryChapter(source: String, book: String, chapter: Int): ByteArray? =
         store.query("commentary.$source") { c ->
