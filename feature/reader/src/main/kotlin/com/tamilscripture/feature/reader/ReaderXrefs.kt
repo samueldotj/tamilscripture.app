@@ -21,7 +21,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,58 +63,46 @@ private fun refLabel(r: CrossRef, manifest: ContentManifest?, lang: UiLang): Str
     return "$name ${vid.chapter}:${vid.verse}$tail"
 }
 
+/** A cross-reference's identity within its verse (the reference and its end). */
+internal fun CrossRef.key(): String = to + (end?.let { "-$it" } ?: "")
+
 /**
- * Study Bible: the verse's cross-references in small type under it (the website's
- * fmt-xref list). Each reference is its own button: a tap opens a box under the line with
- * that verse's text, a second tap (or another reference) closes it, and the box opens the
- * verse. "+n" shows the rest of the references.
+ * Study Bible: the verse's cross-references in small type right after its text, on the same
+ * line (the website's fmt-xref list). Each is a link; [openKey] is the one whose box is open.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun VerseCrossRefs(
-    verseKey: String,
+internal fun AnnotatedString.Builder.appendCrossRefs(
     refs: List<CrossRef>,
+    all: Boolean,
+    openKey: String?,
     manifest: ContentManifest?,
-    version: String,
-    onOpen: (VerseId) -> Unit,
+    onRef: (String) -> Unit,
+    onMore: () -> Unit,
 ) {
-    if (refs.isEmpty()) return
     val c = Ts.colors
     val lang = LocalUiLang.current
-    var openRef by rememberSaveable(verseKey) { mutableStateOf<String?>(null) }
-    var all by rememberSaveable(verseKey) { mutableStateOf(false) }
-    val key = { r: CrossRef -> r.to + (r.end?.let { "-$it" } ?: "") }
-    val shown = if (all) refs else refs.take(SHOWN)
-    val style = Ts.type.caption.copy(fontSize = 12.sp)
-    Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 4.dp)) {
-        FlowRow(verticalArrangement = Arrangement.Center) {
-            Text("↗", style = style, color = c.muted, modifier = Modifier.padding(end = 2.dp, top = 6.dp, bottom = 6.dp))
-            shown.forEach { r ->
-                val selected = openRef == key(r)
-                Text(
-                    refLabel(r, manifest, lang),
-                    style = style.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
-                    color = c.accent,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (selected) c.accentSoft else Color.Transparent)
-                        .clickable(role = Role.Button) { openRef = if (selected) null else key(r) }
-                        .padding(horizontal = 5.dp, vertical = 6.dp),
-                )
-            }
-            if (!all && refs.size > SHOWN) {
-                Text(
-                    "+${refs.size - SHOWN}", style = style, color = c.muted,
-                    modifier = Modifier.clip(RoundedCornerShape(6.dp))
-                        .clickable(role = Role.Button, onClickLabel = tr("அனைத்தும்", "Show all")) { all = true }
-                        .padding(horizontal = 5.dp, vertical = 6.dp),
-                )
-            }
-        }
-        val current = refs.firstOrNull { key(it) == openRef }
-        AnimatedVisibility(current != null) {
-            current?.let { r -> Column(Modifier.padding(top = 2.dp, bottom = 6.dp)) { RefBox(r, manifest, version, onOpen) } }
-        }
+    val small = SpanStyle(fontSize = 12.sp, color = c.accent, fontWeight = FontWeight.Normal, baselineShift = BaselineShift.None)
+    append("  ")
+    withStyle(small.copy(color = c.muted)) { append("↗") }
+    for (r in if (all) refs else refs.take(SHOWN)) {
+        append("\u2002")
+        val k = r.key()
+        val style = if (k == openKey) small.copy(fontWeight = FontWeight.Bold, background = c.accentSoft) else small
+        // No-break spaces: a reference never splits across lines.
+        withLink(LinkAnnotation.Clickable(k, TextLinkStyles(style)) { onRef(k) }) { append(refLabel(r, manifest, lang).replace(' ', '\u00A0')) }
+    }
+    if (!all && refs.size > SHOWN) {
+        append("\u2002")
+        withLink(LinkAnnotation.Clickable("more", TextLinkStyles(small.copy(color = c.muted))) { onMore() }) { append("+${refs.size - SHOWN}") }
+    }
+}
+
+/** The box of the cross-reference opened under its verse, if any. */
+@Composable
+fun CrossRefBox(refs: List<CrossRef>, openKey: String?, manifest: ContentManifest?, version: String, onOpen: (VerseId) -> Unit) {
+    val current = refs.firstOrNull { it.key() == openKey }
+    AnimatedVisibility(current != null) {
+        current?.let { r -> Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 6.dp)) { RefBox(r, manifest, version, onOpen) } }
     }
 }
 

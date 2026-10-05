@@ -84,7 +84,7 @@ private val HEAT_ALPHA = floatArrayOf(0f, 0.08f, 0.16f, 0.26f, 0.38f)
 
 /** A verse's text with its superscript number, in the design's 1B style. */
 @Composable
-fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean, words: List<WordMark> = emptyList(), leading: Boolean = false): AnnotatedString {
+fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean, words: List<WordMark> = emptyList(), leading: Boolean = false, refs: (@Composable AnnotatedString.Builder.() -> Unit)? = null): AnnotatedString {
     val c = Ts.colors
     return buildAnnotatedString {
         if (leading) {
@@ -112,6 +112,7 @@ fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Bool
                 }
             }
         }
+        refs?.invoke(this)
     }
 }
 
@@ -205,12 +206,19 @@ fun ReaderTextList(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                     is ReaderItem.Verse -> Row { Column(Modifier.weight(1f)) {
+                        // Study Bible: the verse's cross-references end its text; one may be open in a box below.
+                        val refs = if (format == ReadingFormat.Study) xrefs[item.verse].orEmpty() else emptyList()
+                        var openRef by rememberSaveable(item.key) { mutableStateOf<String?>(null) }
+                        var allRefs by rememberSaveable(item.key) { mutableStateOf(false) }
                         val selected = item.verse in selection
                         val playing = item.verse == playingVerse
                         val mark = marks[item.verse]
                         val bookmarkColor = c.accent
                         VerseInteractionBox(item.verse, interactions) { extra -> Text(
-                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study),
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study,
+                                refs = if (refs.isEmpty()) null else ({
+                                    appendCrossRefs(refs, allRefs, openRef, manifest, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
+                                })),
                             style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                             color = c.ink,
                             modifier = Modifier
@@ -233,9 +241,7 @@ fun ReaderTextList(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                 .semantics { contentDescription = "${item.label}. ${item.text}" },
                         ) }
-                        if (format == ReadingFormat.Study) {
-                            xrefs[item.verse]?.let { refs -> VerseCrossRefs(item.key, refs, manifest, version, onOpenRef) }
-                        }
+                        if (refs.isNotEmpty()) CrossRefBox(refs, openRef, manifest, version, onOpenRef)
                         if (showNotes && item.notes.isNotEmpty()) {
                             Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
                                 item.notes.forEachIndexed { i, n ->
