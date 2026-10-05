@@ -62,7 +62,7 @@ open class MainActivity : ComponentActivity() {
         if (id != null && id != links.getString("handled", null)) {
             intent?.data?.let { pendingUri = it; pendingId = id }
         } else if (id == null && savedInstanceState == null) {
-            intent?.data?.let { pendingUri = it }
+            intent?.data?.let { pendingUri = replayed(links) }
         }
         val start = startStack()
 
@@ -87,7 +87,7 @@ open class MainActivity : ComponentActivity() {
                     // Not awaited: a manifest refresh must not cancel the navigation half-way.
                     link?.compare?.let { code -> lifecycleScope.launch { services.graph.settings.update { it.copy(compare = code) } } }
                     pendingLink = link?.route
-                    pendingId?.let { links.edit().putString("handled", it).apply() }
+                    pendingId?.let { links.edit().putString("handled", it).putString("last", uri.toString()).putLong("lastAt", System.currentTimeMillis()).apply() }
                     pendingUri = null
                 }
             }
@@ -156,9 +156,26 @@ open class MainActivity : ComponentActivity() {
         pendingLink = AccountRoute
     }
 
+    /**
+     * A link without LinkActivity's id is the system replaying an old intent: after the app is
+     * updated, System UI relaunches the task with its first link (no extras, clearing the task)
+     * just after a new link opened. The reader stays on the link opened last if that was
+     * moments ago; otherwise the replay is ignored rather than opening a stale chapter.
+     */
+    private fun replayed(links: android.content.SharedPreferences): Uri? {
+        val last = links.getString("last", null) ?: return null
+        val at = links.getLong("lastAt", 0)
+        return if (System.currentTimeMillis() - at < 10_000) Uri.parse(last) else null
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.data?.let { pendingUri = it; pendingId = intent.getStringExtra(LINK_ID) }
+        val id = intent.getStringExtra(LINK_ID)
+        if (id == null) {
+            intent.data?.let { replayed(getSharedPreferences("links", MODE_PRIVATE))?.let { u -> pendingUri = u; pendingId = null } }
+            return
+        }
+        intent.data?.let { pendingUri = it; pendingId = id }
     }
 
     companion object {

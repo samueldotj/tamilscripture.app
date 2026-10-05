@@ -4,6 +4,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -180,6 +184,9 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     var showOriginal by rememberSaveable { mutableStateOf(false) }
     var showPeople by rememberSaveable { mutableStateOf(false) }
     var showHighlight by rememberSaveable { mutableStateOf(false) }
+    // The size while two fingers pinch; the saved setting otherwise.
+    var pinchSize by remember { mutableStateOf<Int?>(null) }
+    val textSize = pinchSize ?: settings.fontSize
     var askSignIn by rememberSaveable { mutableStateOf(false) }
     // Highlights and notes need an account, as on the website (design §13.2); bookmarks do not.
     val signedIn = services.graph.account.session.collectAsStateWithLifecycle().value != null
@@ -337,6 +344,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             // Landscape: keep text clear of a side navigation bar or cutout.
             .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End))
             .ctrlScrollFontSize { step -> vm.updateSettings { it.copy(fontSize = (it.fontSize + step).coerceIn(15, 30)) } }
+            .pinchFontSize({ settings.fontSize }, onLive = { pinchSize = it }, onDone = { n -> vm.updateSettings { it.copy(fontSize = n) } })
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
@@ -375,7 +383,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     color = c.ink, modifier = Modifier.padding(start = 46.dp, top = 28.dp, bottom = 4.dp),
                                 )
                                 ChapterBody(
-                                    state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
+                                    state, items, (textSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
                                     marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs, signedIn = signedIn, onAskSignIn = { askSignIn = true },
@@ -436,7 +444,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                     // Medium windows show dual view as columns; phones stack the versions (A-3.3).
                     val columns = maxWidth >= 600.dp
                     ChapterBody(
-                        state, items, settings.fontSize, 1.8f, settings.footnotes, listState, playingVerse, sourceName,
+                        state, items, textSize, 1.8f, settings.footnotes, listState, playingVerse, sourceName,
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
@@ -878,6 +886,40 @@ private fun Modifier.ctrlScrollFontSize(onStep: (Int) -> Unit): Modifier = this.
                 if (dy != 0f) onStep(if (dy < 0) 1 else -1)
                 e.changes.forEach { it.consume() }
             }
+        }
+    }
+}
+
+/**
+ * Two fingers pinch the text larger or smaller, as in a browser: the size follows the fingers
+ * in whole sp steps ([onLive]) and is kept when they lift ([onDone]). One finger is left to
+ * scrolling, swipes and taps; the pinch is taken before the list sees it, so it does not scroll.
+ */
+internal fun Modifier.pinchFontSize(current: () -> Int, onLive: (Int?) -> Unit, onDone: (Int) -> Unit): Modifier = this.pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val base = current()
+        var scale = 1f
+        var pinching = false
+        var size = base
+        while (true) {
+            val e = awaitPointerEvent(PointerEventPass.Initial)
+            val down = e.changes.count { it.pressed }
+            if (down == 0) break
+            if (down >= 2) {
+                pinching = true
+                scale *= e.calculateZoom()
+                size = (base * scale).roundToInt().coerceIn(15, 30)
+                onLive(size)
+                e.changes.forEach { it.consume() }
+            } else if (pinching) {
+                // One finger left after a pinch: it neither scrolls nor taps.
+                e.changes.forEach { it.consume() }
+            }
+        }
+        if (pinching) {
+            onLive(null)
+            if (size != base) onDone(size)
         }
     }
 }
