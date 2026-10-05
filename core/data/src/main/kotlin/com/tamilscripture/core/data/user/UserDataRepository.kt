@@ -47,6 +47,15 @@ data class UserData(
     val clearHistory: Boolean = false,
     /** The account this data belongs to; null while signed out. */
     val owner: String? = null,
+    /** The server time of the newest change pulled; the next pull asks only for what is newer (M6-8). */
+    val cursor: String? = null,
+)
+
+@Serializable
+private data class DeletedRow(
+    @kotlinx.serialization.SerialName("table_name") val table: String,
+    @kotlinx.serialization.SerialName("row_id") val rowId: String,
+    @kotlinx.serialization.SerialName("deleted_at") val deletedAt: String,
 )
 
 /**
@@ -226,8 +235,6 @@ class UserDataRepository(
             }
             runCatching { api.request("POST", "/rest/v1/rpc/record_visit", body.toString(), token) }
         }
-        val highlights = json.decodeFromString<List<Highlight>>(api.request("GET", "/rest/v1/highlights?select=*&order=book,chapter,verse_start", null, token))
-        val notes = json.decodeFromString<List<UserNote>>(api.request("GET", "/rest/v1/notes?select=*&order=updated_at.desc", null, token))
         // Bookmarks (M6-1): a verse already bookmarked from elsewhere keeps the account's row.
         val pushBookmarks = if (firstSync) d.bookmarks else d.bookmarks.filter { it.id in d.dirtyBookmarks }
         if (pushBookmarks.isNotEmpty()) {
@@ -237,7 +244,28 @@ class UserDataRepository(
             val (b, c, v) = k.split('.')
             api.request("DELETE", "/rest/v1/bookmarks?book=eq.$b&chapter=eq.$c&verse=eq.$v", null, token)
         }
-        val bookmarks = json.decodeFromString<List<Bookmark>>(api.request("GET", "/rest/v1/bookmarks?select=*&order=created_at.desc", null, token))
+        // A full pull the first time and after a long gap (deleted_rows keeps 90 days);
+        // otherwise rows changed since the cursor, a few seconds of overlap, and the deletions.
+        val since = d.cursor?.takeIf { !firstSync && runCatching { java.time.OffsetDateTime.parse(it).isAfter(java.time.OffsetDateTime.now().minusDays(80)) }.getOrDefault(false) }
+            ?.let { java.time.OffsetDateTime.parse(it).minusSeconds(5).toString() }
+        fun changed(table: String, order: String): String =
+            "/rest/v1/$table?select=*&order=$order" + (since?.let { "&updated_at=gte." + java.net.URLEncoder.encode(it, "UTF-8") } ?: "")
+        val hlRows = json.decodeFromString<List<Highlight>>(api.request("GET", changed("highlights", "book,chapter,verse_start"), null, token))
+        val noteRows = json.decodeFromString<List<UserNote>>(api.request("GET", changed("notes", "updated_at.desc"), null, token))
+        val bmRows = json.decodeFromString<List<Bookmark>>(api.request("GET", changed("bookmarks", "created_at.desc"), null, token))
+        val gone = if (since == null) emptyList() else json.decodeFromString<List<DeletedRow>>(
+            api.request("GET", "/rest/v1/deleted_rows?select=table_name,row_id,deleted_at&deleted_at=gte." + java.net.URLEncoder.encode(since, "UTF-8"), null, token),
+        )
+        fun goneFrom(table: String) = gone.filter { it.table == table }.map { it.rowId }.toSet()
+        val highlights = if (since == null) hlRows else (d.highlights.associateBy { it.id } + hlRows.associateBy { it.id }).values.filter { it.id !in goneFrom("highlights") }
+        val notes = if (since == null) noteRows else (d.notes.associateBy { it.id } + noteRows.associateBy { it.id }).values.filter { it.id !in goneFrom("notes") }
+        val bookmarks = if (since == null) bmRows else {
+            val byVerse = d.bookmarks.associateBy { Triple(it.book, it.chapter, it.verse) } + bmRows.associateBy { Triple(it.book, it.chapter, it.verse) }
+            byVerse.values.filter { it.id !in goneFrom("bookmarks") && "${it.book}.${it.chapter}.${it.verse}" !in d.deletedBookmarks }
+        }
+        val newest = (hlRows.map { it.updatedAt } + noteRows.map { it.updatedAt } + gone.map { it.deletedAt } + listOfNotNull(d.cursor.takeIf { since != null }))
+            .mapNotNull { runCatching { java.time.OffsetDateTime.parse(it) }.getOrNull() }
+            .maxOrNull()?.toString()
         val history = json.decodeFromString<List<Visit>>(api.request("GET", "/rest/v1/history?select=*&order=visited_at.desc&limit=200", null, token))
         val paused = runCatching {
             json.parseToJsonElement(api.request("GET", "/rest/v1/profiles?select=history_paused", null, token))
@@ -266,6 +294,7 @@ class UserDataRepository(
                 pendingVisits = now.pendingVisits - sent.pendingVisits.toSet(),
                 clearHistory = now.clearHistory && !sent.clearHistory,
                 owner = userId,
+                cursor = newest ?: now.cursor,
             )
         }
         return true

@@ -1018,7 +1018,7 @@ grant execute on function public.track_app_batch(jsonb, text, text, text) to ano
 
 ## 13. Accounts and sync
 
-> **As built (4 Oct 2026).** Sign-in runs in the browser with PKCE and returns through the website's own callback (ADR-13); personal data is one JSON file, not Room (ADR-14); sync pushes dirty rows and then pulls each table whole, until `deleted_rows` (M6-1) allows cursors. Realtime is not used yet: the app syncs on sign-in, on coming to the foreground, a few seconds after a change and every 12 hours. The rest of this section is the full design; the roadmap (M6) records what is open.
+> **As built (4 Oct 2026).** Sign-in runs in the browser with PKCE and returns through the website's own callback (ADR-13); personal data is one JSON file, not Room (ADR-14); sync pushes dirty rows and then pulls what changed since its cursor, with the `deleted_rows` log for deletions. Realtime is not used yet: the app syncs on sign-in, on coming to the foreground, a few seconds after a change and every 12 hours. The rest of this section is the full design; the roadmap (M6) records what is open.
 
 ### 13.1 Sign-in
 

@@ -96,7 +96,7 @@ class SyncTest {
         assertEquals("Edited on the website", phone.data.value.notes.single().body)
         assertEquals(4, phone.data.value.highlights.single().charStart)
 
-        server.notes.clear()
+        server.notes.keys.toList().forEach { server.websiteDelete("notes", it) }
         phone.sync()
         assertTrue(phone.data.value.notes.isEmpty())
     }
@@ -164,5 +164,25 @@ class SyncTest {
         assertTrue(server.bookmarks.isEmpty())
         phone.sync()
         assertTrue(phone.data.value.bookmarks.isEmpty())
+    }
+
+    @Test fun laterPullsAskOnlyForChanges() = runTest {
+        val phone = device()
+        val tablet = device()
+        phone.setHighlight("JHN", 1, listOf(1), HighlightColor.Yellow)
+        phone.saveNote(null, "JHN", 1, 2, 2, "the Word")
+        phone.sync()
+        tablet.sync()
+        server.gets.clear()
+
+        phone.removeHighlight("JHN", 1, listOf(1))
+        phone.setHighlight("JHN", 1, listOf(14), HighlightColor.Pink)
+        phone.sync()
+        tablet.sync()
+        assertTrue(server.gets.any { it.startsWith("/rest/v1/deleted_rows") })
+        assertTrue(server.gets.filter { it.startsWith("/rest/v1/highlights") }.all { "updated_at=gte." in it })
+        assertEquals(listOf(14), tablet.data.value.highlights.map { it.verseStart })
+        assertEquals("the Word", tablet.data.value.notes.single().body)
+        assertTrue(tablet.data.value.cursor != null)
     }
 }
