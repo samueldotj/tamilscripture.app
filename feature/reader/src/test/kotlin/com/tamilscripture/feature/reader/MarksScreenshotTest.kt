@@ -42,6 +42,8 @@ class MarksScreenshotTest {
         1 to VerseMarks(bookmarked = true),
         3 to VerseMarks(color = HighlightColor.Green, notes = listOf(note)),
         4 to VerseMarks(color = HighlightColor.Pink),
+        // A word range made on the website (R-10.15), its ends inside letters on purpose.
+        2 to VerseMarks(words = listOf(WordMark(28, 46, HighlightColor.Yellow))),
     )
 
     private fun shot(file: String, margin: Boolean, dark: Boolean) {
@@ -53,7 +55,7 @@ class MarksScreenshotTest {
                         commentary = null, commentaryName = null, listState = rememberLazyListState(), chapterKey = "JHN.3",
                         contentPadding = PaddingValues(16.dp), onTapVerse = {}, onVerseRead = { _, _ -> }, onOpenCommentary = {},
                         modifier = Modifier.fillMaxSize().background(Ts.colors.bg),
-                        marks = marks, heat = mapOf(2 to 3), notesInMargin = margin,
+                        marks = marks, heat = mapOf(1 to 3), notesInMargin = margin,
                     )
                 }
             }

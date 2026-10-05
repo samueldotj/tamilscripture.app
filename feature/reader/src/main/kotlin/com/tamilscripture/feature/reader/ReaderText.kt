@@ -63,18 +63,42 @@ import kotlinx.coroutines.delay
 
 private val MARGIN_WIDTH = 220.dp
 
+private fun String.clusterStart(i: Int): Int {
+    if (i <= 0 || i >= length) return i.coerceIn(0, length)
+    val it = android.icu.text.BreakIterator.getCharacterInstance().also { b -> b.setText(this) }
+    return if (it.isBoundary(i)) i else it.preceding(i)
+}
+
+private fun String.clusterEnd(i: Int): Int {
+    if (i <= 0 || i >= length) return i.coerceIn(0, length)
+    val it = android.icu.text.BreakIterator.getCharacterInstance().also { b -> b.setText(this) }
+    return if (it.isBoundary(i)) i else it.following(i)
+}
+
+/** The UTF-16 index [n] code points in, clamped to the text. */
+private fun String.offsetByCodePointsSafe(n: Int): Int =
+    if (n >= codePointCount(0, length)) length else offsetByCodePoints(0, n.coerceAtLeast(0))
+
 private val HEAT_ALPHA = floatArrayOf(0f, 0.08f, 0.16f, 0.26f, 0.38f)
 
 /** A verse's text with its superscript number, in the design's 1B style. */
 @Composable
-fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean): AnnotatedString {
+fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean, words: List<WordMark> = emptyList()): AnnotatedString {
     val c = Ts.colors
     return buildAnnotatedString {
         withStyle(SpanStyle(fontSize = numberSize.sp, color = c.accent, fontWeight = FontWeight.Bold, baselineShift = BaselineShift.Superscript)) {
             append(item.label)
         }
         append(' ')
+        val shift = length
         append(item.text)
+        // Word-range highlights: offsets count code points of the verse text.
+        for (w in words) {
+            // Snapped out to whole letters: a background split inside a Tamil cluster breaks its shaping.
+            val from = item.text.clusterStart(item.text.offsetByCodePointsSafe(w.from))
+            val to = item.text.clusterEnd(item.text.offsetByCodePointsSafe(w.to))
+            if (to > from) addStyle(SpanStyle(background = c.highlight(w.color)), shift + from, shift + to)
+        }
         if (showNotes) {
             item.notes.forEachIndexed { i, _ ->
                 withStyle(SpanStyle(fontSize = 11.sp, color = c.muted, baselineShift = BaselineShift.Superscript)) {
@@ -160,7 +184,7 @@ fun ReaderTextList(
                         val mark = marks[item.verse]
                         val bookmarkColor = c.accent
                         VerseInteractionBox(item.verse, interactions) { extra -> Text(
-                            verseAnnotated(item, numberSize = 12, showNotes = showNotes),
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty()),
                             style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                             color = c.ink,
                             modifier = Modifier

@@ -49,15 +49,34 @@ import com.tamilscripture.core.services.tr
 /** What the reader has put on one verse (M6): a highlight, notes, a bookmark. */
 data class VerseMarks(
     val color: HighlightColor? = null,
+    /** Highlights on part of the verse (the website's word ranges, R-10.15), in this version's text. */
+    val words: List<WordMark> = emptyList(),
     val notes: List<UserNote> = emptyList(),
     val bookmarked: Boolean = false,
 )
 
-/** The marks of one chapter, by verse. */
-fun UserData.marksFor(book: String, chapter: Int): Map<Int, VerseMarks> {
+/** Characters [from, to) of a verse's text (code points; [to] may be past the end). */
+data class WordMark(val from: Int, val to: Int, val color: HighlightColor)
+
+/**
+ * The marks of one chapter, by verse. A word-range highlight made in [version] is drawn on
+ * its words; one made in another version covers its whole verses, as on the website.
+ */
+fun UserData.marksFor(book: String, chapter: Int, version: String? = null): Map<Int, VerseMarks> {
     val out = HashMap<Int, VerseMarks>()
     fun at(v: Int) = out.getOrPut(v) { VerseMarks() }
-    for (h in highlights) if (h.book == book && h.chapter == chapter) for (v in h.verseStart..h.verseEnd) out[v] = at(v).copy(color = HighlightColor.of(h.color))
+    // Older first, so a later colour wins where two overlap.
+    for (h in highlights.sortedBy { it.updatedAt }) if (h.book == book && h.chapter == chapter) {
+        val color = HighlightColor.of(h.color)
+        val partial = h.charStart != null && h.charEnd != null && h.version != null
+        for (v in h.verseStart..h.verseEnd) {
+            out[v] = if (partial && h.version.equals(version, ignoreCase = true)) {
+                val from = if (v == h.verseStart) h.charStart!! else 0
+                val to = if (v == h.verseEnd) h.charEnd!! else Int.MAX_VALUE
+                at(v).let { it.copy(words = it.words + WordMark(from, to, color)) }
+            } else at(v).copy(color = color)
+        }
+    }
     // A note shows under the last verse it covers.
     for (n in notes.sortedBy { it.updatedAt }) if (n.book == book && n.chapter == chapter) out[n.verseEnd] = at(n.verseEnd).let { it.copy(notes = it.notes + n) }
     for (b in bookmarks) if (b.book == book && b.chapter == chapter) out[b.verse] = at(b.verse).copy(bookmarked = true)

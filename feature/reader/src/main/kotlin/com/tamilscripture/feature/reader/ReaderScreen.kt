@@ -178,7 +178,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     /** The note open in the editor: its id, [NEW_NOTE], or null. */
     var editingNote by rememberSaveable { mutableStateOf<String?>(null) }
     val userData by vm.userData.collectAsStateWithLifecycle()
-    val marks = remember(userData, state.passage.book, state.passage.chapter) { userData.marksFor(state.passage.book, state.passage.chapter) }
+    val marks = remember(userData, state.passage.book, state.passage.chapter) { userData.marksFor(state.passage.book, state.passage.chapter, state.passage.version) }
     // Wide windows (M2-2, M8-4): one study pane beside the text, in tabs, sized by a divider.
     var paneTab by rememberSaveable { mutableStateOf<String?>(null) }
     var paneShare by rememberSaveable { mutableFloatStateOf(0.42f) }
