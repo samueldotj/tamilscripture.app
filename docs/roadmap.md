@@ -161,7 +161,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [ ] M2-7 Right-click context menu on verses; hover states; Ctrl+scroll font size.
 - [ ] M2-8 Drag selected verses out as text.
 - [x] M2-9 Open in new window (multi-instance); per-window state. `ReaderWindowActivity` (Ctrl+N or the verse menu) opens as its own task next to the current window; verified in split screen on the Pixel 9.
-- [ ] M2-10 State survives rotation, fold, resize and window moves (tests for each).
+- [~] M2-10 State survives rotation, fold, resize and window moves (tests for each). Started: every route round-trips through its saved form (`RoutesSaveTest`), so a back stack restored after process death cannot fail; links survive process death (checked on the Galaxy Tab). Device runs for rotation and fold are open.
 - [ ] M2-11 **[web]** `/.well-known/assetlinks.json`; App Links for chapter, verse and shorthand URLs.
 - [ ] M2-12 Accessibility pass: TalkBack verse labels, Tamil/English locale spans, 200% font scale, contrast on highlight colours, Accessibility Scanner clean. Started: scripture text carries its version's language (TalkBack reads Tamil in a Tamil voice, both columns in dual view); verse card labels wrap or shrink instead of clipping at 200% (screenshot test). Accessibility Scanner run still to do on a device.
 - [~] M2-13 Screenshot tests at compact, medium, expanded, large; light/dark; Tamil/English. Started: `ReaderMatrixScreenshotTest` renders the reader frame (top bar, Study Bible text with cross-references, chapter buttons) in all 16 combinations. The wide reader layout and other screens are open (they need app services faked).
