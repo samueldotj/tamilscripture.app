@@ -26,6 +26,9 @@ class TsApplication : Application(), GraphHost {
 
     override val graph: AppGraph get() = services.graph
 
+    /** M6-9a: the minute-by-minute pull while the app is in the foreground. */
+    private var foregroundPull: kotlinx.coroutines.Job? = null
+
     override fun onCreate() {
         super.onCreate()
         // M0-17: debug builds log disk and network work on the main thread, and leaks.
@@ -89,9 +92,18 @@ class TsApplication : Application(), GraphHost {
             // M6-9a: what changed on the website meanwhile comes down when the app is opened.
             override fun onStart(owner: LifecycleOwner) {
                 if (graph.account.session.value != null) SyncWorker.syncSoon(this@TsApplication, delaySeconds = 0)
+                // And every minute while the app is in front, so the website's edits show within a minute.
+                foregroundPull?.cancel()
+                foregroundPull = graph.appScope.launch {
+                    while (true) {
+                        kotlinx.coroutines.delay(60_000)
+                        if (graph.account.session.value != null) runCatching { graph.syncAccount() }
+                    }
+                }
             }
 
             override fun onStop(owner: LifecycleOwner) {
+                foregroundPull?.cancel()
                 StatsRecorder.syncSoon(this@TsApplication)
                 graph.appScope.launch { runCatching { TodayWidget.refresh(this@TsApplication) } }
             }

@@ -267,7 +267,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M6-7 Bookmarks (synced with `public.bookmarks`, one per verse) and history screens; pause and clear history.
 - [x] M6-8 `SyncWorker`: push dirty rows (upsert; bookmarks by verse), deletes, visits via `record_visit`; then pull rows changed since the cursor and the `deleted_rows` since it, with a full pull on first sync or after 80 days ([design §13.3](design.md#133-sync-protocol)). Runs soon after a change, on sign-in and foreground, every 12 h.
 - [x] M6-9 Settings sync through `profiles.settings` with the website's keys (language, version, Tamil font, headings, footnotes, xrefs, heat, commentary and its source); appearance and text size stay per device. Three-way: a local change since the last send goes up, otherwise the account's values come down. The website itself does not read them yet.
-- [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.
+- [~] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect. Built: a pull on coming to the foreground and every 60 s while there (cursor pulls, so a few small requests). Realtime is open.
 - [x] M6-9b Sign-out sends what is pending, then wipes the account's local data; a dead session (refresh refused) signs the app out.
 - [x] M6-9c "Open on website" action on the verse card, always in the browser (never back into the app).
 - [x] M6-10 Export my data (`export_my_data`, saved as a JSON file) and delete account (`delete_my_account`).
