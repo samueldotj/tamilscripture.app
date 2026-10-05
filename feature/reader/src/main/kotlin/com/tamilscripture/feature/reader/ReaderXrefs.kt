@@ -19,6 +19,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
@@ -84,7 +88,6 @@ internal fun AnnotatedString.Builder.appendCrossRefs(
     val c = Ts.colors
     val lang = LocalUiLang.current
     val small = SpanStyle(fontSize = 12.sp, color = c.accent, fontWeight = FontWeight.Normal, baselineShift = BaselineShift.None)
-    append("  ")
     withStyle(small.copy(color = c.muted)) { append("↗") }
     for (r in if (all) refs else refs.take(SHOWN)) {
         append("\u2002")
@@ -138,5 +141,56 @@ private fun RefBox(r: CrossRef, manifest: ContentManifest?, version: String, onO
             },
             style = Ts.type.scripture(15.sp, 1.65f), color = c.ink2, maxLines = 6, overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/**
+ * [main] with [trailer] carried on right after its last word, as one run of text, while the
+ * trailer keeps its own, tighter line spacing: Compose gives a paragraph one line height,
+ * so the trailer is a second text laid out from where [main] ends, on the same baseline.
+ * When too little room is left on that line, the trailer starts on the next one.
+ */
+@Composable
+fun TextWithTrailer(
+    main: AnnotatedString,
+    mainStyle: TextStyle,
+    color: Color,
+    trailer: AnnotatedString?,
+    trailerStyle: TextStyle,
+    modifier: Modifier = Modifier,
+) {
+    if (trailer == null) {
+        Text(main, style = mainStyle, color = color, modifier = modifier)
+        return
+    }
+    SubcomposeLayout(modifier) { constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        var mainLayout: TextLayoutResult? = null
+        val mainPlaceable = subcompose("main") {
+            Text(main, style = mainStyle, color = color, onTextLayout = { mainLayout = it })
+        }.single().measure(loose)
+        val m = mainLayout!!
+        val last = m.lineCount - 1
+        val gap = 6.dp.toPx()
+        val lineEnd = m.getLineRight(last) + gap
+        // Start the trailer on the verse's last line when a reference or two fits there.
+        val sameLine = loose.maxWidth - lineEnd > 72.dp.toPx()
+        val indent = if (sameLine) lineEnd else 0f
+        var tLayout: TextLayoutResult? = null
+        val trailerPlaceable = subcompose("trailer") {
+            Text(
+                trailer, color = color, onTextLayout = { tLayout = it },
+                style = trailerStyle.copy(textIndent = TextIndent(firstLine = indent.toSp())),
+            )
+        }.single().measure(loose)
+        val t = tLayout!!
+        val y = if (sameLine) (m.getLineBaseline(last) - t.getLineBaseline(0)).toInt()
+        else mainPlaceable.height + 2.dp.roundToPx()
+        val width = maxOf(mainPlaceable.width, trailerPlaceable.width).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = maxOf(mainPlaceable.height, y + trailerPlaceable.height).coerceAtLeast(constraints.minHeight)
+        layout(width, height) {
+            mainPlaceable.place(0, 0)
+            trailerPlaceable.place(0, y)
+        }
     }
 }

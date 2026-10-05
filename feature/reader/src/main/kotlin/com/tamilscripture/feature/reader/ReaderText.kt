@@ -214,13 +214,16 @@ fun ReaderTextList(
                         val playing = item.verse == playingVerse
                         val mark = marks[item.verse]
                         val bookmarkColor = c.accent
-                        VerseInteractionBox(item.verse, interactions) { extra -> Text(
-                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study,
-                                refs = if (refs.isEmpty()) null else ({
-                                    appendCrossRefs(refs, allRefs, openRef, manifest, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
-                                })),
-                            style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
+                        // Study Bible: the references follow the last word, in small type with tight lines.
+                        val trailer = if (refs.isEmpty()) null else buildAnnotatedString {
+                            appendCrossRefs(refs, allRefs, openRef, manifest, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
+                        }
+                        VerseInteractionBox(item.verse, interactions) { extra -> TextWithTrailer(
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study),
+                            mainStyle = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                             color = c.ink,
+                            trailer = trailer,
+                            trailerStyle = Ts.type.caption.copy(fontSize = 12.sp, lineHeight = 22.sp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
