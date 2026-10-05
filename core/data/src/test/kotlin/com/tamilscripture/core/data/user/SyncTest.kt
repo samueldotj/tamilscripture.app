@@ -148,4 +148,21 @@ class SyncTest {
         assertTrue(phone.sync())
         assertEquals(2, server.highlights.size)
     }
+
+    @Test fun bookmarksFollowTheAccountOnePerVerse() = runTest {
+        val phone = device()
+        val tablet = device()
+        phone.toggleBookmark("JHN", 3, 16, "IRVTAM")
+        tablet.toggleBookmark("JHN", 3, 16, "BSB")
+        phone.sync()
+        tablet.sync()
+        assertEquals(1, server.bookmarks.size)
+        assertEquals(phone.data.value.bookmarks.single().id, tablet.data.value.bookmarks.single().id)
+
+        tablet.toggleBookmark("JHN", 3, 16, "BSB")
+        tablet.sync()
+        assertTrue(server.bookmarks.isEmpty())
+        phone.sync()
+        assertTrue(phone.data.value.bookmarks.isEmpty())
+    }
 }

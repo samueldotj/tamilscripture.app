@@ -22,6 +22,8 @@ class FakeSupabase(private val userId: String = "u1") : Supabase() {
     val highlights = LinkedHashMap<String, JsonObject>()
     val notes = LinkedHashMap<String, JsonObject>()
     val history = ArrayList<JsonObject>()
+    /** One per verse: unique (user_id, book, chapter, verse), as the migration has it. */
+    val bookmarks = LinkedHashMap<String, JsonObject>()
     var profile: JsonObject = JsonObject(mapOf("history_paused" to JsonPrimitive(false), "settings" to JsonObject(emptyMap())))
     var online = true
     private var clock = Instant.parse("2026-10-04T10:00:00Z")
@@ -50,6 +52,21 @@ class FakeSupabase(private val userId: String = "u1") : Supabase() {
             method == "GET" && route == "history" -> JsonArray(history.sortedByDescending { it["visited_at"]!!.jsonPrimitive.content }).toString()
             method == "GET" && route == "profiles" -> JsonArray(listOf(profile)).toString()
             method == "GET" && route == "plan_progress" -> "[]"
+            method == "GET" && route == "bookmarks" -> JsonArray(bookmarks.values.toList()).toString()
+            method == "POST" && route == "bookmarks" -> {
+                Json.parseToJsonElement(body!!).jsonArray.forEach { r ->
+                    val o = r.jsonObject
+                    val key = listOf("book", "chapter", "verse").joinToString(".") { o[it]!!.jsonPrimitive.content }
+                    // resolution=ignore-duplicates: a verse already bookmarked keeps its row.
+                    if (key !in bookmarks) bookmarks[key] = JsonObject(o + ("created_at" to JsonPrimitive(now())))
+                }
+                ""
+            }
+            method == "DELETE" && route == "bookmarks" -> {
+                val f = query.split('&').associate { it.substringBefore('=') to it.substringAfter("eq.") }
+                bookmarks.remove("${f["book"]}.${f["chapter"]}.${f["verse"]}")
+                ""
+            }
             method == "POST" && route in setOf("highlights", "notes") -> {
                 val rows = Json.parseToJsonElement(body!!).jsonArray
                 val keys = rows.map { it.jsonObject.keys }.toSet()

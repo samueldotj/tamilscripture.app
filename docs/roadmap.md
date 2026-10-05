@@ -255,7 +255,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 **Requirements:** A-2.11, A-7.1–A-7.8, X-1–X-9, NF-12.
 
 ### Tasks
-- [ ] M6-1 **[web]** Migrations: `bookmarks`, `deleted_rows` with triggers, `updated_at` triggers verified; pgTAP RLS tests.
+- [x] M6-1 **[web]** Migrations: `bookmarks` (one per verse), `deleted_rows` with triggers, `export_my_data()` with bookmarks; pgTAP tests (website PR #8, 4 Oct 2026).
 - [x] M6-2 **[web]** App sign-in callback: the website's `/auth/callback?app=1` hands the PKCE code to `tamilscripture://auth` (website PR #7), for magic links and Google alike.
 - [ ] M6-2a Google Cloud: Android OAuth client in the website's existing project (package name, SHA-1 of the Play app-signing and debug keys); confirm Supabase automatic identity linking by verified email ([design §13.1](design.md#131-sign-in)).
 - [ ] M6-2b **[web]** Bookmarks on the website: verse-action-bar action and `/me/bookmarks`; bookmarks in `export_my_data()`.
@@ -264,7 +264,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M6-4 Local store for highlights, notes, bookmarks, history with dirty/deleted sets (one JSON file, `UserDataRepository`; small enough that Room is not needed). Plan progress still in plans.
 - [~] M6-5 Highlights: whole-verse, four colours, change/remove (splitting rows like the website); list by colour. Word-range highlights from the website show as whole verses; making them in the app is open.
 - [x] M6-6 Notes: editor sheet (kept when the sheet is closed), notes under their verse on phones and in the margin on wide windows, notes list with search.
-- [x] M6-7 Bookmarks (device only until M6-1) and history screens; pause and clear history.
+- [x] M6-7 Bookmarks (synced with `public.bookmarks`, one per verse) and history screens; pause and clear history.
 - [~] M6-8 `SyncWorker`: push dirty rows (upsert), deletes, visits via `record_visit`, then a full pull per table (soon after a change, on sign-in, every 12 h). Pull by cursor waits for `deleted_rows` (M6-1).
 - [x] M6-9 Settings sync through `profiles.settings` with the website's keys (language, version, Tamil font, headings, footnotes, xrefs, heat, commentary and its source); appearance and text size stay per device. Three-way: a local change since the last send goes up, otherwise the account's values come down. The website itself does not read them yet.
 - [ ] M6-9a Supabase Realtime subscription while in the foreground, 60 s pull fallback, pull on foreground and on reconnect.

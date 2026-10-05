@@ -50,15 +50,15 @@ data class UserNote(
     fun covers(verse: Int) = verse in verseStart..verseEnd
 }
 
-/** Kept on the device until the website has a bookmarks table (roadmap M6-1). */
+/** One per verse (`public.bookmarks`); [version] is the one it was made in, empty when unknown. */
 @Serializable
 data class Bookmark(
     val id: String,
     val book: String,
     val chapter: Int,
     val verse: Int,
-    val version: String,
-    @SerialName("created_at") val createdAt: String,
+    val version: String = "",
+    @SerialName("created_at") val createdAt: String = "",
 )
 
 @Serializable

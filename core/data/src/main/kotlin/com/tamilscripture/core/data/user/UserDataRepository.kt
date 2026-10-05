@@ -38,6 +38,9 @@ data class UserData(
     /** Ids deleted here and not yet deleted on the server. */
     val deletedHighlights: Set<String> = emptySet(),
     val deletedNotes: Set<String> = emptySet(),
+    /** Bookmarks added here and not yet sent (ids), and verses unbookmarked here ("JHN.3.16"). */
+    val dirtyBookmarks: Set<String> = emptySet(),
+    val deletedBookmarks: Set<String> = emptySet(),
     /** Visits recorded here and not yet sent (they have no server id yet). */
     val pendingVisits: List<Visit> = emptyList(),
     /** Set when the history should be cleared on the server at the next sync. */
@@ -50,7 +53,7 @@ data class UserData(
  * Highlights, notes, bookmarks and history (roadmap M6). They work signed out, on the
  * device alone; signed in, [sync] sends local changes first and then takes the account's
  * rows as they are, so the phone matches the website (deletions there included). The
- * website's tables and RLS are used as they are (design §13.3); bookmarks stay on the
+ * website's tables and RLS are used as they are (design §13.3), bookmarks included; the
  * device until the website has a table for them.
  */
 class UserDataRepository(
@@ -147,15 +150,24 @@ class UserDataRepository(
         d.copy(notes = d.notes.filter { it.id != id }, dirtyNotes = d.dirtyNotes - id, deletedNotes = d.deletedNotes + id)
     }
 
-    // ---- bookmarks (device only) --------------------------------------------------------
+    // ---- bookmarks ---------------------------------------------------------------------
+
+    /** One bookmark per verse, as the website's table keeps it; deletes go by verse, whatever its id. */
+    private fun Bookmark.key() = "$book.$chapter.$verse"
 
     suspend fun toggleBookmark(book: String, chapter: Int, verse: Int, version: String) = edit { d ->
         val existing = d.bookmarks.firstOrNull { it.book == book && it.chapter == chapter && it.verse == verse }
-        if (existing != null) d.copy(bookmarks = d.bookmarks - existing)
-        else d.copy(bookmarks = d.bookmarks + Bookmark(UUID.randomUUID().toString(), book, chapter, verse, version, now()))
+        if (existing != null) removeBookmark(d, existing)
+        else {
+            val b = Bookmark(UUID.randomUUID().toString(), book, chapter, verse, version, now())
+            d.copy(bookmarks = d.bookmarks + b, dirtyBookmarks = d.dirtyBookmarks + b.id, deletedBookmarks = d.deletedBookmarks - b.key())
+        }
     }
 
-    suspend fun deleteBookmark(id: String) = edit { d -> d.copy(bookmarks = d.bookmarks.filter { it.id != id }) }
+    suspend fun deleteBookmark(id: String) = edit { d -> d.bookmarks.firstOrNull { it.id == id }?.let { removeBookmark(d, it) } ?: d }
+
+    private fun removeBookmark(d: UserData, b: Bookmark) =
+        d.copy(bookmarks = d.bookmarks - b, dirtyBookmarks = d.dirtyBookmarks - b.id, deletedBookmarks = d.deletedBookmarks + b.key())
 
     // ---- history -----------------------------------------------------------------------
 
@@ -216,6 +228,16 @@ class UserDataRepository(
         }
         val highlights = json.decodeFromString<List<Highlight>>(api.request("GET", "/rest/v1/highlights?select=*&order=book,chapter,verse_start", null, token))
         val notes = json.decodeFromString<List<UserNote>>(api.request("GET", "/rest/v1/notes?select=*&order=updated_at.desc", null, token))
+        // Bookmarks (M6-1): a verse already bookmarked from elsewhere keeps the account's row.
+        val pushBookmarks = if (firstSync) d.bookmarks else d.bookmarks.filter { it.id in d.dirtyBookmarks }
+        if (pushBookmarks.isNotEmpty()) {
+            api.request("POST", "/rest/v1/bookmarks?on_conflict=user_id,book,chapter,verse", rows(pushBookmarks, Bookmark.serializer(), userId), token, "resolution=ignore-duplicates,return=minimal")
+        }
+        for (k in d.deletedBookmarks) {
+            val (b, c, v) = k.split('.')
+            api.request("DELETE", "/rest/v1/bookmarks?book=eq.$b&chapter=eq.$c&verse=eq.$v", null, token)
+        }
+        val bookmarks = json.decodeFromString<List<Bookmark>>(api.request("GET", "/rest/v1/bookmarks?select=*&order=created_at.desc", null, token))
         val history = json.decodeFromString<List<Visit>>(api.request("GET", "/rest/v1/history?select=*&order=visited_at.desc&limit=200", null, token))
         val paused = runCatching {
             json.parseToJsonElement(api.request("GET", "/rest/v1/profiles?select=history_paused", null, token))
@@ -226,9 +248,15 @@ class UserDataRepository(
             // Changes made while this sync ran stay pending for the next one.
             val newHighlights = now.dirtyHighlights - sent.dirtyHighlights
             val newNotes = now.dirtyNotes - sent.dirtyNotes
+            val newBookmarks = now.dirtyBookmarks - sent.dirtyBookmarks
+            val unmarked = now.deletedBookmarks - sent.deletedBookmarks
             now.copy(
                 highlights = highlights.filter { it.id !in now.deletedHighlights - sent.deletedHighlights } + now.highlights.filter { it.id in newHighlights && highlights.none { h -> h.id == it.id } },
                 notes = notes + now.notes.filter { it.id in newNotes && notes.none { n -> n.id == it.id } },
+                bookmarks = bookmarks.filter { "${it.book}.${it.chapter}.${it.verse}" !in unmarked } +
+                    now.bookmarks.filter { it.id in newBookmarks && bookmarks.none { b -> b.book == it.book && b.chapter == it.chapter && b.verse == it.verse } },
+                dirtyBookmarks = newBookmarks,
+                deletedBookmarks = unmarked,
                 history = history,
                 historyPaused = paused,
                 dirtyHighlights = newHighlights,
@@ -277,7 +305,8 @@ class UserDataRepository(
     private fun <T> rows(items: List<T>, serializer: kotlinx.serialization.KSerializer<T>, userId: String): String =
         items.joinToString(",", "[", "]") { item ->
             val obj = rowJson.encodeToJsonElement(serializer, item).jsonObject
-            val keys = listOf("id", "book", "chapter", "verse_start", "verse_end", "color", "body", "version", "char_start", "char_end", "quote")
+            val keys = if (serializer == Bookmark.serializer()) listOf("id", "book", "chapter", "verse", "version")
+            else listOf("id", "book", "chapter", "verse_start", "verse_end", "color", "body", "version", "char_start", "char_end", "quote")
                 .filter { k -> k != "color" || serializer == Highlight.serializer() }
                 .filter { k -> k != "body" || serializer == UserNote.serializer() }
             JsonObject(keys.associateWith { obj[it] ?: kotlinx.serialization.json.JsonNull } + ("user_id" to kotlinx.serialization.json.JsonPrimitive(userId))).toString()
