@@ -33,7 +33,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object DictionaryRoute : NavKey
 @Serializable data object RootWordsRoute : NavKey
 /** [focus] a place to centre on; [journey] a journey to show (the website's /atlas/{journey}). */
-@Serializable data class AtlasRoute(val focus: String? = null, val journey: String? = null) : NavKey
+@Serializable data class AtlasRoute(val focus: String? = null, val journey: String? = null, val fit: List<String> = emptyList()) : NavKey
 @Serializable data class PresentRoute(val passage: Passage) : NavKey
 
 /** Home is the landing page (the cross); Bible opens the reader at the last chapter read. */

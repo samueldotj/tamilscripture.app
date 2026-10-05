@@ -34,7 +34,7 @@ class AtlasScreenshotTest {
 
     private fun shot(
         file: String, mode: ThemeMode, tamil: Boolean, journey: String? = null, focus: String? = null,
-        year: Int? = null, withChurch: Boolean = false, zoomOut: Boolean = false,
+        year: Int? = null, withChurch: Boolean = false, zoomOut: Boolean = false, fit: List<String> = emptyList(),
     ) {
         compose.setContent {
             TsTheme(mode) {
@@ -43,6 +43,7 @@ class AtlasScreenshotTest {
                         data, tamil, journey, focus, focus,
                         kingdoms = year?.let { y -> kingdoms.shapes.filter { y in it.from..it.to } }.orEmpty(),
                         church = if (withChurch) church else emptyList(),
+                        fitPlaces = fit,
                     ) {}
                 }
             }
@@ -70,6 +71,12 @@ class AtlasScreenshotTest {
 
     /** Zoomed all the way out, the world fills in around the detailed box (no bare sea at its edges). */
     @Test fun zoomedOut() = shot("atlas_zoomed_out_en", ThemeMode.Light, tamil = false, zoomOut = true)
+
+    /** M8-5e: opened from Acts 13's map, the atlas fits the chapter's places. */
+    @Test fun chapterPlaces() = shot(
+        "atlas_fit_acts13_en", ThemeMode.Light, tamil = false,
+        fit = listOf("salamis", "paphos", "perga", "seleucia", "antioch", "cyprus"),
+    )
 
     @Test fun earlyChurch() = shot("atlas_church_en", ThemeMode.Light, tamil = false, withChurch = true)
 }

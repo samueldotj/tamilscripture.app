@@ -28,6 +28,8 @@ import com.tamilscripture.core.data.content.References
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.SchematicMap
+import com.tamilscripture.core.designsystem.component.PillStyle
+import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.ChapterMentions
@@ -105,10 +107,11 @@ fun PeoplePlacesSheet(
     verse: Int?,
     onPerson: (String) -> Unit,
     onPlace: (String) -> Unit,
+    onAtlas: ((List<String>) -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     TsSheet(onDismiss) {
-        PeoplePlacesContent(title, book, chapter, verse, onPerson, onPlace, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp))
+        PeoplePlacesContent(title, book, chapter, verse, onPerson, onPlace, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp), onAtlas)
     }
 }
 
@@ -123,6 +126,8 @@ fun PeoplePlacesContent(
     onPerson: (String) -> Unit,
     onPlace: (String) -> Unit,
     modifier: Modifier,
+    /** M8-5e: opens the atlas fitted to the chapter's places. */
+    onAtlas: ((List<String>) -> Unit)? = null,
 ) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
@@ -150,6 +155,12 @@ fun PeoplePlacesContent(
         }
         map?.let { d ->
             SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), description = title, onPlace = onPlace)
+        }
+        if (onAtlas != null && m.places.isNotEmpty()) {
+            TsPillButton(
+                tr("வரைபடத்தில் திற", "Open in the atlas"), { onAtlas(m.places.keys.toList()) },
+                height = 36.dp, style = PillStyle.Tinted, modifier = Modifier.padding(bottom = 8.dp),
+            )
         }
         val here = verse?.let { v -> m.verses.firstOrNull { it.verse == "$book.$chapter.$v" } }
         val pad = PaddingValues(horizontal = 12.dp, vertical = 8.dp)

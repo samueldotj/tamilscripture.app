@@ -174,6 +174,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                                 present = { p -> backStack.add(PresentRoute(p)) },
                                 account = { backStack.add(AccountRoute) },
                                 follow = { p -> backStack.add(ReaderRoute(p)) },
+                                atlas = { places -> backStack.add(AtlasRoute(fit = places)) },
                             ),
                         )
                     }
@@ -202,7 +203,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<ArticleRoute> { r -> ArticleScreen(r.id, studyLinks) }
                     entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
-                    entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks, startJourney = r.journey) }
+                    entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks, startJourney = r.journey, fitPlaces = r.fit) }
                     entry<PresentRoute> { r -> PresentScreen(r.passage, onExit = { backStack.removeAt(backStack.lastIndex) }) }
                     entry<AccountRoute> { AccountScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onMine = { backStack.add(MineRoute()) }) }
                     entry<MineRoute> { r -> MineScreen(r.tab, onBack = { backStack.removeAt(backStack.lastIndex) }, onRead = ::read) }

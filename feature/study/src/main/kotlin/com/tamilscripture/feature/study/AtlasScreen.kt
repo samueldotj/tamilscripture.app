@@ -206,7 +206,7 @@ private fun path(features: List<GeoFeature>, close: Boolean): Path = Path().appl
  * option A), so labels use the reader's typeface and language.
  */
 @Composable
-fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null) {
+fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null, fitPlaces: List<String> = emptyList()) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -289,7 +289,7 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null)
                 ys[yearIndex]
             }
             AtlasCanvas(
-                d, tamil, journey, selected, focus,
+                d, tamil, journey, selected, focus, fitPlaces = fitPlaces,
                 kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
                 church = if (layer == "church") church else emptyList(),
             ) { selected = it }
@@ -421,6 +421,8 @@ internal fun AtlasCanvas(
     focus: String?,
     kingdoms: List<PolityShape> = emptyList(),
     church: List<ChurchPoint> = emptyList(),
+    /** Places to bring into view on opening (a chapter's places, M8-5e). */
+    fitPlaces: List<String> = emptyList(),
     onSelect: (String?) -> Unit,
 ) {
     val c = Ts.colors
@@ -482,6 +484,18 @@ internal fun AtlasCanvas(
                 glideTo(
                     (xs.min() + xs.max()) / 2f, (ys.min() + ys.max()) / 2f,
                     min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * MIN_ZOOM, fit * 40f),
+                )
+            }
+        }
+        // A chapter's places, when the atlas was opened from its map (M8-5e).
+        LaunchedEffect(fitPlaces) {
+            val ps = d.places.filter { it.id in fitPlaces.toSet() }
+            if (ps.isNotEmpty()) {
+                val xs = ps.map { it.x }
+                val ys = ps.map { it.y }
+                glideTo(
+                    (xs.min() + xs.max()) / 2f, (ys.min() + ys.max()) / 2f,
+                    min(w / max(xs.max() - xs.min(), 0.5f), h / max(ys.max() - ys.min(), 0.5f)).times(0.7f).coerceIn(fit * MIN_ZOOM, fit * 40f),
                 )
             }
         }

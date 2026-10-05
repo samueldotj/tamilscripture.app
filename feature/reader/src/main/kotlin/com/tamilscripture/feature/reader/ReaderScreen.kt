@@ -140,6 +140,8 @@ class ReaderNav(
     val account: () -> Unit = {},
     /** A cross-reference opened as its own reader, so Back returns to the verse it came from. */
     val follow: ((Passage) -> Unit)? = null,
+    /** M8-5e: the atlas fitted to a chapter's places. */
+    val atlas: ((List<String>) -> Unit)? = null,
 )
 
 private class VerseActions(
@@ -404,6 +406,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     PANE_PEOPLE -> PeoplePlacesContent(
                                         title, state.passage.book, state.passage.chapter, v, nav.person, nav.place,
                                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp),
+                                        onAtlas = nav.atlas,
                                     )
                                     else -> OriginalWordsContent(
                                         book?.label(lang, state.passage.chapter, v ?: 1) ?: "", state.passage.book, state.passage.chapter, v ?: 1, nav.strongs,
@@ -507,6 +510,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             title, state.passage.book, state.passage.chapter, state.selection.firstOrNull(),
             onPerson = { id -> showPeople = false; nav.person(id) },
             onPlace = { id -> showPeople = false; nav.place(id) },
+            onAtlas = nav.atlas?.let { open -> { ids: List<String> -> showPeople = false; open(ids) } },
         ) { showPeople = false }
     }
     if (askSignIn) {
