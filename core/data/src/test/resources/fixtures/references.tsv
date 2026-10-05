@@ -1,0 +1,192 @@
+# Reference parser fixtures: input <TAB> expected id (BOOK.chapter[.verse[-end]]) or NONE.
+# Shared by the Rust tests (crates/bible-ref) and the browser tests (packages/bible-wasm).
+Gen 1:3	GEN.1.3
+Gen 1.3	GEN.1.3
+Gen 1,3	GEN.1.3
+Gen 1 3	GEN.1.3
+gen1:3	GEN.1.3
+Genesis 1:1	GEN.1.1
+GEN 1	GEN.1
+Ge 50:26	GEN.50.26
+Exod 20:1-17	EXO.20.1-17
+Ex 20	EXO.20
+Lev 19:18	LEV.19.18
+Deut 6:4-5	DEU.6.4-5
+Josh 1:9	JOS.1.9
+Judg 6	JDG.6
+Ruth 1:16	RUT.1.16
+1 Sam 17:45	1SA.17.45
+1Sa 17	1SA.17
+2 Samuel 7	2SA.7
+1 Kings 18	1KI.18
+2 Kgs 2:11	2KI.2.11
+1 Chr 29:11	1CH.29.11
+2 Chronicles 7:14	2CH.7.14
+Ezra 7:10	EZR.7.10
+Neh 8:10	NEH.8.10
+Esther 4:14	EST.4.14
+Job 19:25	JOB.19.25
+Ps 23	PSA.23
+Psalm 23:1	PSA.23.1
+Psalms 119:105	PSA.119.105
+Pss 150	PSA.150
+Prov 3:5-6	PRO.3.5-6
+Eccl 3:1	ECC.3.1
+Song of Songs 2:1	SNG.2.1
+Song of Solomon 8:6	SNG.8.6
+SoS 1	SNG.1
+Isa 53:5	ISA.53.5
+Isaiah 40:31	ISA.40.31
+Jer 29:11	JER.29.11
+Lam 3:22-23	LAM.3.22-23
+Ezek 37	EZK.37
+Dan 3	DAN.3
+Hos 6:6	HOS.6.6
+Joel 2:28	JOL.2.28
+Amos 5:24	AMO.5.24
+Obad 1	OBA.1.1
+Obadiah	OBA.1
+Jonah 2	JON.2
+Mic 6:8	MIC.6.8
+Nah 1:7	NAM.1.7
+Hab 3:17-19	HAB.3.17-19
+Zeph 3:17	ZEP.3.17
+Hag 2:9	HAG.2.9
+Zech 4:6	ZEC.4.6
+Mal 3:10	MAL.3.10
+Matt 5:3-12	MAT.5.3-12
+Mt 28:19	MAT.28.19
+Mark 16:15	MRK.16.15
+Mk 1	MRK.1
+Luke 2:11	LUK.2.11
+Lk 15	LUK.15
+John 3:16	JHN.3.16
+Jn 3	JHN.3
+jn3.16	JHN.3.16
+Joh 1:1	JHN.1.1
+John 3:16–18	JHN.3.16-18
+Acts 2:38	ACT.2.38
+Ac 1:8	ACT.1.8
+Rom 8:28	ROM.8.28
+Romans 12:1-2	ROM.12.1-2
+1 Cor 13	1CO.13
+1co13.4-7	1CO.13.4-7
+I Corinthians 13:4	1CO.13.4
+II Cor 5:17	2CO.5.17
+2 Corinthians 12:9	2CO.12.9
+Gal 5:22-23	GAL.5.22-23
+Eph 2:8-9	EPH.2.8-9
+Phil 4:13	PHP.4.13
+Php 4:6	PHP.4.6
+Col 3:23	COL.3.23
+1 Thess 5:16-18	1TH.5.16-18
+2 Th 3:3	2TH.3.3
+1 Tim 4:12	1TI.4.12
+2 Timothy 3:16	2TI.3.16
+Titus 2	TIT.2
+Philemon 1:5	PHM.1.5
+Phm 5	PHM.1.5
+Heb 11:1	HEB.11.1
+Hebrews 4:12	HEB.4.12
+Jas 1:5	JAS.1.5
+James 1:2-4	JAS.1.2-4
+1 Pet 5:7	1PE.5.7
+2 Peter 1:3	2PE.1.3
+1 John 4:8	1JN.4.8
+1Jn 1:9	1JN.1.9
+2 John 6	2JN.1.6
+3 John 4	3JN.1.4
+Jude 24	JUD.1.24
+Jude 24-25	JUD.1.24-25
+Rev 21:4	REV.21.4
+Revelation 3:20	REV.3.20
+1-corinthians 13	1CO.13
+song-of-songs 2	SNG.2
+ஆதி 1:3	GEN.1.3
+ஆதியாகமம் 1:1	GEN.1.1
+யாத் 20	EXO.20
+யாத்திராகமம் 20:3	EXO.20.3
+லேவி 19:18	LEV.19.18
+எண் 6:24-26	NUM.6.24-26
+உபா 6:4	DEU.6.4
+யோசு 1:9	JOS.1.9
+நியா 6	JDG.6
+ரூத் 1:16	RUT.1.16
+1 சாமு 17:45	1SA.17.45
+1சாமு 17	1SA.17
+1 சாமுவேல் 17	1SA.17
+1 சாமுயேல் 17	1SA.17
+2 இராஜா 2:11	2KI.2.11
+1 நாளா 29:11	1CH.29.11
+எஸ்றா 7:10	EZR.7.10
+நெகே 8:10	NEH.8.10
+எஸ்தர் 4:14	EST.4.14
+யோபு 19:25	JOB.19.25
+சங் 23	PSA.23
+சங் ௨௩	PSA.23
+சங்கீதம் 23:1	PSA.23.1
+சங்கீதங்கள் 119:105	PSA.119.105
+நீதி 3:5-6	PRO.3.5-6
+பிரச 3:1	ECC.3.1
+உன்னத 2:1	SNG.2.1
+ஏசா 53:5	ISA.53.5
+ஏசாயா 40:31	ISA.40.31
+எரே 29:11	JER.29.11
+புலம் 3:22	LAM.3.22
+எசேக் 37	EZK.37
+தானி 3	DAN.3
+ஓசியா 6:6	HOS.6.6
+யோவே 2:28	JOL.2.28
+ஆமோ 5:24	AMO.5.24
+ஒபதி 1	OBA.1.1
+யோனா 2	JON.2
+மீகா 6:8	MIC.6.8
+நாகூ 1:7	NAM.1.7
+ஆப 3:17	HAB.3.17
+செப்ப 3:17	ZEP.3.17
+ஆகாய் 2:9	HAG.2.9
+சகரி 4:6	ZEC.4.6
+மல்கி 3:10	MAL.3.10
+மத் 5:3-12	MAT.5.3-12
+மத்தேயு 28:19	MAT.28.19
+மாற் 16:15	MRK.16.15
+மாற்கு 1	MRK.1
+லூக் 2:11	LUK.2.11
+லூக்கா 15	LUK.15
+யோவான் 3:16	JHN.3.16
+யோவா 3	JHN.3
+யோவா. 3:16	JHN.3.16
+அப் 2:38	ACT.2.38
+அப்போஸ்தலர் 1:8	ACT.1.8
+ரோமர் 8:28	ROM.8.28
+1 கொரி 13	1CO.13
+1 கொரி 13.4-7	1CO.13.4-7
+1கொரி13:4	1CO.13.4
+2 கொரி 5:17	2CO.5.17
+கலா 5:22	GAL.5.22
+எபே 2:8-9	EPH.2.8-9
+பிலி 4:13	PHP.4.13
+கொலோ 3:23	COL.3.23
+1 தெச 5:16-18	1TH.5.16-18
+1 தீமோ 4:12	1TI.4.12
+தீத் 2	TIT.2
+பிலே 5	PHM.1.5
+எபி 11:1	HEB.11.1
+யாக் 1:5	JAS.1.5
+1 பேது 5:7	1PE.5.7
+1 யோவா 4:8	1JN.4.8
+3 யோவா 5	3JN.1.5
+யூதா 24	JUD.1.24
+வெளி 21:4	REV.21.4
+வெளிப்படுத்தின விசேஷம் 21	REV.21
+வெளிப்படுத்தல் 3:20	REV.3.20
+	NONE
+hello world	NONE
+அன்பு	NONE
+John 99	NONE
+John 3:0	NONE
+John 3:18-16	NONE
+Jn 3:16:17	NONE
+J 3	NONE
+Genesis 51	NONE
+Psalm 151	NONE

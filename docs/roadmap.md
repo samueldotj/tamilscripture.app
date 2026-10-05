@@ -53,7 +53,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 **Rust bridge**
 - [x] M0-6 **[web]** Create `crates/ts-mobile` with UniFFI exports for `bible-ref` and `tamil-norm` ([design §9](design.md#9-shared-rust-code)).
 - [x] M0-7 `:core:rust`: `cargo-ndk` Gradle task for arm64-v8a, armeabi-v7a, x86_64; generated Kotlin bindings; size check < 1 MB per ABI.
-- [ ] M0-8 Instrumented test running the website's reference fixture list through the Android build.
+- [x] M0-8 The website's reference fixture list (`data/fixtures/references.tsv`, 190 cases) through the app's binding of the Rust parser: `ReferenceFixturesTest`, on the JVM with the host build of ts-mobile rather than on a device (same Rust code; the Android build of it is exercised by the app on devices).
 
 **Pack pipeline (thin slice)**
 - [x] M0-9 **[web]** Create `crates/pack-build`; build a Bible pack for one book with the schema in [design §7.3](design.md#73-bible-pack-schema), including `verse_fts` and `verse_tri`.
