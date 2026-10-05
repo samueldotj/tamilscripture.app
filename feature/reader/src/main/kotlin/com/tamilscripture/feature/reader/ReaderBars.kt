@@ -400,12 +400,12 @@ private fun HighlightSwatches(current: HighlightColor?, onColor: (HighlightColor
         HighlightColor.entries.forEach { color ->
             val on = color == current
             Box(
-                Modifier.size(40.dp).clip(CircleShape).background(c.highlight(color))
-                    .border(if (on) 3.dp else 1.dp, if (on) c.accent else c.line2, CircleShape)
+                Modifier.size(40.dp).clip(CircleShape).background(swatch(color))
+                    .border(if (on) 3.dp else 0.dp, if (on) c.ink else androidx.compose.ui.graphics.Color.Transparent, CircleShape)
                     .clickable(role = Role.Button, onClickLabel = tr("முனைப்பு", "Highlight")) { onColor(color) }
                     .semantics { contentDescription = colorLabel(color, tamil) + if (on) (if (tamil) " (இப்போது)" else " (current)") else "" },
                 contentAlignment = Alignment.Center,
-            ) { if (on) Icon(TsIcons.Check, null, Modifier.size(18.dp), tint = c.ink) }
+            ) { if (on) Icon(TsIcons.Check, null, Modifier.size(18.dp), tint = androidx.compose.ui.graphics.Color(0xFF1B1D22)) }
         }
         // Remove: an empty circle with a cross.
         Box(
@@ -415,6 +415,17 @@ private fun HighlightSwatches(current: HighlightColor?, onColor: (HighlightColor
             contentAlignment = Alignment.Center,
         ) { Icon(TsIcons.Close, null, Modifier.size(16.dp), tint = if (current != null) c.ink2 else c.faint) }
     }
+}
+
+/**
+ * The colour of a swatch: full and bright, so it reads as a button. The highlight behind
+ * text is a dimmer tint of the same colour (dark mode keeps text readable over it).
+ */
+private fun swatch(color: HighlightColor): androidx.compose.ui.graphics.Color = when (color) {
+    HighlightColor.Yellow -> androidx.compose.ui.graphics.Color(0xFFF2C94C)
+    HighlightColor.Green -> androidx.compose.ui.graphics.Color(0xFF5CC27A)
+    HighlightColor.Blue -> androidx.compose.ui.graphics.Color(0xFF5B9BEF)
+    HighlightColor.Pink -> androidx.compose.ui.graphics.Color(0xFFF07AA0)
 }
 
 private fun colorLabel(color: HighlightColor, tamil: Boolean) = when (color) {
