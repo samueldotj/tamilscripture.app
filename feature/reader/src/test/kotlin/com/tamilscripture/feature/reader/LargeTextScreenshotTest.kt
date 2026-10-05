@@ -36,6 +36,7 @@ class LargeTextScreenshotTest {
                         VerseActionCard(
                             "1 கொரிந்தியர் 13:4–7", hasAudio = true, onClose = {}, onPlayHere = {}, onCommentary = {}, onCrossRefs = {},
                             onBookmark = {}, onCopy = {}, onShare = {}, onNote = {}, onHighlight = {}, onOriginal = {}, onPeople = {}, onShareImage = {},
+                            currentColor = com.tamilscripture.core.model.HighlightColor.Green, onColor = {},
                         )
                     }
                 }

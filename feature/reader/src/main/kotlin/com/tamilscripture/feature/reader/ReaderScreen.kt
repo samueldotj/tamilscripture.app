@@ -263,6 +263,11 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         services.audio.play(state.passage.version, b, state.passage.chapter, fromVerse)
     }
 
+    // One tap on a colour highlights the selection (signed in), then the selection clears so it shows.
+    val selColor = state.selection.firstOrNull()?.let { marks[it]?.color }
+    val pickColor: (com.tamilscripture.core.model.HighlightColor?) -> Unit = { color ->
+        if (signedIn) { vm.highlight(color); vm.clearSelection() } else askSignIn = true
+    }
     val actions = VerseActions(
         onPlayHere = { vm.recordVerseAction("listen"); play(state.selection.firstOrNull()) },
         onCommentary = {
@@ -391,7 +396,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs, signedIn = signedIn, onAskSignIn = { askSignIn = true },
                                 )
                             }
-                            ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
+                            ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp), selColor, pickColor)
                         }
                         if (tab != null) {
                             PaneDivider(paneShare, (rowWidth - 200.dp).coerceAtLeast(1.dp)) { paneShare = it }
@@ -456,7 +461,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
-                        Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 12.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 12.dp),
+                        currentColor = selColor, onColor = pickColor,
                     )
                 }
                 val bottom: @Composable () -> Unit = {
@@ -630,6 +636,8 @@ private fun ActionCardOverlay(
     vm: ReaderViewModel,
     a: VerseActions,
     modifier: Modifier,
+    currentColor: com.tamilscripture.core.model.HighlightColor? = null,
+    onColor: ((com.tamilscripture.core.model.HighlightColor?) -> Unit)? = null,
 ) {
     AnimatedVisibility(
         visible, modifier.widthIn(max = 560.dp),
@@ -638,6 +646,7 @@ private fun ActionCardOverlay(
         VerseActionCard(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
+            currentColor = currentColor, onColor = onColor,
             onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite, onLarge = a.onLarge,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),

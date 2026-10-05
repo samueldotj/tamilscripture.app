@@ -1,5 +1,9 @@
 package com.tamilscripture.feature.reader
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import com.tamilscripture.core.services.LocalUiLang
+import com.tamilscripture.core.model.HighlightColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -204,6 +208,9 @@ fun VerseActionCard(
     onShare: () -> Unit,
     onNote: () -> Unit,
     onHighlight: () -> Unit,
+    /** One tap highlights in a colour (null removes); the selection's current colour is ringed. */
+    currentColor: HighlightColor? = null,
+    onColor: ((HighlightColor?) -> Unit)? = null,
     onOriginal: () -> Unit,
     onPeople: () -> Unit,
     onShareImage: () -> Unit,
@@ -228,6 +235,7 @@ fun VerseActionCard(
             Text(reference, style = Ts.type.label, color = c.accent, modifier = Modifier.weight(1f))
             Icon(TsIcons.Close, tr("மூடு", "Close"), Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onClose), tint = c.muted)
         }
+        if (onColor != null) HighlightSwatches(currentColor, onColor)
         // Four across, or two by two when the card is narrow (the text column beside a wide
         // study pane), where four would cut long Tamil labels.
         BoxWithConstraints {
@@ -248,7 +256,7 @@ fun VerseActionCard(
             SmallAction(tr("நகல்", "Copy"), onCopy, Modifier.weight(1f))
             SmallAction(tr("பகிர்", "Share"), onShare, Modifier.weight(1f))
             SmallAction(tr("குறிப்பு", "Note"), onNote, Modifier.weight(1f))
-            SmallAction(tr("முனைப்பு", "Highlight"), onHighlight, Modifier.weight(1f))
+            if (onColor == null) SmallAction(tr("முனைப்பு", "Highlight"), onHighlight, Modifier.weight(1f))
         }
         // M8-2, M8-4: the verse in Hebrew or Greek; who and where it names.
         Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -379,3 +387,39 @@ fun KeyHintStrip(hints: List<Hint>, trailing: Hint?) {
  * to 8 sp on screen whatever the text-size setting (the minimum above is divided by it).
  */
 private fun labelLines(label: String) = if (label.trim().contains(' ')) 2 else 1
+
+/**
+ * The four highlight colours as circles, and a fifth that removes the highlight: one tap
+ * marks the selected verses, as on the website's action bar.
+ */
+@Composable
+private fun HighlightSwatches(current: HighlightColor?, onColor: (HighlightColor?) -> Unit) {
+    val c = Ts.colors
+    val tamil = LocalUiLang.current == com.tamilscripture.core.model.UiLang.Tamil
+    Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+        HighlightColor.entries.forEach { color ->
+            val on = color == current
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(c.highlight(color))
+                    .border(if (on) 3.dp else 1.dp, if (on) c.accent else c.line2, CircleShape)
+                    .clickable(role = Role.Button, onClickLabel = tr("முனைப்பு", "Highlight")) { onColor(color) }
+                    .semantics { contentDescription = colorLabel(color, tamil) + if (on) (if (tamil) " (இப்போது)" else " (current)") else "" },
+                contentAlignment = Alignment.Center,
+            ) { if (on) Icon(TsIcons.Check, null, Modifier.size(18.dp), tint = c.ink) }
+        }
+        // Remove: an empty circle with a cross.
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).border(1.dp, c.line2, CircleShape)
+                .clickable(role = Role.Button, enabled = current != null) { onColor(null) }
+                .semantics { contentDescription = if (tamil) "முனைப்பை நீக்கு" else "Remove highlight" },
+            contentAlignment = Alignment.Center,
+        ) { Icon(TsIcons.Close, null, Modifier.size(16.dp), tint = if (current != null) c.ink2 else c.faint) }
+    }
+}
+
+private fun colorLabel(color: HighlightColor, tamil: Boolean) = when (color) {
+    HighlightColor.Yellow -> if (tamil) "மஞ்சள்" else "Yellow"
+    HighlightColor.Green -> if (tamil) "பச்சை" else "Green"
+    HighlightColor.Blue -> if (tamil) "நீலம்" else "Blue"
+    HighlightColor.Pink -> if (tamil) "இளஞ்சிவப்பு" else "Pink"
+}
