@@ -202,7 +202,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<ArticleRoute> { r -> ArticleScreen(r.id, studyLinks) }
                     entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
-                    entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks) }
+                    entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks, startJourney = r.journey) }
                     entry<PresentRoute> { r -> PresentScreen(r.passage, onExit = { backStack.removeAt(backStack.lastIndex) }) }
                     entry<AccountRoute> { AccountScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onMine = { backStack.add(MineRoute()) }) }
                     entry<MineRoute> { r -> MineScreen(r.tab, onBack = { backStack.removeAt(backStack.lastIndex) }, onRead = ::read) }

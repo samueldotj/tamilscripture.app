@@ -32,7 +32,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class ArticleRoute(val id: String) : NavKey
 @Serializable data object DictionaryRoute : NavKey
 @Serializable data object RootWordsRoute : NavKey
-@Serializable data class AtlasRoute(val focus: String? = null) : NavKey
+/** [focus] a place to centre on; [journey] a journey to show (the website's /atlas/{journey}). */
+@Serializable data class AtlasRoute(val focus: String? = null, val journey: String? = null) : NavKey
 @Serializable data class PresentRoute(val passage: Passage) : NavKey
 
 /** Home is the landing page (the cross); Bible opens the reader at the last chapter read. */
@@ -65,6 +66,17 @@ fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): 
     val seg = uri.pathSegments.filter { it.isNotBlank() }
     if (seg.isEmpty()) return null
     if (seg.size == 1 && seg[0] == "search") return DeepLink(SearchRoute(query = uri.getQueryParameter("q")?.trim()?.takeIf { it.isNotEmpty() }))
+    // Study pages (M8-5d): the atlas, a journey on it, places, people, Strong's numbers, the dictionary.
+    val slug = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
+    when {
+        seg[0] == "atlas" && seg.size == 1 -> return DeepLink(AtlasRoute())
+        seg[0] == "atlas" && seg.size == 2 && seg[1] == "explore" -> return DeepLink(AtlasRoute())
+        seg[0] == "atlas" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(AtlasRoute(journey = seg[1]))
+        seg[0] == "place" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(PlaceRoute(seg[1]))
+        seg[0] == "person" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(PersonRoute(seg[1]))
+        seg[0] == "strongs" && seg.size == 2 && Regex("^[HGhg][0-9]{1,5}[A-Za-z]?$").matches(seg[1]) -> return DeepLink(StrongsRoute(seg[1].uppercase()))
+        seg[0] == "dictionary" && seg.size == 1 -> return DeepLink(DictionaryRoute)
+    }
     val codes = manifest.versions.associateBy { it.code.lowercase() }
     val parts = seg[0].lowercase().split('+')
     val hasVersion = parts.size <= 2 && parts.all { it in codes }

@@ -128,13 +128,13 @@ private fun path(features: List<GeoFeature>, close: Boolean): Path = Path().appl
  * option A), so labels use the reader's typeface and language.
  */
 @Composable
-fun AtlasScreen(focus: String?, links: StudyLinks) {
+fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
     val lang = LocalUiLang.current
     val tamil = lang == UiLang.Tamil
     val data by produceState<AtlasData?>(null, Unit) { value = loadAtlas { graph.study.file(it) } }
-    var journey by rememberSaveable { mutableStateOf<String?>(null) }
+    var journey by rememberSaveable { mutableStateOf(startJourney) }
     // M8-5c: "places", "kingdoms" (a year on the timeline) or "church".
     var layer by rememberSaveable { mutableStateOf("places") }
     val kingdoms by produceState<Kingdoms?>(null, layer == "kingdoms") {
