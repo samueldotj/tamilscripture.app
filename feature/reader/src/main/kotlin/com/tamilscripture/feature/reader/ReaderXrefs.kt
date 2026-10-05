@@ -20,6 +20,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
@@ -102,7 +104,7 @@ internal fun AnnotatedString.Builder.appendCrossRefs(
 fun CrossRefBox(refs: List<CrossRef>, openKey: String?, manifest: ContentManifest?, version: String, onOpen: (VerseId) -> Unit) {
     val current = refs.firstOrNull { it.key() == openKey }
     AnimatedVisibility(current != null) {
-        current?.let { r -> Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 6.dp)) { RefBox(r, manifest, version, onOpen) } }
+        current?.let { r -> Column(Modifier.padding(start = 40.dp, end = 10.dp, top = 2.dp, bottom = 8.dp)) { RefBox(r, manifest, version, onOpen) } }
     }
 }
 
@@ -119,8 +121,11 @@ private fun RefBox(r: CrossRef, manifest: ContentManifest?, version: String, onO
         value = chapter?.let { ch -> (vid.verse..(end ?: vid.verse)).joinToString(" ") { ch.verseText(it) }.trim() } ?: ""
     }
     val shape = RoundedCornerShape(12.dp)
+    val barColor = c.accent
     Column(
-        Modifier.fillMaxWidth().background(c.surface2, shape).border(1.dp, c.line, shape)
+        // Indented, smaller and marked by a bar on the left, so it reads as a note, not the text.
+        Modifier.fillMaxWidth().clip(shape).background(c.surface2).border(1.dp, c.line, shape)
+            .drawBehind { drawRect(barColor, size = Size(3.dp.toPx(), size.height)) }
             .clickable(role = Role.Button) { onOpen(vid) }.padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -131,7 +136,7 @@ private fun RefBox(r: CrossRef, manifest: ContentManifest?, version: String, onO
                 text!!.isEmpty() -> tr("இணைப்பின்றி இந்த வசனத்தைத் திறக்க முடியவில்லை.", "This verse needs a connection.")
                 else -> text!!
             },
-            style = Ts.type.scripture(16.sp, 1.7f), color = c.ink, maxLines = 6, overflow = TextOverflow.Ellipsis,
+            style = Ts.type.scripture(15.sp, 1.65f), color = c.ink2, maxLines = 6, overflow = TextOverflow.Ellipsis,
         )
     }
 }
