@@ -1,5 +1,32 @@
 package com.tamilscripture.feature.study
 
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.exponentialDecay
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.pow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -305,6 +332,8 @@ internal fun AtlasCanvas(
     // Label layouts (text and its halo), measured once per language and theme, not every frame.
     val labels = remember(d, tamil, c) { HashMap<String, Pair<TextLayoutResult, TextLayoutResult>>() }
 
+    val mapFocus = remember { FocusRequester() }
+    val keyStepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 80.dp.toPx() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
@@ -319,15 +348,44 @@ internal fun AtlasCanvas(
             scale = cover
             d.places.firstOrNull { it.id == focus }?.let { cx = it.x; cy = it.y; scale = fit * 6f }
         }
+        val scope = rememberCoroutineScope()
+        var motion by remember { mutableStateOf<Job?>(null) }
+        // The centre stays over the region the map has detail for, give or take a screen.
+        fun clampCentre() {
+            cx = cx.coerceIn(-10f, 75f)
+            cy = cy.coerceIn(wy(62.0), wy(5.0))
+        }
+
+        /** Glides the camera to a centre and scale (fit to a journey, centre on a place). */
+        fun glideTo(tx: Float, ty: Float, ts: Float) {
+            motion?.cancel()
+            val (x0, y0, s0) = Triple(cx, cy, scale)
+            motion = scope.launch {
+                animate(0f, 1f, animationSpec = tween(450, easing = FastOutSlowInEasing)) { t, _ ->
+                    cx = x0 + (tx - x0) * t
+                    cy = y0 + (ty - y0) * t
+                    // Scale moves in log space, so zooming in and out feel alike.
+                    scale = s0 * (ts / s0).pow(t)
+                }
+            }
+        }
+
         // A new journey brings its stops into view.
         LaunchedEffect(journey) {
             if (stops.isNotEmpty()) {
                 val xs = stops.map { it.lon.toFloat() }
                 val ys = stops.map { wy(it.lat) }
-                cx = (xs.min() + xs.max()) / 2f
-                cy = (ys.min() + ys.max()) / 2f
-                scale = min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * MIN_ZOOM, fit * 40f)
+                glideTo(
+                    (xs.min() + xs.max()) / 2f, (ys.min() + ys.max()) / 2f,
+                    min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * MIN_ZOOM, fit * 40f),
+                )
             }
+        }
+        // A place chosen from the list or search glides into view.
+        LaunchedEffect(selected) {
+            val p = d.places.firstOrNull { it.id == selected } ?: return@LaunchedEffect
+            val sp = Offset((p.x - cx) * scale + w / 2f, (p.y - cy) * scale + h / 2f)
+            if (sp.x !in 0f..w || sp.y !in 0f..h) glideTo(p.x, p.y, max(scale, fit * 4f))
         }
         fun toScreen(x: Float, y: Float) = Offset((x - cx) * scale + w / 2f, (y - cy) * scale + h / 2f)
         fun zoomAt(p: Offset, factor: Float) {
@@ -336,7 +394,11 @@ internal fun AtlasCanvas(
             scale = (scale * factor).coerceIn(fit * MIN_ZOOM, fit * 40f)
             cx = wx - (p.x - w / 2f) / scale
             cy = wyv - (p.y - h / 2f) / scale
+            clampCentre()
         }
+
+        /** Zoom about the centre in steps, as the + and - buttons and keys do, gliding. */
+        fun zoomStep(factor: Float) = glideTo(cx, cy, (scale * factor).coerceIn(fit * MIN_ZOOM, fit * 40f))
 
         // The base map in its own layer: it reads the view only while drawing, so a new year
         // or selection redraws the overlay alone and the base is composited from its texture.
@@ -345,11 +407,59 @@ internal fun AtlasCanvas(
             // Clipped: a Canvas draws outside its bounds, over the header and chips.
             Modifier.fillMaxSize().clipToBounds()
                 .semantics { contentDescription = if (tamil) "வேதாகம வரைபடம்" else "Bible atlas" }
+                .focusRequester(mapFocus)
+                .focusable()
+                .onKeyEvent { e ->
+                    // Keyboard on ALOS and tablets (M8-5d): arrows pan, + and - zoom.
+                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    val step = keyStepPx / scale
+                    when (e.key) {
+                        Key.DirectionLeft -> { cx -= step; clampCentre(); true }
+                        Key.DirectionRight -> { cx += step; clampCentre(); true }
+                        Key.DirectionUp -> { cy -= step; clampCentre(); true }
+                        Key.DirectionDown -> { cy += step; clampCentre(); true }
+                        Key.Plus, Key.Equals, Key.NumPadAdd -> { zoomStep(1.6f); true }
+                        Key.Minus, Key.NumPadSubtract -> { zoomStep(1 / 1.6f); true }
+                        else -> false
+                    }
+                }
                 .pointerInput(Unit) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        if (zoom != 1f) zoomAt(centroid, zoom)
-                        cx -= pan.x / scale
-                        cy -= pan.y / scale
+                    // Pinch and pan, and a fling that carries on after a one-finger flick (M8-5a).
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        motion?.cancel()
+                        val tracker = VelocityTracker()
+                        var multi = false
+                        while (true) {
+                            val e = awaitPointerEvent()
+                            val pressed = e.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            if (pressed.size > 1) multi = true
+                            val zoom = e.calculateZoom()
+                            val pan = e.calculatePan()
+                            if (zoom != 1f) zoomAt(e.calculateCentroid(), zoom)
+                            if (pan != Offset.Zero) {
+                                cx -= pan.x / scale
+                                cy -= pan.y / scale
+                                clampCentre()
+                                e.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                            pressed.firstOrNull()?.let { tracker.addPosition(it.uptimeMillis, it.position) }
+                        }
+                        val v = tracker.calculateVelocity()
+                        if (!multi && (abs(v.x) > 300f || abs(v.y) > 300f)) {
+                            motion = scope.launch {
+                                var last = Offset.Zero
+                                AnimationState(Offset.VectorConverter, Offset.Zero, Offset(v.x, v.y))
+                                    .animateDecay(exponentialDecay(frictionMultiplier = 1.6f)) {
+                                        val d = value - last
+                                        last = value
+                                        cx -= d.x / scale
+                                        cy -= d.y / scale
+                                        clampCentre()
+                                    }
+                            }
+                        }
                     }
                 }
                 .pointerInput(d) {
@@ -472,6 +582,14 @@ internal fun AtlasCanvas(
                     label("stop-$journey-$i", if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn, s + Offset(4f, 0f))
                 }
             }
+        }
+        // Zoom buttons (M8-5f): for one hand, a mouse, and TalkBack.
+        Column(
+            Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IconBox(TsIcons.Plus, if (tamil) "பெரிதாக்கு" else "Zoom in", { zoomStep(1.6f) }, background = c.surface)
+            IconBox(TsIcons.Minus, if (tamil) "சிறிதாக்கு" else "Zoom out", { zoomStep(1 / 1.6f) }, background = c.surface)
         }
     }
 }
