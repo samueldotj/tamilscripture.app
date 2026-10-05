@@ -30,6 +30,8 @@ import kotlin.math.pow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.foundation.lazy.LazyColumn
+import com.tamilscripture.core.designsystem.component.HDivider
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -118,6 +120,42 @@ import kotlinx.serialization.json.Json
  */
 private val Hairline = Stroke(0f)
 
+/**
+ * The atlas as a list (M8-5f): a journey's stops in order, or the places by how often the
+ * Bible names them. A row opens the place's page; its map button shows it on the map.
+ */
+@Composable
+private fun PlaceList(d: AtlasData, journey: String?, tamil: Boolean, onOpen: (String) -> Unit, onShow: (String) -> Unit) {
+    val c = Ts.colors
+    val stops = d.journeys.firstOrNull { it.id == journey }?.stops
+    val byId = remember(d) { d.places.associateBy { it.id } }
+    val rows: List<Pair<String, AtlasPlace?>> = remember(d, journey) {
+        stops?.mapIndexed { i, st -> "${i + 1}. " + (if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn) to byId[st.place] }
+            ?: d.places.take(400).map { (if (tamil) it.nameTa.ifBlank { it.nameEn } else it.nameEn) to it }
+    }
+    LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(bottom = 24.dp)) {
+        items(rows.size) { i ->
+            val (title, p) = rows[i]
+            Row(
+                Modifier.fillMaxWidth().then(if (p != null) Modifier.clickable { onOpen(p.id) } else Modifier)
+                    .padding(start = 18.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = Ts.type.label, color = c.ink)
+                    if (p != null) Text(
+                        listOf(if (tamil) p.nameEn else p.nameTa, p.type, if (tamil) "${p.mentions} இடங்களில்" else if (p.mentions == 1) "1 mention" else "${p.mentions} mentions")
+                            .filter { it.isNotBlank() }.joinToString(" · "),
+                        style = Ts.type.caption, color = c.muted,
+                    )
+                }
+                if (p != null) IconBox(TsIcons.MapView, if (tamil) "வரைபடத்தில் காட்டு" else "Show on the map", { onShow(p.id) }, tint = c.muted, iconSize = 20.dp)
+            }
+            HDivider(Modifier.padding(start = 18.dp))
+        }
+    }
+}
+
 /** Places whose Tamil or English name matches [query]: names that start with it first, then by mentions. */
 internal fun findPlaces(places: List<AtlasPlace>, query: String, limit: Int = 8): List<AtlasPlace> {
     val q = query.trim().lowercase()
@@ -188,11 +226,18 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null)
     // M8-5d: find a place on the map by name.
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
+    // M8-5f: the places as a list, in rank order (a journey's stops in order), for TalkBack and for reading.
+    var listView by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), links.back)
             Text(tr("வரைபடம்", "Atlas"), style = Ts.type.barTitle, color = c.ink, modifier = Modifier.padding(start = 4.dp).weight(1f))
+            IconBox(
+                if (listView) TsIcons.MapView else TsIcons.ListView,
+                if (listView) tr("வரைபடமாகக் காட்டு", "Show as a map") else tr("பட்டியலாகக் காட்டு", "Show as a list"),
+                { listView = !listView },
+            )
             IconBox(
                 if (searching) TsIcons.Close else TsIcons.Search, if (searching) tr("தேடலை மூடு", "Close search") else tr("இடம் தேடு", "Find a place"),
                 { searching = !searching; query = "" },
@@ -232,6 +277,10 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null)
             d.journeys.forEach { j ->
                 TsChip(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, journey == j.id, { layer = "places"; journey = j.id; selected = null }, contentPadding = pad)
             }
+        }
+        if (listView) {
+            PlaceList(d, journey, tamil, onOpen = { links.place(it) }, onShow = { id -> layer = "places"; journey = null; selected = id; listView = false })
+            return@Column
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val k = kingdoms
@@ -485,13 +534,22 @@ internal fun AtlasCanvas(
                         motion?.cancel()
                         val tracker = VelocityTracker()
                         var multi = false
+                        // A two-finger tap zooms out (the map convention): two fingers, briefly, barely moving.
+                        val started = currentEvent.changes.first().uptimeMillis
+                        var ended = started
+                        var travel = 0f
+                        var zoomed = 1f
+                        var tapAt = Offset.Zero
                         while (true) {
                             val e = awaitPointerEvent()
                             val pressed = e.changes.filter { it.pressed }
+                            ended = e.changes.first().uptimeMillis
                             if (pressed.isEmpty()) break
-                            if (pressed.size > 1) multi = true
+                            if (pressed.size > 1) { multi = true; tapAt = e.calculateCentroid() }
                             val zoom = e.calculateZoom()
                             val pan = e.calculatePan()
+                            travel += pan.getDistance()
+                            zoomed *= zoom
                             if (zoom != 1f) zoomAt(e.calculateCentroid(), zoom)
                             if (pan != Offset.Zero) {
                                 cx -= pan.x / scale
@@ -500,6 +558,10 @@ internal fun AtlasCanvas(
                                 e.changes.forEach { if (it.positionChanged()) it.consume() }
                             }
                             pressed.firstOrNull()?.let { tracker.addPosition(it.uptimeMillis, it.position) }
+                        }
+                        if (multi && ended - started < 300 && travel < 24.dp.toPx() && abs(zoomed - 1f) < 0.08f) {
+                            zoomAt(tapAt, 1 / 1.6f)
+                            return@awaitEachGesture
                         }
                         val v = tracker.calculateVelocity()
                         if (!multi && (abs(v.x) > 300f || abs(v.y) > 300f)) {

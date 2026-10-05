@@ -76,4 +76,6 @@ object TsIcons {
     val Copy = line("copy", "M9 9h11v11H9z", "M5 15H4V4h11v1")
     val Note = line("note", "M5 4h10l4 4v12H5z", "M15 4v4h4", "M8 13h8M8 17h5")
     val Highlight = line("highlight", "M4 20h7", "M14.5 4.5l5 5L10 19H5v-5z")
+    val ListView = line("list", "M9 6h11M9 12h11M9 18h11", "M4.5 6h.01M4.5 12h.01M4.5 18h.01")
+    val MapView = line("map", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z", "M9 4v14M15 6v14")
 }
