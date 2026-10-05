@@ -27,6 +27,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.pow
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -115,6 +118,16 @@ import kotlinx.serialization.json.Json
  */
 private val Hairline = Stroke(0f)
 
+/** Places whose Tamil or English name matches [query]: names that start with it first, then by mentions. */
+internal fun findPlaces(places: List<AtlasPlace>, query: String, limit: Int = 8): List<AtlasPlace> {
+    val q = query.trim().lowercase()
+    if (q.isEmpty()) return emptyList()
+    fun starts(p: AtlasPlace) = p.nameEn.lowercase().startsWith(q) || p.nameTa.startsWith(q)
+    return places.filter { it.nameEn.lowercase().contains(q) || it.nameTa.contains(q) }
+        .sortedWith(compareByDescending<AtlasPlace> { starts(it) }.thenByDescending { it.mentions })
+        .take(limit)
+}
+
 /** How far the atlas zooms out, as a share of the detailed box: about Europe to India in view. */
 private const val MIN_ZOOM = 0.3f
 
@@ -172,11 +185,32 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null)
     }
     var yearIndex by rememberSaveable { mutableIntStateOf(-1) }
     var selected by rememberSaveable { mutableStateOf(focus) }
+    // M8-5d: find a place on the map by name.
+    var searching by rememberSaveable { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
 
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), links.back)
-            Text(tr("வரைபடம்", "Atlas"), style = Ts.type.barTitle, color = c.ink, modifier = Modifier.padding(start = 4.dp))
+            Text(tr("வரைபடம்", "Atlas"), style = Ts.type.barTitle, color = c.ink, modifier = Modifier.padding(start = 4.dp).weight(1f))
+            IconBox(
+                if (searching) TsIcons.Close else TsIcons.Search, if (searching) tr("தேடலை மூடு", "Close search") else tr("இடம் தேடு", "Find a place"),
+                { searching = !searching; query = "" },
+            )
+        }
+        if (searching) {
+            Box(
+                Modifier.padding(start = 14.dp, end = 14.dp, bottom = 8.dp).fillMaxWidth()
+                    .background(c.surface, RoundedCornerShape(14.dp)).border(1.dp, c.line2, RoundedCornerShape(14.dp)).padding(12.dp),
+            ) {
+                if (query.isEmpty()) Text(tr("இடத்தின் பெயர்", "Place name"), style = Ts.type.body, color = c.faint)
+                val fr = remember { FocusRequester() }
+                LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+                BasicTextField(
+                    query, { query = it }, singleLine = true, textStyle = Ts.type.body.copy(color = c.ink),
+                    cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth().focusRequester(fr),
+                )
+            }
         }
         val d = data
         if (d == null || d.land.isEmpty()) {
@@ -210,6 +244,27 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null)
                 kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
                 church = if (layer == "church") church else emptyList(),
             ) { selected = it }
+            val found = remember(d, query) { if (query.isBlank()) emptyList() else findPlaces(d.places, query) }
+            if (searching && found.isNotEmpty()) {
+                Column(
+                    Modifier.align(Alignment.TopCenter).padding(horizontal = 14.dp).widthIn(max = 560.dp).fillMaxWidth()
+                        .background(c.surface, RoundedCornerShape(14.dp)).border(1.dp, c.line2, RoundedCornerShape(14.dp)),
+                ) {
+                    found.forEach { p ->
+                        Column(
+                            Modifier.fillMaxWidth().clickable {
+                                layer = "places"; journey = null; selected = p.id; searching = false; query = ""
+                            }.padding(horizontal = 14.dp, vertical = 10.dp),
+                        ) {
+                            Text(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, style = Ts.type.label, color = c.ink)
+                            Text(
+                                listOf(if (tamil) p.nameEn else p.nameTa, p.type).filter { it.isNotBlank() }.joinToString(" · "),
+                                style = Ts.type.caption, color = c.muted,
+                            )
+                        }
+                    }
+                }
+            }
             if (layer == "kingdoms") {
                 InfoCard(Modifier.align(Alignment.BottomCenter)) {
                     if (k == null || year == null) {
