@@ -155,6 +155,11 @@ fun ReaderTextList(
     /** The website's reading format: Reader and Standard flow in paragraphs; Study is a verse a line. */
     format: ReadingFormat = ReadingFormat.Study,
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
+    /** Study Bible: each verse's cross-references under it, by verse; empty when the setting is off. */
+    xrefs: Map<Int, List<com.tamilscripture.core.model.CrossRef>> = emptyMap(),
+    manifest: com.tamilscripture.core.model.ContentManifest? = null,
+    version: String = "",
+    onOpenRef: (com.tamilscripture.core.model.VerseId) -> Unit = {},
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -228,6 +233,9 @@ fun ReaderTextList(
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                                 .semantics { contentDescription = "${item.label}. ${item.text}" },
                         ) }
+                        if (format == ReadingFormat.Study) {
+                            xrefs[item.verse]?.let { refs -> VerseCrossRefs(item.key, refs, manifest, version, onOpenRef) }
+                        }
                         if (showNotes && item.notes.isNotEmpty()) {
                             Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
                                 item.notes.forEachIndexed { i, n ->

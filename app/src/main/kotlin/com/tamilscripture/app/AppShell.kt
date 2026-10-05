@@ -171,6 +171,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                                 place = studyLinks.place,
                                 present = { p -> backStack.add(PresentRoute(p)) },
                                 account = { backStack.add(AccountRoute) },
+                                follow = { p -> backStack.add(ReaderRoute(p)) },
                             ),
                         )
                     }

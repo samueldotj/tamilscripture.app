@@ -134,6 +134,8 @@ class ReaderNav(
     val present: (Passage) -> Unit,
     /** The account screen, to sign in (highlights and notes need an account, design §13.2). */
     val account: () -> Unit = {},
+    /** A cross-reference opened as its own reader, so Back returns to the verse it came from. */
+    val follow: ((Passage) -> Unit)? = null,
 )
 
 private class VerseActions(
@@ -192,6 +194,11 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val items = remember(chapter, second, settings.headings, paragraphs) {
         val a = if (paragraphs) chapter?.toParagraphs(settings.headings).orEmpty() else chapter?.toItems(settings.headings).orEmpty()
         if (second == null) a else dualItems(a, second.toItems(showHeadings = false))
+    }
+    // Study Bible: cross-references under each verse when the setting is on (the website's fmt-xref).
+    val studyXrefs = remember(state.crossRefs, settings.crossRefs, settings.format) {
+        if (!settings.crossRefs || settings.format != ReadingFormat.Study) emptyMap()
+        else state.crossRefs.mapNotNull { (k, v) -> k.substringAfterLast('.').toIntOrNull()?.let { it to v } }.toMap()
     }
     val versionLabel = state.versionShort + (state.compareShort?.let { " + $it" } ?: "")
     val dualLabels = if (state.dual) state.versionShort to (state.compareShort ?: "") else null
@@ -366,7 +373,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format,
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs,
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -425,7 +432,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
-                        marks = marks, onOpenNote = { n -> editingNote = n.id }, format = settings.format,
+                        marks = marks, onOpenNote = { n -> editingNote = n.id }, format = settings.format, xrefs = studyXrefs,
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -643,6 +650,7 @@ private fun ChapterBody(
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
     notesInMargin: Boolean = false,
     format: ReadingFormat = ReadingFormat.Study,
+    xrefs: Map<Int, List<com.tamilscripture.core.model.CrossRef>> = emptyMap(),
 ) {
     val c = Ts.colors
     when {
@@ -673,6 +681,11 @@ private fun ChapterBody(
                 secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
                 marks = marks, onOpenNote = onOpenNote, heat = state.heat, notesInMargin = notesInMargin && !state.dual,
                 format = format,
+                xrefs = xrefs, manifest = state.manifest, version = state.passage.version,
+                onOpenRef = { vid ->
+                    val p = Passage(state.passage.version, vid.book, vid.chapter, vid.verse)
+                    nav.follow?.invoke(p) ?: vm.open(p)
+                },
             )
         }
     }
