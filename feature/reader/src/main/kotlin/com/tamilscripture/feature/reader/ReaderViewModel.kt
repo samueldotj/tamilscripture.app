@@ -52,7 +52,10 @@ data class ReaderState(
 }
 
 /** Holds one chapter at a time; chapter changes replace the content in place (A-2.4). */
-class ReaderViewModel(private val services: AppServices, initial: Passage, compareAtStart: Boolean = false) : ViewModel() {
+class ReaderViewModel(private val services: AppServices, initial: Passage, compareAtStart: Boolean = false, selectAtStart: Boolean = true) : ViewModel() {
+    /** Opened from Bible or Continue reading: scroll to the verse, but leave it unselected (no verse card). */
+    private var quiet = !selectAtStart
+
     /** Two columns in this reader; off unless the reader was opened to compare. */
     private var comparing = compareAtStart
 
@@ -97,7 +100,8 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
 
     fun open(passage: Passage) {
         if (passage.chapterKey() == state.value.passage.chapterKey()) {
-            mutable.update { it.copy(passage = passage, selection = listOfNotNull(passage.verse)) }
+            mutable.update { it.copy(passage = passage, selection = if (quiet) emptyList() else listOfNotNull(passage.verse)) }
+            quiet = false
             return
         }
         load(passage)
@@ -109,7 +113,7 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
         loadJob?.cancel()
         mutable.update {
             it.copy(passage = p, chapter = if (it.chapter?.book == p.book && it.chapter.chapter == p.chapter && it.chapter.version == p.version) it.chapter else null,
-                loading = true, error = false, selection = listOfNotNull(p.verse), crossRefs = emptyMap(), commentary = null)
+                loading = true, error = false, selection = if (quiet) emptyList() else listOfNotNull(p.verse), crossRefs = emptyMap(), commentary = null)
         }
         loadJob = viewModelScope.launch {
             graph.content.chapter(p.version, p.book, p.chapter)

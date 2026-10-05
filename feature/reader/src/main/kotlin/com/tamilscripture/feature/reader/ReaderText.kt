@@ -216,7 +216,7 @@ fun ReaderTextList(
                         val bookmarkColor = c.accent
                         // Study Bible: the references follow the last word, in small type with tight lines.
                         val trailer = if (refs.isEmpty()) null else buildAnnotatedString {
-                            appendCrossRefs(refs, allRefs, openRef, manifest, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
+                            appendCrossRefs(refs, allRefs, openRef, manifest, c, lang, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
                         }
                         VerseInteractionBox(item.verse, interactions) { extra -> TextWithTrailer(
                             verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study),

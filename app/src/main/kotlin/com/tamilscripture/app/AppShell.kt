@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavBackStack
@@ -97,7 +98,8 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
         if (top is ReaderRoute || top is PickerRoute || top is CommentaryRoute) {
             while (backStack.size > 1 && backStack.last().tab() == null) backStack.removeAt(backStack.lastIndex)
         }
-        backStack.add(ReaderRoute(p))
+        // Continue reading goes back to the place, not to a selected verse.
+        backStack.add(ReaderRoute(p, select = p != settings.lastRead))
     }
 
     fun selectTab(t: Tab) {
@@ -106,7 +108,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
             if (backStack.lastOrNull() is ReaderRoute) return
             backStack.clear()
             backStack.add(HomeRoute)
-            backStack.add(ReaderRoute(settings.lastRead ?: Passage(settings.version, "JHN", 1)))
+            backStack.add(ReaderRoute(settings.lastRead ?: Passage(settings.version, "JHN", 1), select = false))
             return
         }
         val key: NavKey = when (t) {
@@ -158,7 +160,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
                         ReaderScreen(
-                            r.passage, wide, r.compare,
+                            r.passage, wide, r.compare, select = r.select, nav =
                             ReaderNav(
                                 back = { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) else selectTab(Tab.Home) },
                                 picker = { p -> backStack.add(PickerRoute(p)) },
@@ -263,10 +265,17 @@ private fun NavItem(t: TabSpec, selected: Boolean, modifier: Modifier, onClick: 
             if (t.icon != null) Icon(t.icon, null, Modifier.size(22.dp), tint = if (selected) c.accent else c.muted)
             else CrossMark(height = 20.dp, color = if (selected) c.accent else c.muted)
         }
-        Text(
+        // One line always: with five tabs on a phone, "திட்டங்கள்" shrinks a little rather than wrap.
+        androidx.compose.foundation.text.BasicText(
             tr(t.ta, t.en),
-            style = Ts.type.labelSmall.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold),
-            color = if (selected) c.ink else c.muted,
+            style = Ts.type.labelSmall.copy(
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (selected) c.ink else c.muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            ),
+            maxLines = 1,
+            autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = Ts.type.labelSmall.fontSize),
+            modifier = Modifier.padding(horizontal = 2.dp),
         )
     }
 }

@@ -65,16 +65,20 @@ fun ReaderTopBar(
     onSettings: () -> Unit,
     comparing: Boolean,
     onCompare: () -> Unit,
+    /** "2 கொரி 5": used on a phone, where the full name beside four buttons would be cut. */
+    shortTitle: String = title,
 ) {
     val c = Ts.colors
+    androidx.compose.foundation.layout.BoxWithConstraints {
+    val shown = if (maxWidth < 480.dp) shortTitle else title
     Column {
         Row(
-            Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
+            Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 8.dp, bottom = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), onBack)
-            ReferencePill(title, version, onPicker, Modifier.weight(1f))
+            ReferencePill(shown, version, onPicker, Modifier.weight(1f))
             if (hasAudio) IconBox(TsIcons.Play, tr("கேள்", "Listen"), onPlay, tint = c.accent, iconSize = 18.dp)
             // Two columns on and off (A-3.3); the Bible itself opens in one.
             IconBox(
@@ -87,6 +91,7 @@ fun ReaderTopBar(
             )
         }
         HDivider(thickness = 1.5.dp)
+    }
     }
 }
 
@@ -106,19 +111,33 @@ fun CommentaryChipRow(sources: List<CommentarySource>, selected: String, onSelec
 
 /** Bottom bar: "‹ யோவான் 2 · 3 / 21 · யோவான் 4 ›". */
 @Composable
-fun ChapterNavBar(prevLabel: String?, nextLabel: String?, position: String, onPrev: () -> Unit, onNext: () -> Unit) {
+fun ChapterNavBar(
+    prevLabel: String?,
+    nextLabel: String?,
+    position: String,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    /** Short forms ("2 கொரி 4") used when the full ones would crowd a phone's width. */
+    prevShort: String? = prevLabel,
+    nextShort: String? = nextLabel,
+) {
     val c = Ts.colors
-    Column(Modifier.background(c.surface2)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.background(c.surface2)) {
+    val narrow = maxWidth < 480.dp
+    val prev = if (narrow) prevShort else prevLabel
+    val next = if (narrow) nextShort else nextLabel
+    Column {
         HDivider(thickness = 1.5.dp)
         Row(
             Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (prevLabel != null) TsPillButton("‹ $prevLabel", onPrev) else Box(Modifier.size(1.dp))
+            if (prev != null) TsPillButton("‹ $prev", onPrev) else Box(Modifier.size(1.dp))
             Text(position, style = Ts.type.caption, color = c.muted)
-            if (nextLabel != null) TsPillButton("$nextLabel ›", onNext) else Box(Modifier.size(1.dp))
+            if (next != null) TsPillButton("$next ›", onNext) else Box(Modifier.size(1.dp))
         }
+    }
     }
 }
 

@@ -75,9 +75,9 @@ fun TsPillButton(
             .background(bg)
             .then(if (border != null) Modifier.border(border, Pill) else Modifier)
             .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
         if (icon != null) Icon(icon, null, Modifier.size(16.dp), tint = fg)
         Text(text, style = textStyle, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -271,7 +271,12 @@ fun ReferencePill(title: String, version: String, onClick: () -> Unit, modifier:
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
         // The book name gives way first, so the version (or "IRV + KJV") stays readable.
-        Text(title, style = Ts.type.barTitle, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        // On a phone it shrinks to fit before it is cut ("2 கொரிந்தியர் 5" beside four buttons).
+        androidx.compose.foundation.text.BasicText(
+            title, style = Ts.type.barTitle.copy(color = c.ink), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 13.sp, maxFontSize = Ts.type.barTitle.fontSize),
+            modifier = Modifier.weight(1f, fill = false),
+        )
         Text("$version ▾", style = Ts.type.caption, color = c.muted, maxLines = 1)
     }
 }

@@ -14,7 +14,8 @@ import kotlinx.serialization.Serializable
 
 /** Full-screen destinations above the tabs. */
 /** [compare] opens this reader side by side (a website link such as /irvtam+kjv/…). */
-@Serializable data class ReaderRoute(val passage: Passage, val compare: Boolean = false) : NavKey
+/** [select] false: Bible and Continue reading scroll to the verse without selecting it. */
+@Serializable data class ReaderRoute(val passage: Passage, val compare: Boolean = false, val select: Boolean = true) : NavKey
 @Serializable data class PickerRoute(val passage: Passage) : NavKey
 @Serializable data class CommentaryRoute(val passage: Passage) : NavKey
 @Serializable data object SettingsRoute : NavKey

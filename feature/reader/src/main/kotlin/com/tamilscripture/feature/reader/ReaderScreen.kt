@@ -156,10 +156,15 @@ private class VerseActions(
     val onLarge: () -> Unit,
 )
 
+/** "2 கொரி", "2 Cor": the book's first short form, or its name. */
+private fun com.tamilscripture.core.model.Book.shortName(lang: UiLang): String =
+    (if (lang == UiLang.Tamil) abbrTa else abbrEn).firstOrNull() ?: name(lang)
+
+/** [select] false scrolls to [passage]'s verse without selecting it (Bible, Continue reading). */
 @Composable
-fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav: ReaderNav) {
+fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav: ReaderNav, select: Boolean = true) {
     val services = LocalAppServices.current
-    val vm: ReaderViewModel = viewModel(key = "reader") { ReaderViewModel(services, passage, compare) }
+    val vm: ReaderViewModel = viewModel(key = "reader") { ReaderViewModel(services, passage, compare, select) }
     LaunchedEffect(passage) { vm.open(passage) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
@@ -416,7 +421,10 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             }
         } else {
             Column(Modifier.fillMaxSize().statusBarsPadding()) {
-                ReaderTopBar(title, versionLabel, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true }, state.compare != null, onCompare)
+                ReaderTopBar(
+                    title, versionLabel, hasAudio, settings.commentary, nav.back, { nav.picker(state.passage) }, { play() }, { showSettings = true }, state.compare != null, onCompare,
+                    shortTitle = book?.let { "${it.shortName(lang)} ${state.passage.chapter}" } ?: title,
+                )
                 if (settings.commentary && state.commentarySources.isNotEmpty()) {
                     CommentaryChipRow(
                         state.commentarySources, settings.commentarySource,
@@ -448,6 +456,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                             prevLabel = chapter?.prev?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
                             nextLabel = chapter?.next?.let { r -> m?.book(r.book)?.label(lang, r.chapter) },
                             position = book?.let { "${state.passage.chapter} / ${it.chapters}" } ?: "",
+                            prevShort = chapter?.prev?.let { r -> m?.book(r.book)?.shortName(lang)?.let { "$it ${r.chapter}" } },
+                            nextShort = chapter?.next?.let { r -> m?.book(r.book)?.shortName(lang)?.let { "$it ${r.chapter}" } },
                             onPrev = vm::previousChapter, onNext = vm::nextChapter,
                         )
                     }

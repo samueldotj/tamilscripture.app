@@ -76,17 +76,16 @@ internal fun CrossRef.key(): String = to + (end?.let { "-$it" } ?: "")
  * Study Bible: the verse's cross-references in small type right after its text, on the same
  * line (the website's fmt-xref list). Each is a link; [openKey] is the one whose box is open.
  */
-@Composable
 internal fun AnnotatedString.Builder.appendCrossRefs(
     refs: List<CrossRef>,
     all: Boolean,
     openKey: String?,
     manifest: ContentManifest?,
+    c: com.tamilscripture.core.designsystem.theme.TsColors,
+    lang: UiLang,
     onRef: (String) -> Unit,
     onMore: () -> Unit,
 ) {
-    val c = Ts.colors
-    val lang = LocalUiLang.current
     val small = SpanStyle(fontSize = 12.sp, color = c.accent, fontWeight = FontWeight.Normal, baselineShift = BaselineShift.None)
     withStyle(small.copy(color = c.muted)) { append("↗") }
     for (r in if (all) refs else refs.take(SHOWN)) {
@@ -94,7 +93,7 @@ internal fun AnnotatedString.Builder.appendCrossRefs(
         val k = r.key()
         val style = if (k == openKey) small.copy(fontWeight = FontWeight.Bold, background = c.accentSoft) else small
         // No-break spaces: a reference never splits across lines.
-        withLink(LinkAnnotation.Clickable(k, TextLinkStyles(style)) { onRef(k) }) { append(refLabel(r, manifest, lang).replace(' ', '\u00A0')) }
+        withLink(LinkAnnotation.Clickable(k, TextLinkStyles(style)) { onRef(k) }) { withStyle(style) { append(refLabel(r, manifest, lang).replace(' ', '\u00A0')) } }
     }
     if (!all && refs.size > SHOWN) {
         append("\u2002")
@@ -163,10 +162,14 @@ fun TextWithTrailer(
         Text(main, style = mainStyle, color = color, modifier = modifier)
         return
     }
+    // Laid out afresh when the references change (the open one): inside the reader's lazy
+    // list a SubcomposeLayout kept its earlier measure, so the open reference never showed.
+    androidx.compose.runtime.key(trailer.text, trailer.spanStyles) {
     SubcomposeLayout(modifier) { constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         var mainLayout: TextLayoutResult? = null
-        val mainPlaceable = subcompose("main") {
+        // Slots keyed by what they show, so a change of style (the open reference) is laid out anew.
+        val mainPlaceable = subcompose(main) {
             Text(main, style = mainStyle, color = color, onTextLayout = { mainLayout = it })
         }.single().measure(loose)
         val m = mainLayout!!
@@ -177,7 +180,7 @@ fun TextWithTrailer(
         val sameLine = loose.maxWidth - lineEnd > 72.dp.toPx()
         val indent = if (sameLine) lineEnd else 0f
         var tLayout: TextLayoutResult? = null
-        val trailerPlaceable = subcompose("trailer") {
+        val trailerPlaceable = subcompose(Triple("trailer", trailer.text, trailer.spanStyles)) {
             Text(
                 trailer, color = color, onTextLayout = { tLayout = it },
                 style = trailerStyle.copy(textIndent = TextIndent(firstLine = indent.toSp())),
@@ -192,5 +195,6 @@ fun TextWithTrailer(
             mainPlaceable.place(0, 0)
             trailerPlaceable.place(0, y)
         }
+    }
     }
 }
