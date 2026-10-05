@@ -20,6 +20,7 @@ import com.tamilscripture.core.data.user.UserDataRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -56,14 +57,17 @@ class AppGraph(context: Context, packsBaseOverride: String? = null) {
     val settingsSync = com.tamilscripture.core.data.account.SettingsSync(File(context.filesDir, "account"), supabase, settings, json)
 
     /** Everything that follows the account (M6, M7-4); false when signed out. */
-    suspend fun syncAccount(): Boolean {
-        if (!userData.sync()) return false
-        val token = account.accessToken() ?: return false
-        val user = account.session.value?.userId ?: return false
+    suspend fun syncAccount(): Boolean = syncLock.withLock {
+        if (!userData.sync()) return@withLock false
+        val token = account.accessToken() ?: return@withLock false
+        val user = account.session.value?.userId ?: return@withLock false
         plans.sync(supabase, token, user)
         settingsSync.sync(token, user) { code -> content.manifest.value?.version(code) != null }
-        return true
+        true
     }
+
+    /** One sync at a time: the worker, the foreground pull and "Sync now" never overlap. */
+    private val syncLock = kotlinx.coroutines.sync.Mutex()
 }
 
 /** Implemented by the Application so WorkManager workers reach the single graph. */
