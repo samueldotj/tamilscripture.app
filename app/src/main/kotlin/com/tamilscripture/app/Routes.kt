@@ -34,13 +34,21 @@ import kotlinx.serialization.Serializable
 @Serializable data class AtlasRoute(val focus: String? = null) : NavKey
 @Serializable data class PresentRoute(val passage: Passage) : NavKey
 
-enum class Tab { Home, Plans, Study, Search }
+/** Home is the landing page (the cross); Bible opens the reader at the last chapter read. */
+enum class Tab { Home, Bible, Plans, Study, Search }
 
+/** The tab a screen is the root of; the reader is reached through Bible but opens over the tabs. */
 fun NavKey.tab(): Tab? = when (this) {
     HomeRoute -> Tab.Home
     PlansRoute -> Tab.Plans
     StudyRoute -> Tab.Study
     is SearchRoute -> Tab.Search
+    else -> null
+}
+
+/** The tab to show as selected: the reader and its picker count as Bible. */
+fun NavKey.selectedTab(): Tab? = tab() ?: when (this) {
+    is ReaderRoute, is PickerRoute, is CommentaryRoute, is PresentRoute -> Tab.Bible
     else -> null
 }
 

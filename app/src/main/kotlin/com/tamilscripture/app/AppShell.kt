@@ -101,8 +101,16 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
     }
 
     fun selectTab(t: Tab) {
+        if (t == Tab.Bible) {
+            // The reader at the last chapter read, over the landing page.
+            if (backStack.lastOrNull() is ReaderRoute) return
+            backStack.clear()
+            backStack.add(HomeRoute)
+            backStack.add(ReaderRoute(settings.lastRead ?: Passage(settings.version, "JHN", 1)))
+            return
+        }
         val key: NavKey = when (t) {
-            Tab.Home -> HomeRoute
+            Tab.Bible, Tab.Home -> HomeRoute
             Tab.Plans -> PlansRoute
             Tab.Study -> StudyRoute
             Tab.Search -> SearchRoute()
@@ -130,6 +138,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
         val rail = maxWidth >= 600.dp
         val top = backStack.lastOrNull()
         val currentTab = top?.tab()
+        val selected = top?.selectedTab()
         val content: @Composable () -> Unit = {
             NavDisplay(
                 backStack = backStack,
@@ -201,7 +210,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
 
         if (rail) {
             Row(Modifier.fillMaxSize()) {
-                NavRail(currentTab, ::selectTab, onReader = { read(settings.lastRead ?: Passage(settings.version, "JHN", 1)) })
+                NavRail(selected, ::selectTab, onHome = { selectTab(Tab.Home) })
                 VDivider()
                 Box(Modifier.weight(1f).fillMaxHeight()) { content() }
             }
@@ -214,10 +223,13 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
     }
 }
 
-private data class TabSpec(val tab: Tab, val icon: ImageVector, val ta: String, val en: String)
+/** [icon] null draws the cross, the site's mark, for Home. */
+private data class TabSpec(val tab: Tab, val icon: ImageVector?, val ta: String, val en: String)
+
+private val HOME = TabSpec(Tab.Home, null, "முகப்பு", "Home")
 
 private val TABS = listOf(
-    TabSpec(Tab.Home, TsIcons.Book, "வேதம்", "Bible"),
+    TabSpec(Tab.Bible, TsIcons.Book, "வேதம்", "Bible"),
     TabSpec(Tab.Plans, TsIcons.Calendar, "திட்டங்கள்", "Plans"),
     TabSpec(Tab.Study, TsIcons.Compass, "ஆய்வு", "Study"),
     TabSpec(Tab.Search, TsIcons.Search, "தேடல்", "Search"),
@@ -230,7 +242,7 @@ private fun BottomBar(current: Tab, onSelect: (Tab) -> Unit) {
     Column(Modifier.background(c.surface2)) {
         HDivider(thickness = 1.5.dp)
         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 4.dp)) {
-            TABS.forEach { t -> NavItem(t, t.tab == current, Modifier.weight(1f)) { onSelect(t.tab) } }
+            (listOf(HOME) + TABS).forEach { t -> NavItem(t, t.tab == current, Modifier.weight(1f)) { onSelect(t.tab) } }
         }
     }
 }
@@ -247,7 +259,8 @@ private fun NavItem(t: TabSpec, selected: Boolean, modifier: Modifier, onClick: 
             Modifier.size(60.dp, 30.dp).clip(Pill).background(if (selected) c.navIndicator else Color.Transparent),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(t.icon, null, Modifier.size(22.dp), tint = if (selected) c.accent else c.muted)
+            if (t.icon != null) Icon(t.icon, null, Modifier.size(22.dp), tint = if (selected) c.accent else c.muted)
+            else CrossMark(height = 20.dp, color = if (selected) c.accent else c.muted)
         }
         Text(
             tr(t.ta, t.en),
@@ -257,16 +270,20 @@ private fun NavItem(t: TabSpec, selected: Boolean, modifier: Modifier, onClick: 
     }
 }
 
-/** Navigation rail for medium and wider windows. The mark returns to the last chapter read. */
+/** Navigation rail for medium and wider windows. The cross goes to the landing page, as the site's logo does. */
 @Composable
-private fun NavRail(current: Tab?, onSelect: (Tab) -> Unit, onReader: () -> Unit) {
+private fun NavRail(current: Tab?, onSelect: (Tab) -> Unit, onHome: () -> Unit) {
     val c = Ts.colors
     Column(
         Modifier.width(88.dp).fillMaxHeight().background(c.surface2).statusBarsPadding().navigationBarsPadding().padding(vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Box(Modifier.size(48.dp).clip(Pill).clickable(onClick = onReader), contentAlignment = Alignment.Center) { CrossMark() }
+        Box(
+            Modifier.size(48.dp).clip(Pill).background(if (current == Tab.Home) c.navIndicator else Color.Transparent)
+                .clickable(role = Role.Tab, onClickLabel = tr("முகப்பு", "Home"), onClick = onHome),
+            contentAlignment = Alignment.Center,
+        ) { CrossMark() }
         TABS.forEach { t -> NavItem(t, t.tab == current, Modifier.fillMaxWidth()) { onSelect(t.tab) } }
     }
 }

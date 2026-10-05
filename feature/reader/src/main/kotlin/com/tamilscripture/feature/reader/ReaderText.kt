@@ -53,6 +53,7 @@ import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.icon.TsIcons
+import com.tamilscripture.core.data.settings.ReadingFormat
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.CommentaryChapter
 import com.tamilscripture.core.model.CommentaryUnit
@@ -63,31 +64,36 @@ import kotlinx.coroutines.delay
 
 private val MARGIN_WIDTH = 220.dp
 
-private fun String.clusterStart(i: Int): Int {
+internal fun String.clusterStart(i: Int): Int {
     if (i <= 0 || i >= length) return i.coerceIn(0, length)
     val it = android.icu.text.BreakIterator.getCharacterInstance().also { b -> b.setText(this) }
     return if (it.isBoundary(i)) i else it.preceding(i)
 }
 
-private fun String.clusterEnd(i: Int): Int {
+internal fun String.clusterEnd(i: Int): Int {
     if (i <= 0 || i >= length) return i.coerceIn(0, length)
     val it = android.icu.text.BreakIterator.getCharacterInstance().also { b -> b.setText(this) }
     return if (it.isBoundary(i)) i else it.following(i)
 }
 
 /** The UTF-16 index [n] code points in, clamped to the text. */
-private fun String.offsetByCodePointsSafe(n: Int): Int =
+internal fun String.offsetByCodePointsSafe(n: Int): Int =
     if (n >= codePointCount(0, length)) length else offsetByCodePoints(0, n.coerceAtLeast(0))
 
 private val HEAT_ALPHA = floatArrayOf(0f, 0.08f, 0.16f, 0.26f, 0.38f)
 
 /** A verse's text with its superscript number, in the design's 1B style. */
 @Composable
-fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean, words: List<WordMark> = emptyList()): AnnotatedString {
+fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Boolean, words: List<WordMark> = emptyList(), leading: Boolean = false): AnnotatedString {
     val c = Ts.colors
     return buildAnnotatedString {
-        withStyle(SpanStyle(fontSize = numberSize.sp, color = c.accent, fontWeight = FontWeight.Bold, baselineShift = BaselineShift.Superscript)) {
-            append(item.label)
+        if (leading) {
+            // Study Bible: a bold number at the start of the line, as the website's fmt-xref.
+            withStyle(SpanStyle(fontSize = (numberSize + 2).sp, color = c.accent, fontWeight = FontWeight.Bold)) { append(item.label) }
+        } else {
+            withStyle(SpanStyle(fontSize = numberSize.sp, color = c.accent, fontWeight = FontWeight.Bold, baselineShift = BaselineShift.Superscript)) {
+                append(item.label)
+            }
         }
         append(' ')
         val shift = length
@@ -146,6 +152,8 @@ fun ReaderTextList(
     heat: Map<Int, Int> = emptyMap(),
     /** Notes in a margin column beside the text instead of under each verse. */
     notesInMargin: Boolean = false,
+    /** The website's reading format: Reader and Standard flow in paragraphs; Study is a verse a line. */
+    format: ReadingFormat = ReadingFormat.Study,
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
 ) {
     val c = Ts.colors
@@ -172,6 +180,19 @@ fun ReaderTextList(
                         color = c.amber,
                         modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
                     )
+                    is ReaderItem.Para -> Column {
+                        ParagraphText(
+                            item, numbers = format != ReadingFormat.Reader, selection = selection, playingVerse = playingVerse,
+                            marks = marks, heat = heat, fontSize = fontSize,
+                            // Reader: roomier lines, as the website's fmt-reader.
+                            lineHeightEm = if (format == ReadingFormat.Reader) lineHeightEm + 0.2f else lineHeightEm,
+                            showNotes = showNotes, textLocale = textLocale, notesInMargin = notesInMargin,
+                            onTapVerse = onTapVerse, onOpenNote = onOpenNote,
+                        )
+                        item.verses.flatMap { unitsAfter[it].orEmpty() }.forEach { unit ->
+                            InlineCommentaryCard(unit, commentaryName ?: "", preferTamil = lang == UiLang.Tamil, onOpen = onOpenCommentary)
+                        }
+                    }
                     is ReaderItem.Descriptive -> Text(
                         item.text,
                         style = Ts.type.scripture((fontSize - 3).sp, lineHeightEm).copy(fontWeight = FontWeight.SemiBold),
@@ -184,7 +205,7 @@ fun ReaderTextList(
                         val mark = marks[item.verse]
                         val bookmarkColor = c.accent
                         VerseInteractionBox(item.verse, interactions) { extra -> Text(
-                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty()),
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study),
                             style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                             color = c.ink,
                             modifier = Modifier
@@ -246,12 +267,15 @@ fun ReaderTextList(
             val now = System.currentTimeMillis()
             val seen = HashSet<Int>()
             for (vi in info.visibleItemsInfo) {
-                val verse = byKey[vi.key]?.verseNumber ?: continue
+                val shown = byKey[vi.key]?.verses?.takeIf { it.isNotEmpty() } ?: continue
                 val visible = (minOf(bottom, vi.offset + vi.size) - maxOf(top, vi.offset)).coerceAtLeast(0)
-                if (vi.size > 0 && visible.toFloat() / vi.size >= 0.6f) {
-                    seen += verse
-                    val since = visibleSince.getOrPut(verse) { now }
-                    if (now - since >= 2_000 && reported.add(verse)) readNow(verse, now - since)
+                // A paragraph taller than the screen counts when it fills most of it.
+                if (vi.size > 0 && (visible.toFloat() / vi.size >= 0.6f || visible >= 0.6f * (bottom - top))) {
+                    for (verse in shown) {
+                        seen += verse
+                        val since = visibleSince.getOrPut(verse) { now }
+                        if (now - since >= 2_000 && reported.add(verse)) readNow(verse, now - since)
+                    }
                 }
             }
             visibleSince.keys.retainAll(seen)
@@ -350,7 +374,7 @@ private fun DualRow(
 /** Maps a verse to the commentary units whose last verse it is. */
 private fun commentaryPlacement(items: List<ReaderItem>, commentary: CommentaryChapter?): Map<Int, List<CommentaryUnit>> {
     if (commentary == null) return emptyMap()
-    val verses = items.filterIsInstance<ReaderItem.Verse>().map { it.verse }
+    val verses = items.flatMap { if (it is ReaderItem.Verse || it is ReaderItem.Para) it.verses else emptyList() }
     if (verses.isEmpty()) return emptyMap()
     val last = verses.last()
     val out = HashMap<Int, MutableList<CommentaryUnit>>()

@@ -16,6 +16,19 @@ import kotlinx.coroutines.flow.map
 private val Context.settingsStore: DataStore<Preferences> by preferencesDataStore("settings")
 
 enum class Appearance { System, Dark, Light }
+
+/**
+ * The website's three reading formats, under its keys: Reader (flowing text, no verse
+ * numbers), Standard (paragraphs with verse numbers, like a printed Bible) and Study Bible
+ * (one verse per line with study aids).
+ */
+enum class ReadingFormat(val key: String) {
+    Reader("reader"), Standard("standard"), Study("xref");
+
+    companion object {
+        fun of(key: String?) = entries.firstOrNull { it.key == key }
+    }
+}
 enum class Typeface { MuktaMalar, NotoSansTamil, NotoSerifTamil }
 
 /** Reader and app settings (A-2.6, A-2.7, design 1D). Key names follow the website's settings. */
@@ -26,6 +39,7 @@ data class Settings(
     /** Scripture size in sp. The design's default is 21. */
     val fontSize: Int = 21,
     val typeface: Typeface = Typeface.MuktaMalar,
+    val format: ReadingFormat = ReadingFormat.Standard,
     val headings: Boolean = true,
     val footnotes: Boolean = false,
     /** Community highlight heat behind verses (M8-7), as the website's setting. */
@@ -61,6 +75,7 @@ class SettingsRepository(private val context: Context) {
         val version = stringPreferencesKey("version")
         val fontSize = intPreferencesKey("fontSize")
         val typeface = stringPreferencesKey("typeface")
+        val format = stringPreferencesKey("format")
         val headings = booleanPreferencesKey("headings")
         val footnotes = booleanPreferencesKey("footnotes")
         val heat = booleanPreferencesKey("heat")
@@ -86,6 +101,7 @@ class SettingsRepository(private val context: Context) {
             version = p[K.version] ?: d.version,
             fontSize = p[K.fontSize] ?: d.fontSize,
             typeface = p[K.typeface]?.let { runCatching { Typeface.valueOf(it) }.getOrNull() } ?: d.typeface,
+            format = ReadingFormat.of(p[K.format]) ?: d.format,
             headings = p[K.headings] ?: d.headings,
             footnotes = p[K.footnotes] ?: d.footnotes,
             heat = p[K.heat] ?: d.heat,
@@ -117,6 +133,7 @@ class SettingsRepository(private val context: Context) {
             p[K.version] = n.version
             p[K.fontSize] = n.fontSize
             p[K.typeface] = n.typeface.name
+            p[K.format] = n.format.key
             p[K.headings] = n.headings
             p[K.footnotes] = n.footnotes
             p[K.heat] = n.heat

@@ -91,6 +91,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tamilscripture.core.data.settings.Settings
+import com.tamilscripture.core.data.settings.ReadingFormat
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -186,8 +187,10 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val book = state.book
     val chapter = state.chapter
     val second = state.second.takeIf { state.dual }
-    val items = remember(chapter, second, settings.headings) {
-        val a = chapter?.toItems(settings.headings).orEmpty()
+    // Reader and Standard flow in paragraphs; Study Bible and dual view go a verse at a time.
+    val paragraphs = second == null && settings.format != ReadingFormat.Study
+    val items = remember(chapter, second, settings.headings, paragraphs) {
+        val a = if (paragraphs) chapter?.toParagraphs(settings.headings).orEmpty() else chapter?.toItems(settings.headings).orEmpty()
         if (second == null) a else dualItems(a, second.toItems(showHeadings = false))
     }
     val versionLabel = state.versionShort + (state.compareShort?.let { " + $it" } ?: "")
@@ -202,7 +205,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
 
     LaunchedEffect(items, state.passage.verse) {
         val v = state.passage.verse ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it.verseNumber == v }
+        val i = items.indexOfVerse(v)
         if (i >= 0) listState.scrollToItem(i)
     }
     // Switching between one and two columns keeps the verse at the top in place, instead of a
@@ -213,19 +216,19 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     }
     LaunchedEffect(state.dual) {
         val v = topVerse ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it.verseNumber == v }
+        val i = items.indexOfVerse(v)
         if (i >= 0) listState.scrollToItem(i)
     }
     // A verse selected from the keyboard (M2-6) is scrolled into view.
     LaunchedEffect(state.selection.lastOrNull()) {
         val v = state.selection.lastOrNull() ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it.verseNumber == v }
+        val i = items.indexOfVerse(v)
         if (i >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == i }) listState.animateScrollToItem(i)
     }
     // Follow the verse being read while listening (A-6.4).
     LaunchedEffect(playingVerse) {
         val v = playingVerse ?: return@LaunchedEffect
-        val i = items.indexOfFirst { it.verseNumber == v }
+        val i = items.indexOfVerse(v)
         if (i >= 0 && listState.layoutInfo.visibleItemsInfo.none { it.index == i }) listState.animateScrollToItem(i)
     }
 
@@ -363,7 +366,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null,
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format,
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -422,7 +425,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                         PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = 220.dp), vm, nav,
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
-                        marks = marks, onOpenNote = { n -> editingNote = n.id },
+                        marks = marks, onOpenNote = { n -> editingNote = n.id }, format = settings.format,
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -639,6 +642,7 @@ private fun ChapterBody(
     marks: Map<Int, VerseMarks> = emptyMap(),
     onOpenNote: (com.tamilscripture.core.model.UserNote) -> Unit = {},
     notesInMargin: Boolean = false,
+    format: ReadingFormat = ReadingFormat.Study,
 ) {
     val c = Ts.colors
     when {
@@ -668,6 +672,7 @@ private fun ChapterBody(
                 textLocale = state.manifest?.version(state.passage.version)?.lang?.let(::LocaleList),
                 secondLocale = state.compare?.let { state.manifest?.version(it)?.lang }?.let(::LocaleList),
                 marks = marks, onOpenNote = onOpenNote, heat = state.heat, notesInMargin = notesInMargin && !state.dual,
+                format = format,
             )
         }
     }

@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.data.settings.Appearance
+import com.tamilscripture.core.data.settings.ReadingFormat
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -84,9 +85,25 @@ fun StudySettingsSheet(
     TsSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 14.dp), verticalAlignment = Alignment.Bottom) {
-                Text(tr("ஆய்வு அமைப்பு", "Study settings"), style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.weight(1f))
-                Text("Study Bible", style = Ts.type.caption, color = c.muted)
+                Text(tr("வாசிப்பு அமைப்பு", "Reading settings"), style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.weight(1f))
             }
+            HDivider()
+            // The website's three formats (its settings panel): flowing text, a printed Bible, or a verse a line with study aids.
+            TsListRow(
+                tr("வடிவம்", "Format"),
+                subtitle = when (settings.format) {
+                    ReadingFormat.Reader -> tr("வசன எண்கள் இல்லாமல், தொடர்ந்து வாசிக்க", "Flowing text, no verse numbers")
+                    ReadingFormat.Standard -> tr("அச்சிட்ட வேதாகமம் போல", "Like a printed Bible")
+                    ReadingFormat.Study -> tr("ஒரு வரிக்கு ஒரு வசனம், ஆய்வுக் குறிப்புகளுடன்", "A verse a line, with study aids")
+                },
+            )
+            TsSegmented(
+                listOf(tr("வாசிப்பு", "Reader"), tr("நிலையான", "Standard"), tr("ஆய்வு", "Study Bible")),
+                ReadingFormat.entries.indexOf(settings.format),
+                { i -> onChange { it.copy(format = ReadingFormat.entries[i]) } },
+                height = 40.dp, fill = true, textStyle = Ts.type.labelSmall,
+                modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 16.dp).fillMaxWidth(),
+            )
             HDivider()
             TsListRow(
                 tr("மொழிபெயர்ப்பு", "Translation"), subtitle = tr("ஒப்பிட இரண்டாவது மொழிபெயர்ப்பு", "And a second one to compare"),

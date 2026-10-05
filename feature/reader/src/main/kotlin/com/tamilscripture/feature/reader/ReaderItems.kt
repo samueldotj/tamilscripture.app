@@ -24,6 +24,12 @@ sealed interface ReaderItem {
         val poetry: Boolean,
     ) : ReaderItem
 
+    /**
+     * A paragraph in the Reader and Standard formats: verses flowing on, as on the website.
+     * Consecutive poetry lines are one paragraph with line breaks.
+     */
+    data class Para(override val key: String, val runs: List<Run>, val poetry: Boolean) : ReaderItem
+
     /** Dual view (A-3.3): one verse in both versions; a null side lacks the verse (A-3.4). */
     data class Dual(
         override val key: String,
@@ -34,13 +40,72 @@ sealed interface ReaderItem {
     ) : ReaderItem
 }
 
-/** The verse an item shows, for scrolling, selection and read tracking. */
+/**
+ * A stretch of one verse inside a paragraph: [label] where the verse starts, null on a
+ * continuation; [verse] null on text outside verses. A run of "\n" breaks a poetry line.
+ */
+data class Run(val verse: Int?, val label: String?, val text: String, val notes: List<Note> = emptyList())
+
+/** The verse an item shows (a paragraph: its first), for scrolling, selection and read tracking. */
 val ReaderItem.verseNumber: Int?
     get() = when (this) {
         is ReaderItem.Verse -> verse
         is ReaderItem.Dual -> verse
+        is ReaderItem.Para -> runs.firstNotNullOfOrNull { it.verse }
         else -> null
     }
+
+/** Every verse an item shows. */
+val ReaderItem.verses: List<Int>
+    get() = when (this) {
+        is ReaderItem.Para -> runs.mapNotNull { it.verse }.distinct()
+        else -> listOfNotNull(verseNumber)
+    }
+
+/** The index of the item showing [verse], or -1. */
+fun List<ReaderItem>.indexOfVerse(verse: Int): Int = indexOfFirst { it is ReaderItem.Para && verse in it.verses || it.verseNumber == verse }
+
+/**
+ * The chapter as paragraphs (Reader and Standard formats): headings, psalm titles, and each
+ * paragraph's verses flowing together; consecutive poetry lines join with line breaks.
+ */
+fun Chapter.toParagraphs(showHeadings: Boolean): List<ReaderItem> {
+    val out = ArrayList<ReaderItem>()
+    var poetry: MutableList<Run>? = null
+    var poetryKey = ""
+    fun flushPoetry() {
+        poetry?.let { if (it.isNotEmpty()) out += ReaderItem.Para(poetryKey, it.toList(), poetry = true) }
+        poetry = null
+    }
+    blocks.forEachIndexed { bi, block ->
+        if (block.isHeading) {
+            flushPoetry()
+            if (showHeadings && !block.text.isNullOrBlank()) out += ReaderItem.Heading("h$bi", block.text!!)
+            return@forEachIndexed
+        }
+        if (block.segments.none { it.id != null }) {
+            flushPoetry()
+            block.segments.forEachIndexed { si, seg -> out += ReaderItem.Descriptive("d$bi.$si", seg.text) }
+            return@forEachIndexed
+        }
+        val runs = block.segments.map { seg ->
+            val v = seg.id?.let(VerseId::parse)?.verse
+            Run(v, seg.n, seg.text, seg.notes)
+        }
+        if (block.isPoetry) {
+            val indent = if (block.style == "q2" || block.style == "q3") "\u2003" else ""
+            val p = poetry ?: mutableListOf<Run>().also { poetry = it; poetryKey = "q$bi" }
+            if (p.isNotEmpty()) p += Run(null, null, "\n")
+            if (indent.isNotEmpty()) p += Run(null, null, indent)
+            p += runs
+        } else {
+            flushPoetry()
+            out += ReaderItem.Para("p$bi", runs, poetry = false)
+        }
+    }
+    flushPoetry()
+    return out
+}
 
 /**
  * Aligns two versions' items verse by verse, as the website's DualChapter does: rows
