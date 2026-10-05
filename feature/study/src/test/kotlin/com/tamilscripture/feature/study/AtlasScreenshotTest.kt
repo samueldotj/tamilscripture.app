@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.tamilscripture.core.designsystem.theme.ThemeMode
@@ -31,7 +34,7 @@ class AtlasScreenshotTest {
 
     private fun shot(
         file: String, mode: ThemeMode, tamil: Boolean, journey: String? = null, focus: String? = null,
-        year: Int? = null, withChurch: Boolean = false,
+        year: Int? = null, withChurch: Boolean = false, zoomOut: Boolean = false,
     ) {
         compose.setContent {
             TsTheme(mode) {
@@ -43,6 +46,12 @@ class AtlasScreenshotTest {
                     ) {}
                 }
             }
+        }
+        if (zoomOut) repeat(4) {
+            compose.onRoot().performTouchInput {
+                pinch(Offset(center.x - 300f, center.y), Offset(center.x - 40f, center.y), Offset(center.x + 300f, center.y), Offset(center.x + 40f, center.y))
+            }
+            compose.waitForIdle()
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
     }
@@ -58,6 +67,9 @@ class AtlasScreenshotTest {
     @Test fun kingdoms1000BC() = shot("atlas_kingdoms_1000bce_ta", ThemeMode.Light, tamil = true, year = -1000)
 
     @Test fun kingdomsAD30Dark() = shot("atlas_kingdoms_ad30_dark_en", ThemeMode.Dark, tamil = false, year = 30)
+
+    /** Zoomed all the way out, the world fills in around the detailed box (no bare sea at its edges). */
+    @Test fun zoomedOut() = shot("atlas_zoomed_out_en", ThemeMode.Light, tamil = false, zoomOut = true)
 
     @Test fun earlyChurch() = shot("atlas_church_en", ThemeMode.Light, tamil = false, withChurch = true)
 }

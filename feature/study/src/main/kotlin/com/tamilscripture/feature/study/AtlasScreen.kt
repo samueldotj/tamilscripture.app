@@ -88,6 +88,9 @@ import kotlinx.serialization.json.Json
  */
 private val Hairline = Stroke(0f)
 
+/** How far the atlas zooms out, as a share of the detailed box: about Europe to India in view. */
+private const val MIN_ZOOM = 0.3f
+
 internal class AtlasData(
     val land: List<GeoFeature>,
     val lakes: List<GeoFeature>,
@@ -96,6 +99,8 @@ internal class AtlasData(
     val places: List<AtlasPlace>,
     val routes: Map<String, GeoFeature>,
     val journeys: List<Journey>,
+    /** The rest of the world, coarse (Natural Earth 1:110m, the detailed box cut out), as on the website. */
+    val world: List<GeoFeature> = emptyList(),
 )
 
 internal class AtlasPlace(val id: String, val nameEn: String, val nameTa: String, val type: String, val mentions: Int, val x: Float, val y: Float)
@@ -237,12 +242,13 @@ internal suspend fun loadAtlas(file: suspend (String) -> String?): AtlasData {
         places,
         layer("geo/journeys.geojson").associateBy { it.props["id"].orEmpty() },
         file("journeys.json")?.let { runCatching { json.decodeFromString<List<Journey>>(it) }.getOrNull() }.orEmpty(),
+        world = layer("geo/base/world.geojson"),
     )
 }
 
 /** The base map's paths, held as one immutable value so [BaseMap] skips recomposition. */
 @Immutable
-private class BaseLayers(val land: Path, val coast: Path, val lakes: Path, val rivers: Path)
+private class BaseLayers(val land: Path, val coast: Path, val lakes: Path, val rivers: Path, val world: Path)
 
 @Composable
 private fun BaseMap(layers: BaseLayers, view: () -> Triple<Float, Float, Float>) {
@@ -254,6 +260,8 @@ private fun BaseMap(layers: BaseLayers, view: () -> Triple<Float, Float, Float>)
             translate(size.width / 2f - cx * scale, size.height / 2f - cy * scale)
             scale(scale, scale, Offset.Zero)
         }) {
+            // The world first: zoomed out, it fills in around the detailed box (lon 10-52, lat 22-46).
+            drawPath(layers.world, c.mapLand, style = Fill)
             drawPath(layers.land, c.mapLand, style = Fill)
             drawPath(layers.coast, c.mapCoast, style = Hairline)
             drawPath(layers.lakes, c.mapLake, style = Fill)
@@ -288,6 +296,7 @@ internal fun AtlasCanvas(
     val measurer = rememberTextMeasurer()
     val family = if (tamil) Ts.type.scripture else Ts.type.label.fontFamily
     val land = remember(d) { path(d.land, close = true) }
+    val world = remember(d) { path(d.world, close = true) }
     val lakes = remember(d) { path(d.lakes, close = true) }
     val rivers = remember(d) { path(d.rivers, close = false) }
     val coast = remember(d) { path(d.coast, close = false) }
@@ -317,21 +326,21 @@ internal fun AtlasCanvas(
                 val ys = stops.map { wy(it.lat) }
                 cx = (xs.min() + xs.max()) / 2f
                 cy = (ys.min() + ys.max()) / 2f
-                scale = min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * 0.8f, fit * 40f)
+                scale = min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * MIN_ZOOM, fit * 40f)
             }
         }
         fun toScreen(x: Float, y: Float) = Offset((x - cx) * scale + w / 2f, (y - cy) * scale + h / 2f)
         fun zoomAt(p: Offset, factor: Float) {
             val wx = (p.x - w / 2f) / scale + cx
             val wyv = (p.y - h / 2f) / scale + cy
-            scale = (scale * factor).coerceIn(fit * 0.8f, fit * 40f)
+            scale = (scale * factor).coerceIn(fit * MIN_ZOOM, fit * 40f)
             cx = wx - (p.x - w / 2f) / scale
             cy = wyv - (p.y - h / 2f) / scale
         }
 
         // The base map in its own layer: it reads the view only while drawing, so a new year
         // or selection redraws the overlay alone and the base is composited from its texture.
-        BaseMap(remember(land, coast, lakes, rivers) { BaseLayers(land, coast, lakes, rivers) }) { Triple(cx, cy, scale) }
+        BaseMap(remember(land, coast, lakes, rivers, world) { BaseLayers(land, coast, lakes, rivers, world) }) { Triple(cx, cy, scale) }
         Canvas(
             // Clipped: a Canvas draws outside its bounds, over the header and chips.
             Modifier.fillMaxSize().clipToBounds()
