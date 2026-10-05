@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +19,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -36,8 +41,6 @@ import kotlinx.coroutines.flow.firstOrNull
 /** How many references the line under a verse names before "+n". */
 private const val SHOWN = 6
 
-/** Boxes opened at first; the rest wait for "Show all" (each box may fetch a chapter). */
-private const val BOXES = 8
 
 /** "யோவா 3:16", "Jn 3:16–18": the book's short form, as the website's study margin writes it. */
 private fun refLabel(r: CrossRef, manifest: ContentManifest?, lang: UiLang): String {
@@ -55,8 +58,11 @@ private fun refLabel(r: CrossRef, manifest: ContentManifest?, lang: UiLang): Str
 
 /**
  * Study Bible: the verse's cross-references in small type under it (the website's
- * fmt-xref list). A tap opens them as boxes with each verse's text; a box opens that verse.
+ * fmt-xref list). Each reference is its own button: a tap opens a box under the line with
+ * that verse's text, a second tap (or another reference) closes it, and the box opens the
+ * verse. "+n" shows the rest of the references.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun VerseCrossRefs(
     verseKey: String,
@@ -68,33 +74,39 @@ fun VerseCrossRefs(
     if (refs.isEmpty()) return
     val c = Ts.colors
     val lang = LocalUiLang.current
-    var open by rememberSaveable(verseKey) { mutableStateOf(false) }
-    val line = refs.take(SHOWN).joinToString(" · ") { refLabel(it, manifest, lang) } +
-        if (refs.size > SHOWN) " · +${refs.size - SHOWN}" else ""
+    var openRef by rememberSaveable(verseKey) { mutableStateOf<String?>(null) }
+    var all by rememberSaveable(verseKey) { mutableStateOf(false) }
+    val key = { r: CrossRef -> r.to + (r.end?.let { "-$it" } ?: "") }
+    val shown = if (all) refs else refs.take(SHOWN)
+    val style = Ts.type.caption.copy(fontSize = 12.sp)
     Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 4.dp)) {
-        Text(
-            (if (open) "▾ " else "↗ ") + line,
-            style = Ts.type.caption.copy(fontSize = 12.sp),
-            color = c.accent,
-            maxLines = if (open) Int.MAX_VALUE else 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .clickable(role = Role.Button, onClickLabel = tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { open = !open }
-                .padding(vertical = 4.dp)
-                .semantics { contentDescription = (if (lang == UiLang.Tamil) "தொடர்புள்ள வசனங்கள்: " else "Cross-references: ") + line },
-        )
-        AnimatedVisibility(open) {
-            Column(Modifier.padding(top = 4.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                var all by rememberSaveable(verseKey) { mutableStateOf(false) }
-                (if (all) refs else refs.take(BOXES)).forEach { r -> RefBox(r, manifest, version, onOpen) }
-                if (!all && refs.size > BOXES) {
-                    Text(
-                        tr("அனைத்தும் (${refs.size})", "Show all ${refs.size}"),
-                        style = Ts.type.label, color = c.accent,
-                        modifier = Modifier.clickable(role = Role.Button) { all = true }.padding(vertical = 6.dp, horizontal = 4.dp),
-                    )
-                }
+        FlowRow(verticalArrangement = Arrangement.Center) {
+            Text("↗", style = style, color = c.muted, modifier = Modifier.padding(end = 2.dp, top = 6.dp, bottom = 6.dp))
+            shown.forEach { r ->
+                val selected = openRef == key(r)
+                Text(
+                    refLabel(r, manifest, lang),
+                    style = style.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal),
+                    color = c.accent,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (selected) c.accentSoft else Color.Transparent)
+                        .clickable(role = Role.Button) { openRef = if (selected) null else key(r) }
+                        .padding(horizontal = 5.dp, vertical = 6.dp),
+                )
             }
+            if (!all && refs.size > SHOWN) {
+                Text(
+                    "+${refs.size - SHOWN}", style = style, color = c.muted,
+                    modifier = Modifier.clip(RoundedCornerShape(6.dp))
+                        .clickable(role = Role.Button, onClickLabel = tr("அனைத்தும்", "Show all")) { all = true }
+                        .padding(horizontal = 5.dp, vertical = 6.dp),
+                )
+            }
+        }
+        val current = refs.firstOrNull { key(it) == openRef }
+        AnimatedVisibility(current != null) {
+            current?.let { r -> Column(Modifier.padding(top = 2.dp, bottom = 6.dp)) { RefBox(r, manifest, version, onOpen) } }
         }
     }
 }
