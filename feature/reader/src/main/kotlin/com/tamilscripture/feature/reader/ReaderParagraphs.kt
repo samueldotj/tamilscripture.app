@@ -1,6 +1,5 @@
 package com.tamilscripture.feature.reader
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,16 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.LocaleList
@@ -74,7 +69,10 @@ fun ParagraphText(
                 append(' ')
             }
             val start = length
-            append(r.text)
+            // Each verse is a link without a look of its own: a tap selects it, and TalkBack can
+            // step through the verses of a paragraph and select one (M2-12).
+            if (v != null) withLink(LinkAnnotation.Clickable("v$v-$start", TextLinkStyles(SpanStyle())) { onTapVerse(v) }) { append(r.text) }
+            else append(r.text)
             if (v != null) {
                 ranges += VerseRange(v, start, length)
                 val before = consumed[v] ?: if (r.label != null) 0 else -1
@@ -107,9 +105,6 @@ fun ParagraphText(
         }
     }
 
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val tap by rememberUpdatedState(onTapVerse)
-    val hit by rememberUpdatedState(ranges)
     val notes = item.verses.flatMap { marks[it]?.notes.orEmpty() }.distinctBy { it.id }
 
     Row(Modifier.fillMaxWidth()) {
@@ -118,16 +113,9 @@ fun ParagraphText(
                 text,
                 style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                 color = c.ink,
-                onTextLayout = { layout = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .pointerInput(item.key) {
-                        detectTapGestures { pos ->
-                            val at = layout?.getOffsetForPosition(pos) ?: return@detectTapGestures
-                            hit.firstOrNull { at >= it.start && at <= it.end }?.let { tap(it.verse) }
-                        }
-                    },
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             )
             if (footnotes.isNotEmpty()) {
                 Column(Modifier.padding(start = 22.dp, end = 10.dp, bottom = 4.dp)) {
