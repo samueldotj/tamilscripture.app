@@ -333,7 +333,10 @@ fun WideTopBar(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 CrossMark(height = 20.dp)
-                Text(tr("தமிழ் வேதாகமம்", "Tamil Scripture"), style = Ts.type.cardTitle.copy(fontSize = 20.sp), color = c.ink)
+                BasicText(
+                    tr("தமிழ் வேதாகமம்", "Tamil Scripture"), style = Ts.type.cardTitle.copy(fontSize = 20.sp, color = c.ink), maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 20.sp),
+                )
             }
             ReferencePill(title, version, onPicker, height = 40.dp)
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
