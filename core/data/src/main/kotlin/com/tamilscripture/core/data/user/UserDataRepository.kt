@@ -106,6 +106,40 @@ class UserDataRepository(
         )
     }
 
+    /**
+     * Highlights words [start, end) (code points) of one verse in [version] (R-10.15), replacing
+     * the word ranges it overlaps in that version, as the website does.
+     */
+    suspend fun setRangeHighlight(book: String, chapter: Int, verse: Int, version: String, start: Int, end: Int, quote: String, color: HighlightColor) = edit { d ->
+        val (kept, gone) = d.highlights.partition { !overlapsRange(it, book, chapter, verse, version, start, end) }
+        val h = Highlight(
+            UUID.randomUUID().toString(), book, chapter, verse, verse, color.key,
+            version = version, charStart = start, charEnd = end, quote = quote.take(1000), updatedAt = now(),
+        )
+        d.copy(
+            highlights = kept + h,
+            dirtyHighlights = d.dirtyHighlights - gone.map { it.id }.toSet() + h.id,
+            deletedHighlights = d.deletedHighlights + gone.map { it.id },
+        )
+    }
+
+    /** Removes the word ranges of [version] that overlap words [start, end) of a verse. */
+    suspend fun removeRangeHighlight(book: String, chapter: Int, verse: Int, version: String, start: Int, end: Int) = edit { d ->
+        val gone = d.highlights.filter { overlapsRange(it, book, chapter, verse, version, start, end) }
+        if (gone.isEmpty()) d
+        else d.copy(highlights = d.highlights - gone.toSet(), dirtyHighlights = d.dirtyHighlights - gone.map { it.id }.toSet(), deletedHighlights = d.deletedHighlights + gone.map { it.id })
+    }
+
+    private fun overlapsRange(h: Highlight, book: String, chapter: Int, verse: Int, version: String, start: Int, end: Int): Boolean {
+        val cs = h.charStart ?: return false
+        val ce = h.charEnd ?: return false
+        if (h.book != book || h.chapter != chapter || !h.version.equals(version, ignoreCase = true)) return false
+        if (verse !in h.verseStart..h.verseEnd) return false
+        val from = if (verse == h.verseStart) cs else 0
+        val to = if (verse == h.verseEnd) ce else Int.MAX_VALUE
+        return from < end && start < to
+    }
+
     suspend fun removeHighlight(book: String, chapter: Int, verses: Collection<Int>) = edit { d ->
         val (cleared, removed) = clearVerses(d.highlights, book, chapter, verses.toSet())
         d.copy(

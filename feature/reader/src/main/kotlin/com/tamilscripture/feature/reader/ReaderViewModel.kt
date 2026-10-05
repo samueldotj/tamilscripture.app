@@ -301,10 +301,25 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
             source = state.value.source?.name?.lowercase())
     }
 
+    /** The stylus colour (M8-9): the last one chosen for a highlight. */
+    var penColor: HighlightColor = HighlightColor.Yellow
+        private set
+
+    /** A stylus stroke on [verse]: words highlighted in [penColor], or word ranges erased. */
+    fun pen(verse: Int, start: Int, end: Int, quote: String, erase: Boolean) {
+        val p = state.value.passage
+        viewModelScope.launch {
+            if (erase) graph.userData.removeRangeHighlight(p.book, p.chapter, verse, p.version, start, end)
+            else graph.userData.setRangeHighlight(p.book, p.chapter, verse, p.version, start, end, quote, penColor)
+        }
+        graph.stats.record("verse", verse = "${p.book}.${p.chapter}.$verse", version = p.version, action = if (erase) "pen-erase" else "pen")
+    }
+
     /** Highlights the selected verses in [color], or removes their highlight when null. */
     fun highlight(color: HighlightColor?) {
         val s = state.value
         val sel = s.selection.ifEmpty { return }
+        if (color != null) penColor = color
         viewModelScope.launch {
             if (color == null) graph.userData.removeHighlight(s.passage.book, s.passage.chapter, sel)
             else graph.userData.setHighlight(s.passage.book, s.passage.chapter, sel, color)

@@ -56,6 +56,7 @@ import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.data.settings.ReadingFormat
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.CommentaryChapter
+import com.tamilscripture.core.model.HighlightColor
 import com.tamilscripture.core.model.CommentaryUnit
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalUiLang
@@ -161,6 +162,10 @@ fun ReaderTextList(
     manifest: com.tamilscripture.core.model.ContentManifest? = null,
     version: String = "",
     onOpenRef: (com.tamilscripture.core.model.VerseId) -> Unit = {},
+    /** The pen's colour: the one last chosen for a highlight. */
+    penColor: HighlightColor = HighlightColor.Yellow,
+    /** Stylus marks on a verse (M8-9); null where the pen is not offered. */
+    onPen: ((verse: Int, stroke: PenStroke, quote: String) -> Unit)? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -210,6 +215,10 @@ fun ReaderTextList(
                         val refs = if (format == ReadingFormat.Study) xrefs[item.verse].orEmpty() else emptyList()
                         var openRef by rememberSaveable(item.key) { mutableStateOf<String?>(null) }
                         var allRefs by rememberSaveable(item.key) { mutableStateOf(false) }
+                        var penPreview by remember(item.key) { mutableStateOf<PenStroke?>(null) }
+                        var verseLayout by remember(item.key) { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+                        // Where the verse's own text starts in its line: after the number and a thin space.
+                        val textStart = item.label.length + 1
                         val selected = item.verse in selection
                         val playing = item.verse == playingVerse
                         val mark = marks[item.verse]
@@ -219,11 +228,12 @@ fun ReaderTextList(
                             appendCrossRefs(refs, allRefs, openRef, manifest, c, lang, onRef = { k -> openRef = if (openRef == k) null else k }, onMore = { allRefs = true })
                         }
                         VerseInteractionBox(item.verse, interactions) { extra -> TextWithTrailer(
-                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty(), leading = format == ReadingFormat.Study),
+                            verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty() + listOfNotNull(penPreview?.let { WordMark(it.start, it.end, if (it.erase) HighlightColor.Pink else penColor) }), leading = format == ReadingFormat.Study),
                             mainStyle = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
                             color = c.ink,
                             trailer = trailer,
                             trailerStyle = Ts.type.caption.copy(fontSize = 12.sp, lineHeight = 22.sp),
+                            onMainLayout = { verseLayout = it },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
@@ -242,6 +252,14 @@ fun ReaderTextList(
                                 .then(if (mark?.bookmarked == true) Modifier.drawBehind { drawRect(bookmarkColor, size = Size(3.dp.toPx(), size.height)) } else Modifier)
                                 .clickable { onTapVerse(item.verse) }
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
+                                .then(
+                                    if (onPen == null) Modifier
+                                    else Modifier.stylusMarks(
+                                        item.key, { verseLayout }, textStart, item.text,
+                                        onPreview = { penPreview = it },
+                                        onCommit = { s -> onPen(item.verse, s, s.quote(item.text)) },
+                                    ),
+                                )
                                 .semantics { contentDescription = "${item.label}. ${item.text}" },
                         ) }
                         if (refs.isNotEmpty()) CrossRefBox(refs, openRef, manifest, version, onOpenRef)

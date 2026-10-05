@@ -89,4 +89,19 @@ class UserDataRepositoryTest {
     @Test fun signedOutSyncMakesNoCalls() = runTest {
         assertFalse(repo().sync())
     }
+
+    @Test fun aWordRangeReplacesTheRangesItOverlaps() = runTest {
+        val r = repo()
+        r.setRangeHighlight("JHN", 3, 16, "IRVTAM", 0, 10, "first", HighlightColor.Yellow)
+        r.setRangeHighlight("JHN", 3, 16, "IRVTAM", 20, 30, "second", HighlightColor.Blue)
+        r.setRangeHighlight("JHN", 3, 16, "IRVTAM", 5, 25, "across", HighlightColor.Pink)
+        val rows = r.data.value.highlights
+        assertEquals(listOf("across"), rows.map { it.quote })
+        assertEquals(5 to 25, rows.single().charStart to rows.single().charEnd)
+        assertEquals(2, r.data.value.deletedHighlights.size)
+        // Another version's range is left alone.
+        r.setRangeHighlight("JHN", 3, 16, "BSB", 0, 4, "For", HighlightColor.Green)
+        r.removeRangeHighlight("JHN", 3, 16, "IRVTAM", 0, 100)
+        assertEquals(listOf("For"), r.data.value.highlights.map { it.quote })
+    }
 }

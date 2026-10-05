@@ -378,7 +378,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (settings.fontSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs,
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs, signedIn = signedIn, onAskSignIn = { askSignIn = true },
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp))
@@ -441,6 +441,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
                         marks = marks, onOpenNote = { n -> editingNote = n.id }, format = settings.format, xrefs = studyXrefs,
+                        signedIn = signedIn, onAskSignIn = { askSignIn = true },
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -661,6 +662,8 @@ private fun ChapterBody(
     notesInMargin: Boolean = false,
     format: ReadingFormat = ReadingFormat.Study,
     xrefs: Map<Int, List<com.tamilscripture.core.model.CrossRef>> = emptyMap(),
+    signedIn: Boolean = false,
+    onAskSignIn: () -> Unit = {},
 ) {
     val c = Ts.colors
     when {
@@ -692,6 +695,8 @@ private fun ChapterBody(
                 marks = marks, onOpenNote = onOpenNote, heat = state.heat, notesInMargin = notesInMargin && !state.dual,
                 format = format,
                 xrefs = xrefs, manifest = state.manifest, version = state.passage.version,
+                penColor = vm.penColor,
+                onPen = { v, stroke, quote -> if (signedIn) vm.pen(v, stroke.start, stroke.end, quote, stroke.erase) else onAskSignIn() },
                 onOpenRef = { vid ->
                     val p = Passage(state.passage.version, vid.book, vid.chapter, vid.verse)
                     nav.follow?.invoke(p) ?: vm.open(p)

@@ -157,9 +157,11 @@ fun TextWithTrailer(
     trailer: AnnotatedString?,
     trailerStyle: TextStyle,
     modifier: Modifier = Modifier,
+    /** The main text's layout, for the stylus (positions are relative to [modifier]'s content). */
+    onMainLayout: (TextLayoutResult) -> Unit = {},
 ) {
     if (trailer == null) {
-        Text(main, style = mainStyle, color = color, modifier = modifier)
+        Text(main, style = mainStyle, color = color, modifier = modifier, onTextLayout = onMainLayout)
         return
     }
     // Laid out afresh when the references change (the open one): inside the reader's lazy
@@ -170,7 +172,7 @@ fun TextWithTrailer(
         var mainLayout: TextLayoutResult? = null
         // Slots keyed by what they show, so a change of style (the open reference) is laid out anew.
         val mainPlaceable = subcompose(main) {
-            Text(main, style = mainStyle, color = color, onTextLayout = { mainLayout = it })
+            Text(main, style = mainStyle, color = color, onTextLayout = { mainLayout = it; onMainLayout(it) })
         }.single().measure(loose)
         val m = mainLayout!!
         val last = m.lineCount - 1
