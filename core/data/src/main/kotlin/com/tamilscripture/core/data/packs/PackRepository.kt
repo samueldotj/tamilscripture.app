@@ -203,6 +203,9 @@ class PackRepository(
         val lo = (books?.first ?: 1) * 1_000_000L
         val hi = ((books?.last ?: 99) + 1) * 1_000_000L - 1
         return store.query("bible.$version") { c ->
+            // M3-12: the on-device search, as a trace section the search benchmark measures.
+            android.os.Trace.beginSection("pack-search")
+            try {
             val total = c.prepare("SELECT count(*) FROM verse_fts WHERE verse_fts MATCH ? AND rowid BETWEEN ? AND ?").use { st ->
                 st.bindText(1, match)
                 st.bindLong(2, lo)
@@ -231,6 +234,9 @@ class PackRepository(
                 }
             }
             Found(hits, total, perBook)
+            } finally {
+                android.os.Trace.endSection()
+            }
         }
     }
 

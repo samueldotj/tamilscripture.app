@@ -8,6 +8,8 @@ import androidx.benchmark.macro.FrameTimingMetric
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
+import androidx.benchmark.macro.TraceSectionMetric
+import androidx.benchmark.macro.ExperimentalMetricApi
 import androidx.benchmark.macro.junit4.BaselineProfileRule
 import androidx.benchmark.macro.junit4.MacrobenchmarkRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -95,4 +97,34 @@ class BaselineProfileGenerator {
         openJohn3()
         swipeChapters(3)
     }
+}
+
+/**
+ * M3-12: on-device search (the FTS5 query in the downloaded Bible), Tamil words, a phrase and
+ * romanised input, as people search on the website. Needs the IRV pack on the device.
+ */
+@OptIn(ExperimentalMetricApi::class)
+@RunWith(AndroidJUnit4::class)
+class SearchBenchmark {
+    @get:Rule val rule = MacrobenchmarkRule()
+
+    private fun search(query: String) = rule.measureRepeated(
+        packageName = PACKAGE,
+        metrics = listOf(TraceSectionMetric("pack-search", TraceSectionMetric.Mode.Sum)),
+        iterations = 5,
+        startupMode = StartupMode.WARM,
+        compilationMode = CompilationMode.Partial(BaselineProfileMode.UseIfAvailable),
+    ) {
+        startActivityAndWait(
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://www.tamilscripture.com/search?q=" + Uri.encode(query))).setClassName(PACKAGE, "$PACKAGE.MainActivity"),
+        )
+        device.wait(Until.hasObject(By.textContains("1")), 5_000)
+        device.waitForIdle()
+    }
+
+    @Test fun tamilWord() = search("அன்பு")
+
+    @Test fun tamilPhrase() = search("\"தேவனுடைய ராஜ்யம்\"")
+
+    @Test fun romanised() = search("visuvaasam")
 }

@@ -193,7 +193,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M3-9 Study Bible format: one verse per item, inline cross-references.
 - [x] M3-10 Dual view: alignment by verse number (as the website), two-column rows with a pinned version header (600 dp+), stacked cards (compact), shared selection, missing-verse cells. A versification table is still to come (design §6.5).
 - [x] M3-11 Version switcher and "compare with" control (study settings → Translation, or V on a keyboard).
-- [ ] M3-12 Search benchmark in `:benchmark` (Tamil and English queries from the website's search log).
+- [x] M3-12 Search benchmark in `:benchmark` (`SearchBenchmark`, the `pack-search` trace section): Pixel 9, IRV pack, 5 Oct 2026, median 4.7 ms for a Tamil word, 2.6 ms for a phrase, 3.7 ms for romanised input (two queries); design target 50 ms.
 
 ### Exit criteria
 - Search first results < 300 ms on a Pixel 6a for the 50 most common queries.
