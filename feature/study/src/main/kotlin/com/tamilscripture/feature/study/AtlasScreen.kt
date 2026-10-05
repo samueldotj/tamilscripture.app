@@ -407,8 +407,8 @@ internal fun AtlasCanvas(
         var motion by remember { mutableStateOf<Job?>(null) }
         // The centre stays over the region the map has detail for, give or take a screen.
         fun clampCentre() {
-            cx = cx.coerceIn(-10f, 75f)
-            cy = cy.coerceIn(wy(62.0), wy(5.0))
+            cx = cx.coerceIn(0f, 62f)
+            cy = cy.coerceIn(wy(52.0), wy(14.0))
         }
 
         /** Glides the camera to a centre and scale (fit to a journey, centre on a place). */
@@ -640,7 +640,8 @@ internal fun AtlasCanvas(
         }
         // Zoom buttons (M8-5f): for one hand, a mouse, and TalkBack.
         Column(
-            Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(12.dp),
+            // Top corner: the place and journey cards rise from the bottom.
+            Modifier.align(Alignment.TopEnd).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             IconBox(TsIcons.Plus, if (tamil) "பெரிதாக்கு" else "Zoom in", { zoomStep(1.6f) }, background = c.surface)
