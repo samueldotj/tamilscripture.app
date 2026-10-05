@@ -78,7 +78,9 @@ open class MainActivity : ComponentActivity() {
                 if (uri != null && isSignIn(uri)) {
                     pendingUri = null
                     pendingId?.let { links.edit().putString("handled", it).apply() }
-                    finishSignIn(uri)
+                    // On the activity's scope: clearing pendingUri restarts this effect, which
+                    // cancelled the exchange half-way when it ran here (every sign-in failed).
+                    lifecycleScope.launch { finishSignIn(uri) }
                     return@LaunchedEffect
                 }
                 val m = manifest
@@ -147,7 +149,11 @@ open class MainActivity : ComponentActivity() {
         val graph = (application as TsApplication).services.graph
         val tamil = uiLang == UiLang.Tamil
         val code = uri.getQueryParameter("code")
-        val ok = code != null && runCatching { graph.account.exchange(code) }.isSuccess
+        val result = if (code == null) Result.failure(IllegalStateException("no code: " + uri.getQueryParameter("error")))
+        else runCatching { graph.account.exchange(code) }
+        // The reason, never the code: sign-in failures are otherwise invisible.
+        result.exceptionOrNull()?.let { android.util.Log.w("SignIn", "sign-in failed: ${it.javaClass.simpleName}: ${it.message}") }
+        val ok = result.isSuccess
         Toast.makeText(
             this,
             if (ok) (if (tamil) "உள்நுழைந்தீர்கள்" else "Signed in") else (if (tamil) "உள்நுழைய முடியவில்லை. மீண்டும் முயலுங்கள்." else "Could not sign in. Please try again."),
