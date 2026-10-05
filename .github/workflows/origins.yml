@@ -1,0 +1,25 @@
+name: origins
+
+# Nightly origin conformance (roadmap M1-4c): every host the app reads from still serves
+# Range requests, the right types and cache headers, and packs matching the catalogue.
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: packs
+            base: https://packs.tamilaudiobible.com/
+          - kind: content
+            base: https://www.tamilscripture.com/
+    steps:
+      - uses: actions/checkout@v4
+      - name: ${{ matrix.kind }} at ${{ matrix.base }}
+        run: bash scripts/check-origin.sh ${{ matrix.kind }} ${{ matrix.base }}

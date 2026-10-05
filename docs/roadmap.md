@@ -92,7 +92,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M1-4 `CatalogueRepository`: fetch, verify signature, cache; remote config values; all locations as paths.
 - [x] M1-4a `OriginResolver`: signed `bootstrap.json` from two providers, last-good copy in DataStore, built-in fallback, ordered origins with one-retry failover and 10-minute down marking.
 - [ ] M1-4b **[web]** Publish scripts with targets `vercel`, `r2` or both, writing identical path layouts; `bootstrap.json` published to both providers.
-- [ ] M1-4c `scripts/check-origin.sh` conformance test (Range, cache headers, content types, SHA-256), run nightly against every configured origin.
+- [x] M1-4c `scripts/check-origin.sh` conformance test (Range, cache headers, content types, SHA-256), run nightly against every configured origin (`origins.yml`). Both origins pass (5 Oct 2026); chapters on Vercel are edge-cached (HIT) though sent with `max-age=0`.
 - [x] M1-5 `PackDownloadWorker`: foreground `dataSync` service, progress notification, Range resume, Wi-Fi-only option, pause/cancel ([design §7.7](design.md#77-download-and-install)).
 - [x] M1-6 Verify → decompress → integrity check → atomic install; `installed_pack` table; space check.
 - [x] M1-7 Automatic pack updates: `CatalogueRefreshWorker` (daily and on app start), updates on unmetered networks by default, setting for mobile data or off, side-by-side install and atomic swap, "Recently updated" list ([design §7.10](design.md#710-keeping-content-up-to-date)).
