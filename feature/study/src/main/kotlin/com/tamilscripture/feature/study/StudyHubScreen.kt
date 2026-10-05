@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,7 +96,8 @@ private fun PsalmCard(mod: Modifier, onClick: () -> Unit) {
                 Box(Modifier.weight(n.toFloat()).fillMaxHeight(n / 41f).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(col))
             }
         }
-        Row(Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Scrolls sideways on a phone rather than squeezing the last badge into a column.
+        Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TsBadge(tr("புலம்பல் 41", "Lament 41"))
             TsBadge(tr("துதி 30", "Praise 30"), tinted = false)
             TsBadge(tr("நன்றி 25", "Thanks 25"), tinted = false)

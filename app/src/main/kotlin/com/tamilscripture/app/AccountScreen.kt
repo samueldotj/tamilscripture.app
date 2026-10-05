@@ -103,8 +103,8 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                 if (s == null) {
                     Text(
                         tr(
-                            "tamilscripture.com கணக்குடன் உள்நுழைந்தால் உங்கள் முனைப்புகள், குறிப்புகள், வாசிப்பு வரலாறு இணையதளத்துடனும் உங்கள் மற்ற சாதனங்களுடனும் ஒத்திசையும். உள்நுழையாமலும் இவை இந்தச் சாதனத்தில் இருக்கும்.",
-                            "Sign in with your tamilscripture.com account and your highlights, notes and reading history follow you to the website and your other devices. Without signing in they stay on this device.",
+                            "tamilscripture.com கணக்குடன் உள்நுழைந்து முனைப்பிடலாம், குறிப்பெழுதலாம்; அவையும் குறிகளும் வாசிப்பு வரலாறும் இணையதளத்துடனும் உங்கள் மற்ற சாதனங்களுடனும் ஒத்திசையும். குறிகளும் வரலாறும் உள்நுழையாமலும் இந்தச் சாதனத்தில் இருக்கும்.",
+                            "Sign in with your tamilscripture.com account to highlight and write notes; they, your bookmarks and your reading history then follow you to the website and your other devices. Bookmarks and history also work without signing in, on this device.",
                         ),
                         style = Ts.type.body, color = c.ink2, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
                     )
