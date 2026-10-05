@@ -17,8 +17,7 @@ fail=0
 py=$(command -v python3 >/dev/null && python3 -c 1 2>/dev/null && echo python3 || echo python)
 ok()   { echo "ok   $*"; }
 bad()  { echo "FAIL $*"; fail=1; }
-header() { { grep -i "^$2:" <<<"$1" || true; } | head -1 | cut -d' ' -f2- | tr -d '
-'; }
+header() { { grep -i "^$2:" <<<"$1" || true; } | head -1 | cut -d' ' -f2- | tr -d '\r'; }
 
 case "$kind" in
 packs)
