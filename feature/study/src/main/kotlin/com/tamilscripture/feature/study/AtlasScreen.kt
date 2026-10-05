@@ -32,6 +32,15 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.lazy.LazyColumn
 import com.tamilscripture.core.designsystem.component.HDivider
+import androidx.compose.foundation.layout.fillMaxHeight
+import com.tamilscripture.core.designsystem.component.VDivider
+import com.tamilscripture.core.model.VerseId
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,6 +58,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -282,14 +292,22 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null,
             PlaceList(d, journey, tamil, onOpen = { links.place(it) }, onShow = { id -> layer = "places"; journey = null; selected = id; listView = false })
             return@Column
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        // M8-5b: details in a bottom card on phones, a narrower card on medium windows, and a
+        // pane beside the map on wide ones (with a journey's stops in order).
+        val place = d.places.firstOrNull { it.id == selected }
+        val j = d.journeys.firstOrNull { it.id == journey }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+        val expanded = maxWidth >= 840.dp
+        val cardAt = if (maxWidth >= 600.dp) Modifier.align(Alignment.BottomStart).widthIn(max = 400.dp) else Modifier.align(Alignment.BottomCenter)
+        Row(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxHeight()) {
             val k = kingdoms
             val year = k?.years?.let { ys ->
                 if (yearIndex !in ys.indices) yearIndex = ys.indexOfFirst { it >= -1000 }.coerceAtLeast(0)
                 ys[yearIndex]
             }
             AtlasCanvas(
-                d, tamil, journey, selected, focus, fitPlaces = fitPlaces,
+                d, tamil, journey, selected, focus, fitPlaces = fitPlaces, onOpenPlace = { links.place(it) },
                 kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
                 church = if (layer == "church") church else emptyList(),
             ) { selected = it }
@@ -331,10 +349,9 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null,
                     }
                 }
             }
-            val place = d.places.firstOrNull { it.id == selected }
-            val j = d.journeys.firstOrNull { it.id == journey }
-            if (place != null) {
-                InfoCard(Modifier.align(Alignment.BottomCenter)) {
+            if (expanded) Unit
+            else if (place != null) {
+                InfoCard(cardAt) {
                     Text(if (tamil) place.nameTa.ifBlank { place.nameEn } else place.nameEn, style = Ts.type.cardTitle, color = c.ink)
                     Text(
                         listOf(if (tamil) place.nameEn else place.nameTa, place.type, tr("${place.mentions} இடங்களில்", if (place.mentions == 1) "1 mention" else "${place.mentions} mentions"))
@@ -347,10 +364,74 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null,
                     }
                 }
             } else if (j != null) {
-                InfoCard(Modifier.align(Alignment.BottomCenter)) {
+                InfoCard(cardAt) {
                     Text(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, style = Ts.type.cardTitle, color = c.ink)
                     Text((if (tamil) j.summaryTa.ifBlank { j.summaryEn } else j.summaryEn), style = Ts.type.caption, color = c.ink2, maxLines = 3)
                     Text(tr("${j.stops.size} இடங்கள்", "${j.stops.size} stops"), style = Ts.type.captionSmall, color = c.muted)
+                }
+            }
+        }
+        if (expanded && (place != null || j != null)) {
+            VDivider()
+            val manifest by graph.content.manifest.collectAsStateWithLifecycle()
+            DetailsPane(
+                place, j, tamil, onOpen = { links.place(it) }, onSelect = { selected = it }, onClose = { selected = null; journey = null },
+                refLabel = { id ->
+                    VerseId.parse(id)?.let { v ->
+                        manifest?.book(v.book)?.let { b -> ((if (tamil) b.abbrTa else b.abbrEn).firstOrNull() ?: b.name(lang)) + " ${v.chapter}:${v.verse}" }
+                    } ?: id
+                },
+            )
+        }
+        }
+        }
+    }
+}
+
+/** The details pane beside the map on wide windows (M8-5b): the place, or a journey with its stops. */
+@Composable
+internal fun DetailsPane(
+    place: AtlasPlace?, j: Journey?, tamil: Boolean, onOpen: (String) -> Unit, onSelect: (String) -> Unit, onClose: () -> Unit,
+    /** "ACT.13.1" as a reader would write it ("அப் 13:1"). */
+    refLabel: (String) -> String = { it },
+) {
+    val c = Ts.colors
+    Column(Modifier.width(340.dp).fillMaxHeight().background(c.pane).navigationBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                when {
+                    place != null -> if (tamil) place.nameTa.ifBlank { place.nameEn } else place.nameEn
+                    j != null -> if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn
+                    else -> ""
+                },
+                style = Ts.type.cardTitle, color = c.ink, modifier = Modifier.weight(1f),
+            )
+            IconBox(TsIcons.Close, if (tamil) "மூடு" else "Close", onClose, tint = c.muted)
+        }
+        if (place != null) {
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    listOf(if (tamil) place.nameEn else place.nameTa, place.type, if (tamil) "${place.mentions} இடங்களில்" else if (place.mentions == 1) "1 mention" else "${place.mentions} mentions")
+                        .filter { it.isNotBlank() }.joinToString(" · "),
+                    style = Ts.type.caption, color = c.muted,
+                )
+                TsPillButton(if (tamil) "திற" else "Open", { onOpen(place.id) }, style = PillStyle.Filled, height = 38.dp)
+            }
+        } else if (j != null) {
+            Text((if (tamil) j.summaryTa.ifBlank { j.summaryEn } else j.summaryEn), style = Ts.type.caption, color = c.ink2, modifier = Modifier.padding(horizontal = 18.dp, vertical = 6.dp))
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+                items(j.stops.size) { i ->
+                    val st = j.stops[i]
+                    Row(
+                        Modifier.fillMaxWidth().clickable(enabled = st.place.isNotBlank()) { onSelect(st.place) }.padding(horizontal = 18.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("${i + 1}", style = Ts.type.labelSmall, color = c.amber, modifier = Modifier.width(22.dp))
+                        Column {
+                            Text(if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn, style = Ts.type.label, color = c.ink)
+                            st.ref?.let { Text(refLabel(it), style = Ts.type.captionSmall, color = c.muted) }
+                        }
+                    }
                 }
             }
         }
@@ -423,6 +504,8 @@ internal fun AtlasCanvas(
     church: List<ChurchPoint> = emptyList(),
     /** Places to bring into view on opening (a chapter's places, M8-5e). */
     fitPlaces: List<String> = emptyList(),
+    /** The right-click menu's "Open": the place's page. */
+    onOpenPlace: (String) -> Unit = {},
     onSelect: (String?) -> Unit,
 ) {
     val c = Ts.colors
@@ -455,6 +538,8 @@ internal fun AtlasCanvas(
             d.places.firstOrNull { it.id == focus }?.let { cx = it.x; cy = it.y; scale = fit * 6f }
         }
         val scope = rememberCoroutineScope()
+        var menuAt by remember { mutableStateOf<Offset?>(null) }
+        var menuPlace by remember { mutableStateOf<AtlasPlace?>(null) }
         var motion by remember { mutableStateOf<Job?>(null) }
         // The centre stays over the region the map has detail for, give or take a screen.
         fun clampCentre() {
@@ -611,6 +696,13 @@ internal fun AtlasCanvas(
                                 val ch = e.changes.first()
                                 zoomAt(ch.position, if (ch.scrollDelta.y < 0) 1.25f else 0.8f)
                                 ch.consume()
+                            } else if (e.type == PointerEventType.Press && e.buttons.isSecondaryPressed) {
+                                // Right-click (M8-5d): a menu for the nearest place and the spot.
+                                val at = e.changes.first().position
+                                menuAt = at
+                                menuPlace = d.places.take(600).minByOrNull { p -> (toScreen(p.x, p.y) - at).getDistance() }
+                                    ?.takeIf { (toScreen(it.x, it.y) - at).getDistance() <= 48.dp.toPx() }
+                                e.changes.forEach { it.consume() }
                             }
                         }
                     }
@@ -711,6 +803,26 @@ internal fun AtlasCanvas(
                     val n = measurer.measure("${i + 1}", TextStyle(fontSize = 9.sp, fontWeight = FontWeight.Bold, color = c.surface))
                     drawText(n, topLeft = s - Offset(n.size.width / 2f, n.size.height / 2f))
                     label("stop-$journey-$i", if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn, s + Offset(4f, 0f))
+                }
+            }
+        }
+        menuAt?.let { at ->
+            Box(Modifier.offset { IntOffset(at.x.roundToInt(), at.y.roundToInt()) }) {
+                DropdownMenu(expanded = true, onDismissRequest = { menuAt = null }, containerColor = c.surface) {
+                    menuPlace?.let { p ->
+                        DropdownMenuItem(
+                            text = { Text((if (tamil) "திற: " else "Open ") + (if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn), color = c.ink) },
+                            onClick = { menuAt = null; onSelect(p.id); onOpenPlace(p.id) },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text(if (tamil) "இங்கே மையப்படுத்து" else "Centre here", color = c.ink) },
+                        onClick = { menuAt = null; glideTo((at.x - w / 2f) / scale + cx, (at.y - h / 2f) / scale + cy, scale) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (tamil) "இங்கே பெரிதாக்கு" else "Zoom in here", color = c.ink) },
+                        onClick = { menuAt = null; glideTo((at.x - w / 2f) / scale + cx, (at.y - h / 2f) / scale + cy, (scale * 2f).coerceAtMost(fit * 40f)) },
+                    )
                 }
             }
         }

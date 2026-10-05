@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.geometry.Offset
@@ -79,4 +82,31 @@ class AtlasScreenshotTest {
     )
 
     @Test fun earlyChurch() = shot("atlas_church_en", ThemeMode.Light, tamil = false, withChurch = true)
+
+    /** M8-5b: the pane beside the map on wide windows, a journey with its stops. */
+    @Test fun journeyPane() {
+        compose.setContent {
+            TsTheme(ThemeMode.Light) {
+                Box(Modifier.size(340.dp, 600.dp)) {
+                    DetailsPane(null, data.journeys.first { it.id == "paul-1" }, tamil = true, onOpen = {}, onSelect = {}, onClose = {}, refLabel = { it.replace("ACT.", "அப் ").replace(".", ":") })
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/atlas_pane_paul1_ta.png")
+    }
+
+    /** M8-5d: a right-click opens a menu for the spot. */
+    @OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+    @Test fun rightClickMenu() {
+        compose.setContent {
+            TsTheme(ThemeMode.Light) {
+                Box(Modifier.size(411.dp, 600.dp)) { AtlasCanvas(data, false, null, null, null) {} }
+            }
+        }
+        compose.onRoot().performMouseInput { rightClick(center) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Centre here").assertExists()
+        compose.onNodeWithText("Zoom in here").assertExists()
+        compose.onRoot().captureRoboImage("src/test/screenshots/atlas_menu_en.png")
+    }
 }
