@@ -520,6 +520,9 @@ internal fun AtlasCanvas(
     val stops = remember(d, journey) { d.journeys.firstOrNull { it.id == journey }?.stops.orEmpty() }
     // Label layouts (text and its halo), measured once per language and theme, not every frame.
     val labels = remember(d, tamil, c) { HashMap<String, Pair<TextLayoutResult, TextLayoutResult>>() }
+    // The places drawn with a name in the last frame (dot and label), so a tap goes to the place
+    // the reader sees named rather than an unnamed one a pixel nearer (Jerusalem, not Gibeah).
+    val named = remember(d) { HashMap<String, Pair<Offset, Rect>>() }
 
     val mapFocus = remember { FocusRequester() }
     val keyStepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 80.dp.toPx() }
@@ -591,6 +594,16 @@ internal fun AtlasCanvas(
             if (sp.x !in 0f..w || sp.y !in 0f..h) glideTo(p.x, p.y, max(scale, fit * 4f))
         }
         fun toScreen(x: Float, y: Float) = Offset((x - cx) * scale + w / 2f, (y - cy) * scale + h / 2f)
+
+        /** The place under [at]: a named one (its dot or its label) first, else the nearest dot. */
+        fun hitPlace(at: Offset, reach: Float): AtlasPlace? {
+            // On a label counts as on the place; otherwise the distance to its dot.
+            fun gap(v: Pair<Offset, Rect>) = if (v.second.inflate(reach / 4f).contains(at)) 0f else (v.first - at).getDistance()
+            val byName = named.entries.filter { gap(it.value) <= reach }.minByOrNull { gap(it.value) }?.key
+            byName?.let { id -> d.places.firstOrNull { it.id == id } }?.let { return it }
+            return d.places.take(600).minByOrNull { p -> (toScreen(p.x, p.y) - at).getDistance() }
+                ?.takeIf { (toScreen(it.x, it.y) - at).getDistance() <= reach }
+        }
         fun zoomAt(p: Offset, factor: Float) {
             val wx = (p.x - w / 2f) / scale + cx
             val wyv = (p.y - h / 2f) / scale + cy
@@ -682,8 +695,7 @@ internal fun AtlasCanvas(
                     detectTapGestures(
                         onDoubleTap = { zoomAt(it, 2f) },
                         onTap = { tap ->
-                            val hit = d.places.take(600).minByOrNull { p -> (toScreen(p.x, p.y) - tap).getDistance() }
-                            onSelect(hit?.takeIf { (toScreen(it.x, it.y) - tap).getDistance() <= 24.dp.toPx() }?.id)
+                            onSelect(hitPlace(tap, 24.dp.toPx())?.id)
                         },
                     )
                 }
@@ -700,8 +712,7 @@ internal fun AtlasCanvas(
                                 // Right-click (M8-5d): a menu for the nearest place and the spot.
                                 val at = e.changes.first().position
                                 menuAt = at
-                                menuPlace = d.places.take(600).minByOrNull { p -> (toScreen(p.x, p.y) - at).getDistance() }
-                                    ?.takeIf { (toScreen(it.x, it.y) - at).getDistance() <= 48.dp.toPx() }
+                                menuPlace = hitPlace(at, 48.dp.toPx())
                                 e.changes.forEach { it.consume() }
                             }
                         }
@@ -729,6 +740,7 @@ internal fun AtlasCanvas(
             val dot = 4.5.dp.toPx()
             val labelStyle = TextStyle(fontFamily = family, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = c.ink)
             val placed = ArrayList<Rect>()
+            named.clear()
             /** Where a label would go, or null when it would overlap one already placed. */
             fun place(
                 key: String, text: String, at: Offset, ink: androidx.compose.ui.graphics.Color = c.ink, force: Boolean = false, centred: Boolean = false,
@@ -773,12 +785,13 @@ internal fun AtlasCanvas(
                 val selSpot = sel?.let { p -> place(p.id + "*", if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, toScreen(p.x, p.y), c.amber, force = true) }
                 val labelled = ArrayList<Pair<Offset, Pair<Rect, Pair<TextLayoutResult, TextLayoutResult>>>>()
                 val small = ArrayList<Offset>()
+                if (sel != null && selSpot != null) named[sel.id] = toScreen(sel.x, sel.y) to selSpot.first
                 for (p in d.places) {
                     if (p.id == selected) continue
                     val s = toScreen(p.x, p.y)
                     if (s.x < -20 || s.y < -20 || s.x > w + 20 || s.y > h + 20) continue
                     val spot = place(p.id, if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, s)
-                    if (spot != null) labelled += s to spot else if (scale > fit * 4f && small.size < 400) small += s
+                    if (spot != null) { labelled += s to spot; named[p.id] = s to spot.first } else if (scale > fit * 4f && small.size < 400) small += s
                 }
                 small.forEach { s ->
                     drawCircle(c.surface, dot * 0.6f + 1.5f, s)

@@ -66,23 +66,13 @@ class SearchRepository(private val http: Http, private val packs: PackRepository
     /**
      * Several versions at once (M3-5): each searched in parallel, on the device where its
      * pack is installed, and the hits merged in canonical order, versions in the order given.
+     * The romanised reading follows [search]'s rule across all of them: "love" found in BSB
+     * is not also read as லோவெ in a Tamil version (near spellings of லோத்து); it is offered.
      */
     suspend fun searchVersions(query: String, versions: List<String>, tamil: (String) -> Boolean, books: IntRange? = null): Result =
         coroutineScope {
             val results = versions.map { v -> async { runCatching { search(query, v, tamil(v), 0, books) }.getOrNull() } }.awaitAll()
-            val found = results.filterNotNull()
-            if (found.isEmpty()) throw IOException("no version could be searched")
-            val order = versions.withIndex().associate { (i, v) -> v to i }
-            val hits = found.flatMap { it.response.hits }.sortedWith(
-                compareBy<SearchHit>({ it.bookOrder }, { VerseId.parse(it.verseId)?.chapter ?: 0 }, { VerseId.parse(it.verseId)?.verse ?: 0 }, { order[it.version] ?: 0 }),
-            )
-            val perBook = found.flatMap { it.perBook }.groupBy({ it.first }, { it.second }).map { (o, n) -> o to n.sum() }.sortedBy { it.first }
-            Result(
-                SearchResponse(query = query, hits = hits, total = found.sumOf { it.response.total }),
-                offline = found.all { it.offline },
-                shown = found.firstOrNull { it.response.total > 0 }?.shown ?: query,
-                perBook = perBook,
-            )
+            mergeVersions(query, versions, results.filterNotNull())
         }
 
     private suspend fun searchAs(query: String, version: String, offset: Int, books: IntRange?): Result {
@@ -121,4 +111,25 @@ class SearchRepository(private val http: Http, private val packs: PackRepository
         /** Fewer device hits than this also ask the website (M3-3). */
         const val FEW = 5
     }
+}
+
+/** The versions' results as one list (see [searchVersions]); apart for its test. */
+internal fun mergeVersions(query: String, versions: List<String>, all: List<SearchRepository.Result>): SearchRepository.Result {
+    if (all.isEmpty()) throw IOException("no version could be searched")
+    // Found as typed in some version: a version that fell back to the Tamil reading is dropped and the reading offered.
+    val asTyped = all.any { it.shown == query && it.response.total > 0 }
+    val found = if (asTyped) all.filter { it.shown == query } else all
+    val offer = if (asTyped) all.firstNotNullOfOrNull { r -> r.romanOffer ?: r.shown.takeIf { it != query } } else null
+    val order = versions.withIndex().associate { (i, v) -> v to i }
+    val hits = found.flatMap { it.response.hits }.sortedWith(
+        compareBy<SearchHit>({ it.bookOrder }, { VerseId.parse(it.verseId)?.chapter ?: 0 }, { VerseId.parse(it.verseId)?.verse ?: 0 }, { order[it.version] ?: 0 }),
+    )
+    val perBook = found.flatMap { it.perBook }.groupBy({ it.first }, { it.second }).map { (o, n) -> o to n.sum() }.sortedBy { it.first }
+    return SearchRepository.Result(
+        SearchResponse(query = query, hits = hits, total = found.sumOf { it.response.total }),
+        offline = found.all { it.offline },
+        shown = found.firstOrNull { it.response.total > 0 }?.shown ?: query,
+        romanOffer = offer,
+        perBook = perBook,
+    )
 }
