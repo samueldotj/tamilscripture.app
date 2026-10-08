@@ -294,7 +294,7 @@ M2 to M6 can overlap when there is more than one developer. With two developers,
 - [x] M7-3 Community plans from `reading_plans` (published only), cached offline. Anon PostgREST as the website does; `fromRow` ported with tests.
 - [x] M7-4 Progress local when signed out; joined with the account on first sign-in (earlier start, readings from both), then synced with `plan_progress`.
 - [x] M7-5 Daily reminder notification with a chosen time (exact alarms not needed; inexact is fine). Built (Settings › Daily reminder; today's plan passages or the verse of the day); checked on the Pixel 9.
-- [x] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built: verse of the day plus "Continue reading", refreshed when the app goes to the background; checked on the Pixel 9 and the Galaxy Tab S11.
+- [x] M7-6 Home-screen widget (Glance): today's passages with one-tap open. Built in the Classical design (Claude Design handoff, Bible Widgets - Classical): a verse-of-the-day widget (small: verse, reference, version; medium: date and "Read the chapter") and a Bible plan widget (day, progress, read count and minutes left; medium: percentage, streak and today's readings ticked when read), light and dark, refreshed when the app goes to the background; screenshot-tested. The verse widget checked on the Pixel 9.
 - [x] M7-7 `plan` stats events. Done (`plan` events on ticking a passage).
 - [ ] M7-8 Release prep: store listing in Tamil and English, screenshots for phone, tablet and ALOS, Data safety form, privacy policy update on the website.
 - [ ] M7-9 Staged production rollout 10% → 50% → 100% with crash-free ≥ 99.5%.

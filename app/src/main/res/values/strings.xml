@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">தமிழ் வேதாகமம்</string>
-    <string name="widget_today_description">இன்றைய வசனமும் நீங்கள் நிறுத்திய இடமும்</string>
-    <string name="widget_preview_title">இன்றைய வசனம் · யோவான் 3:16</string>
+    <string name="widget_today_description">இன்றைய வசனம்</string>
+    <string name="widget_preview_title">இன்றைய வசனம்</string>
     <string name="widget_preview_verse">தேவன், தம்முடைய ஒரே பேறான குமாரனை விசுவாசிக்கிறவன் எவனோ அவன் கெட்டுப்போகாமல் நித்தியஜீவனை அடையும்படிக்கு…</string>
-    <string name="widget_preview_continue">தொடர்ந்து வாசிக்க · சங்கீதம் 23 ›</string>
+    <string name="widget_preview_reference">யோவான் 3:16 · IRV</string>
+    <string name="widget_plan_description">வாசிப்புத் திட்டம்: இன்றைய நாளும் வாசிப்புகளும்</string>
+    <string name="widget_plan_preview_name">ஒரு வருடத்தில் வேதாகமம்</string>
+    <string name="widget_plan_preview_days">365 நாட்களில்</string>
+    <string name="widget_plan_preview_done">2-இல் 1 வாசித்தது</string>
 </resources>

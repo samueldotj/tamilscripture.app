@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Tamil Scripture</string>
-    <string name="widget_today_description">The verse of the day and where you left off</string>
-    <string name="widget_preview_title">Verse of the day · John 3:16</string>
+    <string name="widget_today_description">The verse of the day</string>
+    <string name="widget_preview_title">VERSE OF THE DAY</string>
     <string name="widget_preview_verse">தேவன், தம்முடைய ஒரே பேறான குமாரனை விசுவாசிக்கிறவன் எவனோ அவன் கெட்டுப்போகாமல் நித்தியஜீவனை அடையும்படிக்கு…</string>
-    <string name="widget_preview_continue">Continue reading · Psalm 23 ›</string>
+    <string name="widget_preview_reference">John 3:16 · IRV</string>
+    <string name="widget_plan_description">Your reading plan: its day and today’s readings</string>
+    <string name="widget_plan_preview_name">WHOLE BIBLE · 1 YEAR</string>
+    <string name="widget_plan_preview_days">of 365 days</string>
+    <string name="widget_plan_preview_done">1 of 2 read</string>
 </resources>

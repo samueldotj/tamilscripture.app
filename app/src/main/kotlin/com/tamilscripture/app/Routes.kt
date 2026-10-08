@@ -59,7 +59,7 @@ data class DeepLink(val route: NavKey, val compare: String? = null)
 
 /**
  * Website links (A-2.10): `/irvtam/john/3`, `/irvtam/john/3/16`, `/irvtam/john/3.16`,
- * `/john/3`, `/irvtam+kjv/john/3` (dual view, as on the website) and `/search?q=…`.
+ * `/john/3`, `/irvtam+kjv/john/3` (dual view, as on the website), `/search?q=…` and `/plans`.
  * Anything else opens the home screen.
  */
 fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): DeepLink? {
@@ -76,6 +76,7 @@ fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): 
         seg[0] == "person" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(PersonRoute(seg[1]))
         seg[0] == "strongs" && seg.size == 2 && Regex("^[HGhg][0-9]{1,5}[A-Za-z]?$").matches(seg[1]) -> return DeepLink(StrongsRoute(seg[1].uppercase()))
         seg[0] == "dictionary" && seg.size == 1 -> return DeepLink(DictionaryRoute)
+        seg[0] == "plans" && seg.size == 1 -> return DeepLink(PlansRoute)
     }
     val codes = manifest.versions.associateBy { it.code.lowercase() }
     val parts = seg[0].lowercase().split('+')

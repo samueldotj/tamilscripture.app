@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A reading done in the plan widget: a ring with a tick; tinted in code. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="15dp" android:height="15dp" android:viewportWidth="15" android:viewportHeight="15">
+    <path android:pathData="M7.5,0.5a7,7 0 1,0 0.001,0z" android:strokeColor="#000000" android:strokeWidth="1" />
+    <path android:pathData="M10.83,5L6.25,9.58L4.17,7.5" android:strokeColor="#000000" android:strokeWidth="1.1"
+        android:strokeLineCap="round" android:strokeLineJoin="round" />
+</vector>
