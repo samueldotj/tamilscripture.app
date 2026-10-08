@@ -8,7 +8,6 @@ import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
-import android.graphics.Bitmap
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -57,7 +56,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -91,7 +89,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tamilscripture.core.data.settings.Settings
@@ -103,7 +100,6 @@ import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsChip
 import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.component.VDivider
-import com.tamilscripture.core.designsystem.component.VerseImage
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.media.AudioController
@@ -115,11 +111,7 @@ import com.tamilscripture.core.model.label
 import com.tamilscripture.core.services.LocalAppServices
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.services.tr
-import java.io.File
 import kotlin.math.abs
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /** Callbacks into the app's navigation; the reader never navigates by itself. */
 class ReaderNav(
@@ -150,6 +142,7 @@ private class VerseActions(
     val onCrossRefs: () -> Unit,
     val onCopy: () -> Unit,
     val onShare: () -> Unit,
+    val onShareLarge: () -> Unit,
     /** The reader's own marks (M6): kept on the device, and in the account when signed in. */
     val onBookmark: () -> Unit,
     val onNote: () -> Unit,
@@ -177,7 +170,6 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val audio by services.audio.state.collectAsStateWithLifecycle()
     val lang = LocalUiLang.current
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val c = Ts.colors
 
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -194,6 +186,8 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val signedIn = services.graph.account.session.collectAsStateWithLifecycle().value != null
     /** The note open in the editor: its id, [NEW_NOTE], or null. */
     var editingNote by rememberSaveable { mutableStateOf<String?>(null) }
+    /** The verses in the share-as-image sheet (design 3b), or null when it is closed. */
+    var imageVerses by remember { mutableStateOf<List<Int>?>(null) }
     val userData by vm.userData.collectAsStateWithLifecycle()
     val marks = remember(userData, state.passage.book, state.passage.chapter) { userData.marksFor(state.passage.book, state.passage.chapter, state.passage.version) }
     // Wide windows (M2-2, M8-4): one study pane beside the text, in tabs, sized by a divider.
@@ -281,7 +275,11 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         },
         onShare = {
             vm.recordVerseAction("share")
-            shareVerses(context, selectedRef, state.selection.map { chapter?.verseText(it).orEmpty() }, shareUrl(state.passage, book, state.selection))
+            shareVerses(context, selectedRef, state.selection.map { chapter?.verseText(it).orEmpty() }, chapterUrl(state.passage, book, state.selection))
+        },
+        onShareLarge = {
+            vm.recordVerseAction("share-large")
+            shareLink(context, selectedRef ?: "", shareUrl(state.passage, book, state.selection))
         },
         onBookmark = {
             val on = vm.toggleBookmark()
@@ -291,10 +289,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         onHighlight = { if (signedIn) showHighlight = true else askSignIn = true },
         onShareImage = {
             vm.recordVerseAction("share-image")
-            val ref = selectedRef ?: ""
-            val text = state.selection.joinToString(" ") { chapter?.verseText(it).orEmpty() }
-            val url = shareUrl(state.passage, book, state.selection)
-            scope.launch { shareVerseImage(context, ref, text, url) }
+            imageVerses = state.selection.sorted()
         },
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
         onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
@@ -321,7 +316,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             Entry(tr("இங்கிருந்து காட்சிப்படுத்து", "Present from here")) { nav.present(state.passage.copy(verse = v)) }
             Entry(tr("படமாகப் பகிர்", "Share as image")) {
                 vm.recordVerseAction("share-image")
-                scope.launch { shareVerseImage(context, verseRef(v), verseText(v), shareUrl(state.passage, book, listOf(v))) }
+                imageVerses = listOf(v)
             }
             Entry(tr("புதிய சாளரத்தில் திற", "Open in new window")) { nav.newWindow(state.passage.copy(verse = v)) }
             Entry(tr("பகிர்", "Share")) {
@@ -543,6 +538,13 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             vm.clearSelection()
         }) { showHighlight = false }
     }
+    val imageChapter = chapter
+    imageVerses?.takeIf { it.isNotEmpty() && imageChapter != null }?.let { verses ->
+        ShareImageSheet(
+            state.passage, verses, imageChapter!!, state.manifest, shareUrl(state.passage, book, verses),
+            onShared = { vm.recordVerseAction("share-image:$it") },
+        ) { imageVerses = null }
+    }
     editingNote?.let { id ->
         val note = userData.notes.firstOrNull { it.id == id }
         val ref = note?.let { n -> book?.label(lang, n.chapter, n.verseStart, n.verseEnd.takeIf { it != n.verseStart }) } ?: selectedRef ?: ""
@@ -648,6 +650,7 @@ private fun ActionCardOverlay(
             onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
             currentColor = currentColor, onColor = onColor,
             onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite, onLarge = a.onLarge,
+            onShareLarge = a.onShareLarge,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
         )
@@ -946,6 +949,17 @@ private fun Modifier.swipeChapters(onPrev: () -> Unit, onNext: () -> Unit): Modi
     ) { _, dx -> total += dx }
 }
 
+/** The verses in their chapter on the website ("…/irvtam/john/3/16"). */
+private fun chapterUrl(p: Passage, book: Book?, sel: List<Int>): String {
+    val slug = book?.slug ?: p.book.lowercase()
+    val range = when {
+        sel.size > 1 -> "/${sel.min()}-${sel.max()}"
+        sel.size == 1 -> "/${sel.first()}"
+        else -> ""
+    }
+    return "https://www.tamilscripture.com/${p.version.lowercase()}/$slug/${p.chapter}$range"
+}
+
 private fun shareUrl(p: Passage, book: Book?, sel: List<Int>): String {
     val slug = book?.slug ?: p.book.lowercase()
     val range = when {
@@ -971,21 +985,9 @@ private fun copyVerses(context: Context, ref: String?, texts: List<String>) {
     cm.setPrimaryClip(ClipData.newPlainText(ref, texts.joinToString(" ") + "\n— " + (ref ?: "")))
 }
 
-/** M8-6: the verse as a picture, made off the main thread, then the share sheet. */
-private suspend fun shareVerseImage(context: Context, ref: String, text: String, url: String) {
-    val uri = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "verse.png")
-        val bitmap = VerseImage.render(context, text, ref)
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-        FileProvider.getUriForFile(context, context.packageName + ".share", file)
-    }
-    val send = Intent(Intent.ACTION_SEND).setType("image/png")
-        .putExtra(Intent.EXTRA_STREAM, uri)
-        .putExtra(Intent.EXTRA_TEXT, "$ref\n$url")
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(Intent.createChooser(send, ref))
+/** The reference and a link alone (the share menu's "Large text"). */
+private fun shareLink(context: Context, ref: String, url: String) {
+    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "$ref\n$url"), ref))
 }
 
 private fun shareVerses(context: Context, ref: String?, texts: List<String>, url: String) {

@@ -5,6 +5,7 @@ import androidx.compose.ui.semantics.contentDescription
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.model.HighlightColor
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,9 +27,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -216,6 +224,8 @@ fun VerseActionCard(
     onShareImage: () -> Unit,
     onWebsite: () -> Unit = {},
     onLarge: () -> Unit = {},
+    /** "Large text" in the share menu: the reference and the single-verse page's link. */
+    onShareLarge: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
@@ -254,7 +264,7 @@ fun VerseActionCard(
         }
         Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallAction(tr("நகல்", "Copy"), onCopy, Modifier.weight(1f))
-            SmallAction(tr("பகிர்", "Share"), onShare, Modifier.weight(1f))
+            ShareMenu(onShare, onShareLarge, onShareImage, onWebsite, Modifier.weight(1f))
             SmallAction(tr("குறிப்பு", "Note"), onNote, Modifier.weight(1f))
             if (onColor == null) SmallAction(tr("முனைப்பு", "Highlight"), onHighlight, Modifier.weight(1f))
         }
@@ -262,12 +272,46 @@ fun VerseActionCard(
         Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             SmallAction(tr("மூல மொழி", "Original words"), onOriginal, Modifier.weight(1f))
             SmallAction(tr("நபர்கள் · இடங்கள்", "People · places"), onPeople, Modifier.weight(1f))
-            SmallAction(tr("படமாக", "As image"), onShareImage, Modifier.weight(1f))
-        }
-        // M8-6: the verse large on its own (present mode, from this verse); M6-9c: on the website.
-        Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // M8-6: the verse large on its own (present mode, from this verse).
             SmallAction(tr("பெரிதாக", "Large view"), onLarge, Modifier.weight(1f))
-            SmallAction(tr("இணையதளம்", "Website"), onWebsite, Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Share ▾ (design 3a): the verse with its chapter's link, the reference with the
+ * single-verse page's link, the share-as-image sheet, or that page in the browser (M6-9c).
+ */
+@Composable
+private fun ShareMenu(onChapter: () -> Unit, onLarge: () -> Unit, onImage: () -> Unit, onWebsite: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Ts.colors
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        SmallAction(tr("பகிர் ▾", "Share ▾"), { open = true }, Modifier.fillMaxWidth(), selected = open)
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(18.dp),
+            containerColor = c.surface,
+            border = BorderStroke(1.5.dp, c.line),
+            modifier = Modifier.widthIn(max = 288.dp),
+        ) {
+            @Composable
+            fun Item(title: String, sub: String?, action: () -> Unit, color: Color = c.ink) = DropdownMenuItem(
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(title, style = Ts.type.body.copy(fontWeight = FontWeight.SemiBold), color = color)
+                        if (sub != null) Text(sub, style = Ts.type.caption, color = c.muted)
+                    }
+                },
+                onClick = { open = false; action() },
+                modifier = Modifier.padding(horizontal = 6.dp).clip(RoundedCornerShape(8.dp)),
+            )
+            Item(tr("அதிகாரத்தில் வசனம்", "Verse in its chapter"), tr("சுற்றியுள்ள வசனங்களுடன்", "With the verses around it"), onChapter)
+            Item(tr("பெரிய எழுத்தில்", "Large text"), tr("இந்த வசனம் மட்டும், தமிழும் ஆங்கிலமும்", "Just this verse, in Tamil and English"), onLarge)
+            Item(tr("படமாகப் பகிர்", "Share as image"), tr("பகிர்வதற்கேற்ற வசனப் படம்", "A picture of the verse to post or send"), onImage)
+            HDivider(Modifier.padding(top = 4.dp))
+            Item(tr("பெரிய எழுத்தில் திற ↗", "Open large text ↗"), null, onWebsite, color = c.accent)
         }
     }
 }
@@ -294,9 +338,10 @@ private fun BigAction(icon: ImageVector, label: String, onClick: () -> Unit, mod
 }
 
 @Composable
-private fun SmallAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun SmallAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, selected: Boolean = false) {
     Box(
-        modifier.clip(RoundedCornerShape(10.dp)).clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+        modifier.clip(RoundedCornerShape(10.dp)).background(if (selected) Ts.colors.surface2 else Color.Transparent)
+            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         BasicText(

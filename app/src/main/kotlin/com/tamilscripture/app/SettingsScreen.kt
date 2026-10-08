@@ -144,8 +144,8 @@ fun SettingsScreen(onBack: () -> Unit, onDownloads: () -> Unit, onAccount: () ->
                     style = Ts.type.caption, color = c.muted, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
                 )
                 Text(
-                    tr("எழுத்துருக்கள்: Mukta Malar, Noto Sans Tamil, Noto Serif Tamil, Noto Sans — SIL Open Font License 1.1.",
-                        "Fonts: Mukta Malar, Noto Sans Tamil, Noto Serif Tamil, Noto Sans — SIL Open Font License 1.1."),
+                    tr("எழுத்துருக்கள்: Mukta Malar, Noto Sans Tamil, Noto Serif Tamil, Noto Sans, Lora, Cormorant Garamond — SIL Open Font License 1.1.",
+                        "Fonts: Mukta Malar, Noto Sans Tamil, Noto Serif Tamil, Noto Sans, Lora, Cormorant Garamond — SIL Open Font License 1.1."),
                     style = Ts.type.caption, color = c.muted, modifier = Modifier.padding(horizontal = 22.dp, vertical = 4.dp),
                 )
                 Text(

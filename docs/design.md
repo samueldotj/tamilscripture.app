@@ -249,7 +249,7 @@ Tokens live in `TsColors` (an `@Immutable` data class) provided by `LocalTsColor
 
 ### 5.2 Typography
 
-- **Bundled fonts** (in `:core:design/res/font`, subset to Tamil + Latin used by the corpus): Mukta Malar 400/600 (default Tamil), Noto Sans Tamil 400/600, Noto Serif Tamil 400/600, Noto Sans 400/600 (UI and English).
+- **Bundled fonts** (in `:core:design/res/font`, subset to Tamil + Latin used by the corpus): Mukta Malar 400/600 (default Tamil), Noto Sans Tamil 400/600, Noto Serif Tamil 400/600, Noto Sans 400/600 (UI and English); Lora 400 and Cormorant Garamond 400/600 (Latin only, for shared verse images).
 - **Scripture size steps:** 5 steps, default step 3 = 17 sp, matching the site. Steps are 15, 16, 17, 19, 21 sp, multiplied by the system font scale.
 - **Line height:** 1.55 default, 1.4–1.9 adjustable.
 - Tamil text uses `LocaleList("ta-IN")` on its `TextStyle` so TalkBack picks the Tamil voice; English uses `en`.

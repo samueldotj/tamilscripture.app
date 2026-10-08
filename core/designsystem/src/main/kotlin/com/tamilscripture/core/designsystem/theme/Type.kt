@@ -47,6 +47,15 @@ val NotoSans = FontFamily(
     variable(R.font.noto_sans, 700),
 )
 
+/** English verses in a shared verse image (the website's 'Lora'; Latin only, one weight). */
+val Lora = FontFamily(Font(R.font.lora, FontWeight.Normal))
+
+/** References and the numeral in a shared verse image (the website's 'Cormorant Garamond'), a variable font. */
+val CormorantGaramond = FontFamily(
+    variable(R.font.cormorant_garamond, 400),
+    variable(R.font.cormorant_garamond, 600),
+)
+
 /** The reader's typeface choice (A-2.7). */
 enum class ScriptureFace(val family: FontFamily) {
     MuktaMalar(com.tamilscripture.core.designsystem.theme.MuktaMalar),
