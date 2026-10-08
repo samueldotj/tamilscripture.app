@@ -1,6 +1,8 @@
 package com.tamilscripture.feature.study
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -108,5 +110,25 @@ class AtlasScreenshotTest {
         compose.onNodeWithText("Centre here").assertExists()
         compose.onNodeWithText("Zoom in here").assertExists()
         compose.onRoot().captureRoboImage("src/test/screenshots/atlas_menu_en.png")
+    }
+    /** 2B: the journey sheet over the map, partway along Paul's second journey. */
+    @Test fun journeyTourDarkTamil() {
+        val j = data.journeys.first { it.id == "paul-2" }
+        val group = journeyGroups(data.journeys).first { g -> g.journeys.any { it.id == j.id } }
+        compose.setContent {
+            TsTheme(ThemeMode.Dark) {
+                Box(Modifier.size(411.dp, 800.dp)) {
+                    AtlasCanvas(data, true, j.id, null, null, step = 5, insets = PaddingValues(bottom = 390.dp)) {}
+                    JourneySheet(
+                        j, group, tamil = true, subtitle = "அப்போஸ்தலர் 15:36 – 18:22 · " + kmLabel(journeyKm(data.routes[j.id], j.stops), true),
+                        refLabel = { it.replace("ACT.", "அப் ").replace(".", ":") }, step = 5, playing = false, expanded = false, maxHeight = 500.dp,
+                        onExpand = {}, onPlay = {}, onStep = {}, onOpenPlace = {}, onJourney = {}, modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(2000)
+        compose.onNodeWithText("பயணம் 2 / 4 · அப்போஸ்தலர்").assertExists()
+        compose.onRoot().captureRoboImage("src/test/screenshots/atlas_tour_paul2_dark_ta.png")
     }
 }

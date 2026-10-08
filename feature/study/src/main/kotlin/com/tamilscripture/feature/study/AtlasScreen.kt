@@ -23,6 +23,20 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.Role
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -31,6 +45,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import com.tamilscripture.core.designsystem.component.HDivider
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.tamilscripture.core.designsystem.component.VDivider
@@ -209,11 +225,32 @@ private fun path(features: List<GeoFeature>, close: Boolean): Path = Path().appl
     }
 }
 
+/** The controls floating over the map (2B): the sheet's colour, nearly opaque. */
+@Composable
+internal fun floatColor(): Color = sheetColor().copy(alpha = 0.9f)
+
+/** A chip floating over the map: gold when chosen, else the float colour with a hairline. */
+@Composable
+private fun MapChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    val c = Ts.colors
+    val shape = RoundedCornerShape(999.dp)
+    Box(
+        Modifier.clip(shape).background(if (selected) c.accent else floatColor())
+            .then(if (selected) Modifier else Modifier.border(1.dp, c.line2, shape))
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Text(text, style = Ts.type.labelSmall, color = if (selected) c.onAccent else c.ink2, maxLines = 1)
+    }
+}
+
 /**
- * The atlas (roadmap M8-5): base map, places by how often the Bible names them, and the
- * journeys. Pinch, drag, double-tap and the mouse wheel move the map; tapping a place
- * shows it with a way to its page. Drawn in Compose from the website's GeoJSON (ADR-12,
- * option A), so labels use the reader's typeface and language.
+ * The atlas (roadmap M8-5; laid out as the design's 2B): the map fills the screen, with the
+ * back button, search and layers floating at the top over chips for the journeys' groups,
+ * zoom and recentre at the right, and a sheet from the bottom for the chosen journey (its
+ * stops, and a tour along them), place or year. Pinch, drag, double-tap and the mouse wheel
+ * move the map. Drawn in Compose from the website's GeoJSON (ADR-12, option A), so labels
+ * use the reader's typeface and language.
  */
 @Composable
 fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null, fitPlaces: List<String> = emptyList()) {
@@ -221,6 +258,7 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null,
     val c = Ts.colors
     val lang = LocalUiLang.current
     val tamil = lang == UiLang.Tamil
+    val density = LocalDensity.current
     val data by produceState<AtlasData?>(null, Unit) { value = loadAtlas { graph.study.file(it) } }
     var journey by rememberSaveable { mutableStateOf(startJourney) }
     // M8-5c: "places", "kingdoms" (a year on the timeline) or "church".
@@ -233,157 +271,250 @@ fun AtlasScreen(focus: String?, links: StudyLinks, startJourney: String? = null,
     }
     var yearIndex by rememberSaveable { mutableIntStateOf(-1) }
     var selected by rememberSaveable { mutableStateOf(focus) }
-    // M8-5d: find a place on the map by name.
+    // M8-5d: find a place (or a journey) by name.
     var searching by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     // M8-5f: the places as a list, in rank order (a journey's stops in order), for TalkBack and for reading.
     var listView by rememberSaveable { mutableStateOf(false) }
+    var layersMenu by remember { mutableStateOf(false) }
+    // 2B: the tour's stop (-1 before it starts), whether it is moving on, and the sheet opened up.
+    var step by rememberSaveable(journey) { mutableIntStateOf(-1) }
+    var playing by remember(journey) { mutableStateOf(false) }
+    var sheetOpen by rememberSaveable { mutableStateOf(false) }
+    // How much of the map the floating controls and the sheet cover.
+    var topH by remember { mutableStateOf(0.dp) }
+    var sheetH by remember { mutableStateOf(0.dp) }
+    val manifest by graph.content.manifest.collectAsStateWithLifecycle()
+    val refLabel: (String) -> String = { id ->
+        VerseId.parse(id)?.let { v ->
+            manifest?.book(v.book)?.let { b -> ((if (tamil) b.abbrTa else b.abbrEn).firstOrNull() ?: b.name(lang)) + " ${v.chapter}:${v.verse}" }
+        } ?: id
+    }
+    fun chooseJourney(id: String?) {
+        layer = "places"; journey = id; selected = null; sheetOpen = false
+    }
+    val d = data
+    val j = d?.journeys?.firstOrNull { it.id == journey }
+    val groups = remember(d) { d?.let { journeyGroups(it.journeys) }.orEmpty() }
+    // The tour: a stop every few seconds, stopping at the last.
+    LaunchedEffect(playing) {
+        val last = j?.stops?.lastIndex ?: return@LaunchedEffect
+        while (playing) {
+            if (step >= last) { playing = false; break }
+            step += 1
+            delay(2600)
+        }
+    }
 
-    Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), links.back)
-            Text(tr("வரைபடம்", "Atlas"), style = Ts.type.barTitle, color = c.ink, modifier = Modifier.padding(start = 4.dp).weight(1f))
-            IconBox(
-                if (listView) TsIcons.MapView else TsIcons.ListView,
-                if (listView) tr("வரைபடமாகக் காட்டு", "Show as a map") else tr("பட்டியலாகக் காட்டு", "Show as a list"),
-                { listView = !listView },
-            )
-            IconBox(
-                if (searching) TsIcons.Close else TsIcons.Search, if (searching) tr("தேடலை மூடு", "Close search") else tr("இடம் தேடு", "Find a place"),
-                { searching = !searching; query = "" },
-            )
-        }
-        if (searching) {
-            Box(
-                Modifier.padding(start = 14.dp, end = 14.dp, bottom = 8.dp).fillMaxWidth()
-                    .background(c.surface, RoundedCornerShape(14.dp)).border(1.dp, c.line2, RoundedCornerShape(14.dp)).padding(12.dp),
-            ) {
-                if (query.isEmpty()) Text(tr("இடத்தின் பெயர்", "Place name"), style = Ts.type.body, color = c.faint)
-                val fr = remember { FocusRequester() }
-                LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
-                BasicTextField(
-                    query, { query = it }, singleLine = true, textStyle = Ts.type.body.copy(color = c.ink),
-                    cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth().focusRequester(fr),
-                )
-            }
-        }
-        val d = data
+    Box(Modifier.fillMaxSize().background(if (listView) c.bg else c.mapSea)) {
         if (d == null || d.land.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 if (d == null) CircularProgressIndicator(color = c.accent)
                 else Text(tr("வரைபடத்துக்கு இணைய இணைப்பு அல்லது ‘வரைபடங்கள்’ பொதி தேவை.", "The atlas needs a connection, or the Maps pack in Downloads."),
                     style = Ts.type.body, color = c.muted, modifier = Modifier.padding(28.dp))
             }
-            return@Column
-        }
-        Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            val pad = PaddingValues(horizontal = 12.dp, vertical = 7.dp)
-            TsChip(tr("இடங்கள்", "Places"), layer == "places" && journey == null, { layer = "places"; journey = null }, contentPadding = pad)
-            TsChip(tr("அரசுகள்", "Kingdoms"), layer == "kingdoms", { layer = "kingdoms"; journey = null; selected = null }, contentPadding = pad)
-            TsChip(tr("ஆதித் திருச்சபை", "Early church"), layer == "church", { layer = "church"; journey = null; selected = null }, contentPadding = pad)
-            d.journeys.forEach { j ->
-                TsChip(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, journey == j.id, { layer = "places"; journey = j.id; selected = null }, contentPadding = pad)
+        } else if (listView) {
+            Box(Modifier.fillMaxSize().padding(top = topH)) {
+                PlaceList(d, journey, tamil, onOpen = { links.place(it) }, onShow = { id -> layer = "places"; journey = null; selected = id; listView = false })
             }
-        }
-        if (listView) {
-            PlaceList(d, journey, tamil, onOpen = { links.place(it) }, onShow = { id -> layer = "places"; journey = null; selected = id; listView = false })
-            return@Column
-        }
-        // M8-5b: details in a bottom card on phones, a narrower card on medium windows, and a
-        // pane beside the map on wide ones (with a journey's stops in order).
-        val place = d.places.firstOrNull { it.id == selected }
-        val j = d.journeys.firstOrNull { it.id == journey }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-        val expanded = maxWidth >= 840.dp
-        val cardAt = if (maxWidth >= 600.dp) Modifier.align(Alignment.BottomStart).widthIn(max = 400.dp) else Modifier.align(Alignment.BottomCenter)
-        Row(Modifier.fillMaxSize()) {
-        Box(Modifier.weight(1f).fillMaxHeight()) {
-            val k = kingdoms
-            val year = k?.years?.let { ys ->
-                if (yearIndex !in ys.indices) yearIndex = ys.indexOfFirst { it >= -1000 }.coerceAtLeast(0)
-                ys[yearIndex]
-            }
-            AtlasCanvas(
-                d, tamil, journey, selected, focus, fitPlaces = fitPlaces, onOpenPlace = { links.place(it) },
-                kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
-                church = if (layer == "church") church else emptyList(),
-            ) { selected = it }
-            val found = remember(d, query) { if (query.isBlank()) emptyList() else findPlaces(d.places, query) }
-            if (searching && found.isNotEmpty()) {
-                Column(
-                    Modifier.align(Alignment.TopCenter).padding(horizontal = 14.dp).widthIn(max = 560.dp).fillMaxWidth()
-                        .background(c.surface, RoundedCornerShape(14.dp)).border(1.dp, c.line2, RoundedCornerShape(14.dp)),
-                ) {
-                    found.forEach { p ->
-                        Column(
-                            Modifier.fillMaxWidth().clickable {
-                                layer = "places"; journey = null; selected = p.id; searching = false; query = ""
-                            }.padding(horizontal = 14.dp, vertical = 10.dp),
+        } else {
+            // M8-5b: the sheet on phones, narrower at the bottom left on medium windows, and a
+            // pane beside the map on wide ones (with a journey's stops in order).
+            val place = d.places.firstOrNull { it.id == selected }
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val expanded = maxWidth >= 840.dp
+                val medium = maxWidth >= 600.dp
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val sheetMax = maxHeight * 0.62f
+                Row(Modifier.fillMaxSize()) {
+                    Box(Modifier.weight(1f).fillMaxHeight()) {
+                        val k = kingdoms
+                        val year = k?.years?.let { ys ->
+                            if (yearIndex !in ys.indices) yearIndex = ys.indexOfFirst { it >= -1000 }.coerceAtLeast(0)
+                            ys[yearIndex]
+                        }
+                        AtlasCanvas(
+                            d, tamil, journey, selected, focus, fitPlaces = fitPlaces, onOpenPlace = { links.place(it) },
+                            kingdoms = if (layer == "kingdoms" && k != null && year != null) k.shapes.filter { year in it.from..it.to } else emptyList(),
+                            church = if (layer == "church") church else emptyList(),
+                            step = if (j != null) step else -1,
+                            // With no sheet up, the buttons stay above the navigation bar.
+                            insets = PaddingValues(top = topH, bottom = if (expanded) navBottom else maxOf(sheetH, navBottom)),
+                        ) { selected = it }
+                        if (!expanded) Box(
+                            (if (medium) Modifier.align(Alignment.BottomStart).padding(start = 14.dp).widthIn(max = 400.dp) else Modifier.align(Alignment.BottomCenter))
+                                .fillMaxWidth().onSizeChanged { sheetH = with(density) { it.height.toDp() } },
                         ) {
-                            Text(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, style = Ts.type.label, color = c.ink)
-                            Text(
-                                listOf(if (tamil) p.nameEn else p.nameTa, p.type).filter { it.isNotBlank() }.joinToString(" · "),
-                                style = Ts.type.caption, color = c.muted,
+                            when {
+                                place != null -> MapSheet(sheetOpen, { sheetOpen = it }, header = {
+                                    Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        val kick = listOf(place.type, tr("${place.mentions} இடங்களில்", if (place.mentions == 1) "1 mention" else "${place.mentions} mentions"))
+                                            .filter { it.isNotBlank() }.joinToString(" · ")
+                                        Text(if (tamil) kick else kick.uppercase(), style = if (tamil) Ts.type.kicker.copy(letterSpacing = 0.sp) else Ts.type.kicker, color = c.accent)
+                                        Text(if (tamil) place.nameTa.ifBlank { place.nameEn } else place.nameEn, style = Ts.type.headline.copy(fontSize = 22.sp, lineHeight = 28.sp), color = c.ink)
+                                        (if (tamil) place.nameEn else place.nameTa).takeIf { it.isNotBlank() }?.let { Text(it, style = Ts.type.caption.copy(fontSize = 13.sp), color = c.muted) }
+                                        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            TsPillButton(tr("திற", "Open"), { links.place(place.id) }, style = PillStyle.Filled, height = 40.dp)
+                                            TsPillButton(tr("மூடு", "Close"), { selected = null }, height = 40.dp)
+                                        }
+                                    }
+                                })
+                                layer == "kingdoms" -> MapSheet(false, {}, header = {
+                                    Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 6.dp, bottom = 12.dp)) {
+                                        if (k == null || year == null) {
+                                            CircularProgressIndicator(color = c.accent, modifier = Modifier.align(Alignment.CenterHorizontally))
+                                        } else {
+                                            Text(tr("அரசுகள்", "KINGDOMS"), style = if (tamil) Ts.type.kicker.copy(letterSpacing = 0.sp) else Ts.type.kicker, color = c.accent)
+                                            Text(yearLabel(year, tamil), style = Ts.type.headline.copy(fontSize = 22.sp, lineHeight = 28.sp), color = c.ink)
+                                            // Continuous, rounded to the nearest year at which the map changes: a step per
+                                            // year would draw a tick for each of the timeline's ~200 changes.
+                                            Slider(
+                                                value = yearIndex.toFloat(), onValueChange = { yearIndex = it.roundToInt() },
+                                                valueRange = 0f..(k.years.size - 1).toFloat(),
+                                                colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.line2),
+                                            )
+                                            Text("Cliopatria (CC BY 4.0)", style = Ts.type.captionSmall, color = c.muted)
+                                        }
+                                    }
+                                })
+                                j != null -> {
+                                    val subtitle = remember(j, manifest, tamil) {
+                                        fun book(code: String) = manifest?.book(code)?.name(lang) ?: code
+                                        val a = j.passages.firstOrNull()?.substringBefore('-')?.let { VerseId.parse(it) }
+                                        val b = j.passages.lastOrNull()?.substringAfter('-')?.let { VerseId.parse(it) }
+                                        val range = when {
+                                            a == null -> ""
+                                            b == null || b == a -> "${book(a.book)} ${a.chapter}:${a.verse}"
+                                            a.book == b.book -> "${book(a.book)} ${a.chapter}:${a.verse} – ${b.chapter}:${b.verse}"
+                                            else -> "${book(a.book)} ${a.chapter}:${a.verse} – ${book(b.book)} ${b.chapter}:${b.verse}"
+                                        }
+                                        listOf(range, kmLabel(journeyKm(d.routes[j.id], j.stops), tamil)).filter { it.isNotBlank() }.joinToString(" · ")
+                                    }
+                                    JourneySheet(
+                                        j, groups.firstOrNull { g -> g.journeys.any { it.id == j.id } }, tamil, subtitle, refLabel,
+                                        step = step, playing = playing, expanded = sheetOpen, maxHeight = sheetMax,
+                                        onExpand = { sheetOpen = it },
+                                        onPlay = {
+                                            if (!playing && step >= j.stops.lastIndex) step = -1
+                                            playing = !playing
+                                        },
+                                        onStep = { playing = false; step = it },
+                                        onOpenPlace = { links.place(it) },
+                                        onJourney = { chooseJourney(it) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (expanded && (place != null || j != null)) {
+                        VDivider()
+                        DetailsPane(
+                            place, j, tamil, onOpen = { links.place(it) }, onSelect = { selected = it }, onClose = { selected = null; journey = null },
+                            refLabel = refLabel,
+                        )
+                    }
+                }
+            }
+        }
+
+        // The floating top (2B): back, search and layers, then the journeys' groups.
+        Column(Modifier.align(Alignment.TopStart).fillMaxWidth().onSizeChanged { topH = with(density) { it.height.toDp() } }.statusBarsPadding()) {
+            val ring = Modifier.border(1.dp, c.line2, CircleShape)
+            Row(
+                Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBox(TsIcons.ChevronLeft, tr("பின்", "Back"), links.back, ring, tint = c.ink, background = floatColor())
+                val pill = RoundedCornerShape(999.dp)
+                Row(
+                    Modifier.weight(1f).height(44.dp).clip(pill).background(floatColor()).border(1.dp, c.line2, pill)
+                        .then(if (searching) Modifier else Modifier.clickable(role = Role.Button) { searching = true })
+                        .padding(start = 16.dp, end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(TsIcons.Search, null, Modifier.size(18.dp), tint = c.muted)
+                    Box(Modifier.weight(1f)) {
+                        if (query.isEmpty()) Text(tr("இடம், பயணம்", "Place or journey"), style = Ts.type.body.copy(fontSize = 14.sp), color = c.muted, maxLines = 1)
+                        if (searching) {
+                            val fr = remember { FocusRequester() }
+                            LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+                            BasicTextField(
+                                query, { query = it }, singleLine = true, textStyle = Ts.type.body.copy(fontSize = 14.sp, color = c.ink),
+                                cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth().focusRequester(fr),
                             )
+                        }
+                    }
+                    if (searching) IconBox(TsIcons.Close, tr("தேடலை மூடு", "Close search"), { searching = false; query = "" }, tint = c.muted, iconSize = 18.dp)
+                }
+                Box {
+                    IconBox(TsIcons.Filter, tr("அடுக்குகள்", "Layers"), { layersMenu = true }, ring, tint = c.ink, iconSize = 20.dp, background = floatColor())
+                    DropdownMenu(expanded = layersMenu, onDismissRequest = { layersMenu = false }, containerColor = c.surface) {
+                        @Composable
+                        fun item(on: Boolean, ta: String, en: String, onClick: () -> Unit) = DropdownMenuItem(
+                            text = { Text((if (on) "✓  " else "     ") + tr(ta, en), color = c.ink) },
+                            onClick = { layersMenu = false; onClick() },
+                        )
+                        item(!listView && layer == "places" && journey == null, "இடங்கள்", "Places") { listView = false; chooseJourney(null) }
+                        item(!listView && layer == "kingdoms", "அரசுகள்", "Kingdoms") { listView = false; layer = "kingdoms"; journey = null; selected = null }
+                        item(!listView && layer == "church", "ஆதித் திருச்சபை", "Early church") { listView = false; layer = "church"; journey = null; selected = null }
+                        HDivider()
+                        item(listView, "பட்டியலாகக் காட்டு", "Show as a list") { listView = !listView }
+                    }
+                }
+            }
+            if (d != null && d.land.isNotEmpty() && !searching) {
+                val chips = rememberLazyListState()
+                // The chosen group's chip scrolls into view (Paul is off the edge of a phone).
+                val chosen = if (layer == "church") groups.size else groups.indexOfFirst { g -> g.journeys.any { it.id == journey } }
+                LaunchedEffect(chosen) { if (chosen >= 0) chips.animateScrollToItem(chosen, -with(density) { 48.dp.roundToPx() }) }
+                LazyRow(
+                    Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 8.dp), state = chips,
+                    contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(groups.size) { i ->
+                        val g = groups[i]
+                        val on = layer == "places" && g.journeys.any { it.id == journey }
+                        // A second tap on the chosen group clears it, back to the places.
+                        MapChip(if (tamil) g.nameTa else g.nameEn, on) { chooseJourney(if (on) null else g.journeys.first().id) }
+                    }
+                    item {
+                        MapChip(tr("ஆதித் திருச்சபை", "Early church"), layer == "church") {
+                            if (layer == "church") layer = "places" else { layer = "church"; journey = null; selected = null }
                         }
                     }
                 }
             }
-            if (layer == "kingdoms") {
-                InfoCard(Modifier.align(Alignment.BottomCenter)) {
-                    if (k == null || year == null) {
-                        CircularProgressIndicator(color = c.accent)
-                    } else {
-                        Text(yearLabel(year, tamil), style = Ts.type.cardTitle, color = c.ink)
-                        // Continuous, rounded to the nearest year at which the map changes: a step per
-                        // year would draw a tick for each of the timeline's ~200 changes.
-                        Slider(
-                            value = yearIndex.toFloat(), onValueChange = { yearIndex = it.roundToInt() },
-                            valueRange = 0f..(k.years.size - 1).toFloat(),
-                            colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.line2),
+        }
+
+        // Search results, under the search: journeys by name, then places.
+        if (d != null && searching && query.isNotBlank()) {
+            val q = query.trim().lowercase()
+            val js = remember(d, q) { d.journeys.filter { it.nameEn.lowercase().contains(q) || it.nameTa.contains(q) }.take(3) }
+            val found = remember(d, q) { findPlaces(d.places, q, limit = 8 - js.size) }
+            if (js.isNotEmpty() || found.isNotEmpty()) Column(
+                Modifier.align(Alignment.TopCenter).padding(top = topH, start = 14.dp, end = 14.dp).widthIn(max = 560.dp).fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp)).background(c.surface).border(1.dp, c.line2, RoundedCornerShape(16.dp)),
+            ) {
+                js.forEach { jj ->
+                    Column(Modifier.fillMaxWidth().clickable { listView = false; chooseJourney(jj.id); searching = false; query = "" }.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(if (tamil) jj.nameTa.ifBlank { jj.nameEn } else jj.nameEn, style = Ts.type.label, color = c.ink)
+                        Text(tr("பயணம் · ${jj.stops.size} இடங்கள்", "Journey · ${jj.stops.size} stops"), style = Ts.type.caption, color = c.muted)
+                    }
+                }
+                found.forEach { p ->
+                    Column(
+                        Modifier.fillMaxWidth().clickable {
+                            listView = false; layer = "places"; journey = null; selected = p.id; searching = false; query = ""
+                        }.padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        Text(if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn, style = Ts.type.label, color = c.ink)
+                        Text(
+                            listOf(if (tamil) p.nameEn else p.nameTa, p.type).filter { it.isNotBlank() }.joinToString(" · "),
+                            style = Ts.type.caption, color = c.muted,
                         )
-                        Text("Cliopatria (CC BY 4.0)", style = Ts.type.captionSmall, color = c.muted)
                     }
                 }
             }
-            if (expanded) Unit
-            else if (place != null) {
-                InfoCard(cardAt) {
-                    Text(if (tamil) place.nameTa.ifBlank { place.nameEn } else place.nameEn, style = Ts.type.cardTitle, color = c.ink)
-                    Text(
-                        listOf(if (tamil) place.nameEn else place.nameTa, place.type, tr("${place.mentions} இடங்களில்", if (place.mentions == 1) "1 mention" else "${place.mentions} mentions"))
-                            .filter { it.isNotBlank() }.joinToString(" · "),
-                        style = Ts.type.caption, color = c.muted,
-                    )
-                    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TsPillButton(tr("திற", "Open"), { links.place(place.id) }, style = PillStyle.Filled, height = 36.dp)
-                        TsPillButton(tr("மூடு", "Close"), { selected = null }, height = 36.dp)
-                    }
-                }
-            } else if (j != null) {
-                InfoCard(cardAt) {
-                    Text(if (tamil) j.nameTa.ifBlank { j.nameEn } else j.nameEn, style = Ts.type.cardTitle, color = c.ink)
-                    Text((if (tamil) j.summaryTa.ifBlank { j.summaryEn } else j.summaryEn), style = Ts.type.caption, color = c.ink2, maxLines = 3)
-                    Text(tr("${j.stops.size} இடங்கள்", "${j.stops.size} stops"), style = Ts.type.captionSmall, color = c.muted)
-                }
-            }
-        }
-        if (expanded && (place != null || j != null)) {
-            VDivider()
-            val manifest by graph.content.manifest.collectAsStateWithLifecycle()
-            DetailsPane(
-                place, j, tamil, onOpen = { links.place(it) }, onSelect = { selected = it }, onClose = { selected = null; journey = null },
-                refLabel = { id ->
-                    VerseId.parse(id)?.let { v ->
-                        manifest?.book(v.book)?.let { b -> ((if (tamil) b.abbrTa else b.abbrEn).firstOrNull() ?: b.name(lang)) + " ${v.chapter}:${v.verse}" }
-                    } ?: id
-                },
-            )
-        }
-        }
         }
     }
 }
@@ -483,17 +614,6 @@ private fun BaseMap(layers: BaseLayers, view: () -> Triple<Float, Float, Float>)
 }
 
 @Composable
-private fun InfoCard(modifier: Modifier, content: @Composable () -> Unit) {
-    val c = Ts.colors
-    val shape = RoundedCornerShape(18.dp)
-    Column(
-        modifier.navigationBarsPadding().padding(14.dp).widthIn(max = 560.dp).fillMaxWidth().clip(shape).background(c.surface)
-            .border(1.5.dp, c.line2, shape).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) { content() }
-}
-
-@Composable
 internal fun AtlasCanvas(
     d: AtlasData,
     tamil: Boolean,
@@ -506,6 +626,10 @@ internal fun AtlasCanvas(
     fitPlaces: List<String> = emptyList(),
     /** The right-click menu's "Open": the place's page. */
     onOpenPlace: (String) -> Unit = {},
+    /** The journey tour's stop (2B): stops before it are travelled, it is lit; -1 for none. */
+    step: Int = -1,
+    /** What floats over the map's edges (search above, the sheet below): fits and centring keep clear of them. */
+    insets: PaddingValues = PaddingValues(0.dp),
     onSelect: (String?) -> Unit,
 ) {
     val c = Ts.colors
@@ -525,7 +649,11 @@ internal fun AtlasCanvas(
     val named = remember(d) { HashMap<String, Pair<Offset, Rect>>() }
 
     val mapFocus = remember { FocusRequester() }
-    val keyStepPx = with(androidx.compose.ui.platform.LocalDensity.current) { 80.dp.toPx() }
+    val density = LocalDensity.current
+    val keyStepPx = with(density) { 80.dp.toPx() }
+    val buttonsPx = with(density) { 66.dp.toPx() }
+    // Read when a glide starts, so a fit uses the sheet's height once it has one.
+    val edges by rememberUpdatedState(with(density) { insets.calculateTopPadding().toPx() to insets.calculateBottomPadding().toPx() })
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val w = constraints.maxWidth.toFloat()
         val h = constraints.maxHeight.toFloat()
@@ -551,8 +679,10 @@ internal fun AtlasCanvas(
         }
 
         /** Glides the camera to a centre and scale (fit to a journey, centre on a place). */
-        fun glideTo(tx: Float, ty: Float, ts: Float) {
+        fun glideTo(tx: Float, ty0: Float, ts: Float, clear: Boolean = false) {
             motion?.cancel()
+            // [clear]: put the point in the middle of what the search and the sheet leave visible.
+            val ty = if (clear) ty0 - (edges.first - edges.second) / 2f / ts else ty0
             val (x0, y0, s0) = Triple(cx, cy, scale)
             motion = scope.launch {
                 animate(0f, 1f, animationSpec = tween(450, easing = FastOutSlowInEasing)) { t, _ ->
@@ -564,16 +694,33 @@ internal fun AtlasCanvas(
             }
         }
 
-        // A new journey brings its stops into view.
+        /** The journey's stops in the visible part of the map. */
+        fun fitStops() {
+            if (stops.isEmpty()) return
+            val xs = stops.map { it.lon.toFloat() }
+            val ys = stops.map { wy(it.lat) }
+            val visible = max(h - edges.first - edges.second, h * 0.3f)
+            // Clear of the zoom buttons on the right (and as much on the left, to stay centred).
+            val across = max(w - 2 * buttonsPx, w * 0.5f)
+            glideTo(
+                (xs.min() + xs.max()) / 2f, (ys.min() + ys.max()) / 2f,
+                min(across / max(xs.max() - xs.min(), 1f), visible / max(ys.max() - ys.min(), 1f)).times(0.9f).coerceIn(fit * MIN_ZOOM, fit * 40f),
+                clear = true,
+            )
+        }
+
+        // A new journey brings its stops into view, once the sheet below has its height.
         LaunchedEffect(journey) {
             if (stops.isNotEmpty()) {
-                val xs = stops.map { it.lon.toFloat() }
-                val ys = stops.map { wy(it.lat) }
-                glideTo(
-                    (xs.min() + xs.max()) / 2f, (ys.min() + ys.max()) / 2f,
-                    min(w / max(xs.max() - xs.min(), 1f), h / max(ys.max() - ys.min(), 1f)).times(0.75f).coerceIn(fit * MIN_ZOOM, fit * 40f),
-                )
+                withFrameNanos { }
+                withFrameNanos { }
+                fitStops()
             }
+        }
+        // The tour follows its stop, keeping the zoom.
+        LaunchedEffect(step, journey) {
+            val st = stops.getOrNull(step) ?: return@LaunchedEffect
+            glideTo(st.lon.toFloat(), wy(st.lat), max(scale, fit * 1.5f), clear = true)
         }
         // A chapter's places, when the atlas was opened from its map (M8-5e).
         LaunchedEffect(fitPlaces) {
@@ -587,11 +734,22 @@ internal fun AtlasCanvas(
                 )
             }
         }
-        // A place chosen from the list or search glides into view.
+        // A place chosen from the list or search glides into view, clear of the search and sheet.
         LaunchedEffect(selected) {
             val p = d.places.firstOrNull { it.id == selected } ?: return@LaunchedEffect
+            withFrameNanos { }
             val sp = Offset((p.x - cx) * scale + w / 2f, (p.y - cy) * scale + h / 2f)
-            if (sp.x !in 0f..w || sp.y !in 0f..h) glideTo(p.x, p.y, max(scale, fit * 4f))
+            if (sp.x !in 0f..w || sp.y !in edges.first..max(edges.first, h - edges.second)) glideTo(p.x, p.y, max(scale, fit * 4f), clear = true)
+        }
+
+        /** The recentre button: back to the journey, the chosen place, or the whole region. */
+        fun recentre() {
+            val p = d.places.firstOrNull { it.id == selected }
+            when {
+                stops.isNotEmpty() -> fitStops()
+                p != null -> glideTo(p.x, p.y, max(scale, fit * 4f), clear = true)
+                else -> glideTo(31f, wy(34.0), cover, clear = true)
+            }
         }
         fun toScreen(x: Float, y: Float) = Offset((x - cx) * scale + w / 2f, (y - cy) * scale + h / 2f)
 
@@ -808,7 +966,7 @@ internal fun AtlasCanvas(
                     drawCircle(c.amber, 7.dp.toPx(), s)
                     drawLabel(selSpot)
                 }
-            } else {
+            } else if (step < 0) {
                 stops.forEachIndexed { i, st ->
                     val s = toScreen(st.lon.toFloat(), wy(st.lat))
                     drawCircle(c.surface, 8.dp.toPx(), s)
@@ -817,6 +975,35 @@ internal fun AtlasCanvas(
                     drawText(n, topLeft = s - Offset(n.size.width / 2f, n.size.height / 2f))
                     label("stop-$journey-$i", if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn, s + Offset(4f, 0f))
                 }
+            } else {
+                // On tour (2B): travelled stops gold and joined, the stop it is at orange with a halo, the rest rings.
+                val here = step.coerceAtMost(stops.lastIndex)
+                val r = 6.dp.toPx()
+                val travelled = Path()
+                stops.take(here + 1).forEachIndexed { i, st ->
+                    val s = toScreen(st.lon.toFloat(), wy(st.lat))
+                    if (i == 0) travelled.moveTo(s.x, s.y) else travelled.lineTo(s.x, s.y)
+                }
+                if (here > 0) drawPath(travelled, c.accent, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                stops.forEachIndexed { i, st ->
+                    if (i == here) return@forEachIndexed
+                    val s = toScreen(st.lon.toFloat(), wy(st.lat))
+                    if (i < here) {
+                        drawCircle(c.mapLand, r + 1.5f, s)
+                        drawCircle(c.accent, r, s)
+                    } else {
+                        drawCircle(c.mapLand, r, s)
+                        drawCircle(c.lineStrong, r - 1.dp.toPx(), s, style = Stroke(2.dp.toPx()))
+                    }
+                }
+                // Names: the stop it is at, then its neighbours, then wherever there is room.
+                stops.indices.sortedBy { abs(it - here) }.forEach { i ->
+                    val st = stops[i]
+                    label("stop-$journey-$i", if (tamil) st.nameTa.ifBlank { st.nameEn } else st.nameEn, toScreen(st.lon.toFloat(), wy(st.lat)) + Offset(4f, 0f))
+                }
+                val s = toScreen(stops[here].lon.toFloat(), wy(stops[here].lat))
+                drawCircle(c.amber.copy(alpha = 0.25f), r + 6.dp.toPx(), s)
+                drawCircle(c.amber, r + 1.dp.toPx(), s)
             }
         }
         menuAt?.let { at ->
@@ -839,14 +1026,17 @@ internal fun AtlasCanvas(
                 }
             }
         }
-        // Zoom buttons (M8-5f): for one hand, a mouse, and TalkBack.
-        Column(
-            // Top corner: the place and journey cards rise from the bottom.
-            Modifier.align(Alignment.TopEnd).padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+        // Zoom and recentre (M8-5f, 2B): for one hand, a mouse, and TalkBack; just above the sheet,
+        // and out of the way while an opened sheet leaves no room for them below the search.
+        if (maxHeight - insets.calculateTopPadding() - insets.calculateBottomPadding() >= 172.dp) Column(
+            Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = insets.calculateBottomPadding() + 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            IconBox(TsIcons.Plus, if (tamil) "பெரிதாக்கு" else "Zoom in", { zoomStep(1.6f) }, background = c.surface)
-            IconBox(TsIcons.Minus, if (tamil) "சிறிதாக்கு" else "Zoom out", { zoomStep(1 / 1.6f) }, background = c.surface)
+            val bg = floatColor()
+            val ring = Modifier.border(1.dp, c.line2, CircleShape)
+            IconBox(TsIcons.Plus, if (tamil) "பெரிதாக்கு" else "Zoom in", { zoomStep(1.6f) }, ring, tint = c.ink, background = bg)
+            IconBox(TsIcons.Minus, if (tamil) "சிறிதாக்கு" else "Zoom out", { zoomStep(1 / 1.6f) }, ring, tint = c.ink, background = bg)
+            IconBox(TsIcons.Target, if (tamil) "மையப்படுத்து" else "Recentre", { recentre() }, ring, tint = c.accent, iconSize = 20.dp, background = bg)
         }
     }
 }
