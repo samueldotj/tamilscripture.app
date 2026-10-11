@@ -64,6 +64,7 @@ import com.tamilscripture.feature.study.AtlasScreen
 import com.tamilscripture.feature.study.DictionaryScreen
 import com.tamilscripture.feature.study.PersonScreen
 import com.tamilscripture.feature.study.PlaceScreen
+import com.tamilscripture.feature.study.PsalmsScreen
 import com.tamilscripture.feature.study.RootWordsScreen
 import com.tamilscripture.feature.study.StrongsScreen
 import com.tamilscripture.feature.study.StudyHubScreen
@@ -154,7 +155,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                         StudyHubScreen(StudyNav(commentary = {
                             val last = settings.lastRead ?: Passage(settings.version, "JHN", 3)
                             backStack.add(CommentaryRoute(last))
-                        }, dictionary = { backStack.add(DictionaryRoute) }, rootWords = { backStack.add(RootWordsRoute) }, atlas = { backStack.add(AtlasRoute()) }, soon = soon))
+                        }, dictionary = { backStack.add(DictionaryRoute) }, rootWords = { backStack.add(RootWordsRoute) }, atlas = { backStack.add(AtlasRoute()) }, psalms = { backStack.add(PsalmsRoute) }, soon = soon))
                     }
                     entry<SearchRoute> { r -> SearchScreen(onOpen = ::read, autoFocus = r.focus, initialQuery = r.query) }
                     entry<ReaderRoute> { r ->
@@ -201,6 +202,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<ArticleRoute> { r -> ArticleScreen(r.id, studyLinks) }
                     entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
+                    entry<PsalmsRoute> { PsalmsScreen(studyLinks) }
                     entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks, startJourney = r.journey, fitPlaces = r.fit) }
                     entry<AccountRoute> { AccountScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onMine = { backStack.add(MineRoute()) }) }
                     entry<MineRoute> { r -> MineScreen(r.tab, onBack = { backStack.removeAt(backStack.lastIndex) }, onRead = ::read) }

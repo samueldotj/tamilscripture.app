@@ -42,7 +42,7 @@ import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.services.tr
 
-class StudyNav(val commentary: () -> Unit, val dictionary: () -> Unit, val rootWords: () -> Unit, val atlas: () -> Unit, val soon: (String) -> Unit)
+class StudyNav(val commentary: () -> Unit, val dictionary: () -> Unit, val rootWords: () -> Unit, val atlas: () -> Unit, val psalms: () -> Unit, val soon: (String) -> Unit)
 
 /** ஆய்வு · Study hub (design 1G). */
 @Composable
@@ -56,8 +56,7 @@ fun StudyHubScreen(nav: StudyNav) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             val mod = Modifier.widthIn(max = 720.dp).fillMaxWidth()
-            val psalms = tr("சங்கீத ஆய்வு", "Psalm explorer")
-            PsalmCard(mod) { nav.soon(psalms) }
+            PsalmCard(mod, nav.psalms)
             AtlasCard(mod, nav.atlas)
             Row(mod, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val dict = tr("அகராதி", "Dictionary")
@@ -78,27 +77,27 @@ fun StudyHubScreen(nav: StudyNav) {
 private fun PsalmCard(mod: Modifier, onClick: () -> Unit) {
     val c = Ts.colors
     val shape = RoundedCornerShape(20.dp)
-    // Genre counts from the website's Psalm Explorer.
-    val bars = listOf(41 to c.accent, 30 to c.amber, 25 to c.brand, 18 to Color(0xFF7D8C5A), 14 to Color(0xFF8A6E9C), 12 to c.muted, 10 to c.lineStrong)
+    // Psalms per theme in the explorer (data/psalms/psalms.toml on the website), largest first.
+    val bars = listOf(45 to c.accent, 29 to c.amber, 23 to c.brand, 15 to Color(0xFF7D8C5A), 14 to Color(0xFF8A6E9C), 11 to c.muted, 8 to c.lineStrong)
     Column(mod.clip(shape).background(c.surface2).border(1.5.dp, c.line, shape).clickable(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(tr("சங்கீத ஆய்வு", "Psalm explorer"), style = Ts.type.cardTitle.copy(fontSize = 18.sp), color = c.ink)
                 Text(tr("150 சங்கீதங்கள் · வகை × கருப்பொருள்", "150 psalms · genre × theme"), style = Ts.type.caption, color = c.muted)
             }
-            TsBadge(tr("விரைவில்", "Soon"), tinted = false)
+            Icon(TsIcons.ChevronRight, null, Modifier.size(18.dp), tint = c.accent)
         }
         Row(Modifier.fillMaxWidth().height(76.dp).padding(start = 18.dp, end = 18.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
             bars.forEach { (n, col) ->
-                Box(Modifier.weight(n.toFloat()).fillMaxHeight(n / 41f).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(col))
+                Box(Modifier.weight(n.toFloat()).fillMaxHeight(n / 45f).clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)).background(col))
             }
         }
         // Scrolls sideways on a phone rather than squeezing the last badge into a column.
         Row(Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            TsBadge(tr("புலம்பல் 41", "Lament 41"))
-            TsBadge(tr("துதி 30", "Praise 30"), tinted = false)
-            TsBadge(tr("நன்றி 25", "Thanks 25"), tinted = false)
-            TsBadge(tr("அரச 18", "Royal 18"), tinted = false)
+            TsBadge(tr("புலம்பல் 45", "Lament 45"))
+            TsBadge(tr("துதி 29", "Praise 29"), tinted = false)
+            TsBadge(tr("ஞானம் 23", "Wisdom 23"), tinted = false)
+            TsBadge(tr("நன்றி 15", "Thanks 15"), tinted = false)
         }
     }
 }

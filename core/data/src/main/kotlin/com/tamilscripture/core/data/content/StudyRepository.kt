@@ -10,6 +10,8 @@ import com.tamilscripture.core.model.ChapterMentions
 import com.tamilscripture.core.model.OriginalChapter
 import com.tamilscripture.core.model.Person
 import com.tamilscripture.core.model.Place
+import com.tamilscripture.core.model.PsalmCardData
+import com.tamilscripture.core.model.PsalmsIndex
 import com.tamilscripture.core.model.StrongsEntry
 import kotlinx.serialization.json.Json
 import java.io.IOException
@@ -40,6 +42,11 @@ class StudyRepository(
 
     suspend fun articleIndex(): List<ArticleIndexEntry> = typed("articles/index.json") ?: emptyList()
 
+    /** The Psalms explorer's grid and filters (website docs/feature_psalms_explorer.md). */
+    suspend fun psalmsIndex(): PsalmsIndex? = file("psalms/index.json")?.let { runCatching { PsalmsIndex.parse(it, json) }.getOrNull() }
+
+    suspend fun psalmCard(n: Int): PsalmCardData? = typed("psalms/$n.json")
+
     private suspend inline fun <reified T> typed(path: String): T? =
         file(path)?.let { runCatching { json.decodeFromString<T>(it) }.getOrNull() }
 
@@ -69,6 +76,7 @@ class StudyRepository(
                 path in setOf("people.json", "places.json", "glossary.json", "journeys.json", "church.json") -> "study.people"
             path.startsWith("articles/") -> "study.dictionary"
             path.startsWith("maps/") || path.startsWith("geo/") -> "study.maps"
+            path.startsWith("psalms/") || path.startsWith("psalter/") -> "study.psalms"
             else -> null
         }
     }

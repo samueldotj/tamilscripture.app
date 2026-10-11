@@ -32,6 +32,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class ArticleRoute(val id: String) : NavKey
 @Serializable data object DictionaryRoute : NavKey
 @Serializable data object RootWordsRoute : NavKey
+/** The Psalms explorer (the website's /psalms). */
+@Serializable data object PsalmsRoute : NavKey
 /** [focus] a place to centre on; [journey] a journey to show (the website's /atlas/{journey}). */
 @Serializable data class AtlasRoute(val focus: String? = null, val journey: String? = null, val fit: List<String> = emptyList()) : NavKey
 
@@ -69,6 +71,7 @@ fun parseDeepLink(uri: Uri, manifest: ContentManifest, defaultVersion: String): 
     val slug = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
     when {
         seg[0] == "atlas" && seg.size == 1 -> return DeepLink(AtlasRoute())
+        seg[0] == "psalms" && seg.size == 1 -> return DeepLink(PsalmsRoute)
         seg[0] == "atlas" && seg.size == 2 && seg[1] == "explore" -> return DeepLink(AtlasRoute())
         seg[0] == "atlas" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(AtlasRoute(journey = seg[1]))
         seg[0] == "place" && seg.size == 2 && slug.matches(seg[1]) -> return DeepLink(PlaceRoute(seg[1]))
