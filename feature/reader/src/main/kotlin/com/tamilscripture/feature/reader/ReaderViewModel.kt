@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -41,6 +42,9 @@ data class ReaderState(
     val second: Chapter? = null,
     /** M8-7: community heat bucket (1..4) by verse; empty when off or offline. */
     val heat: Map<Int, Int> = emptyMap(),
+    /** The chapters either side, shown greyed past the ends so reading runs on (continuous scrolling). */
+    val prevChapter: Chapter? = null,
+    val nextChapter: Chapter? = null,
     /** M1-9f: after 10 chapters read online, offer this version's pack (id, size in bytes). */
     val offer: Pair<String, Long>? = null,
 ) {
@@ -109,11 +113,19 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
 
     fun retry() = load(state.value.passage)
 
-    private fun load(p: Passage) {
+    /**
+     * Opens [p]. With [preset] (a neighbour already shown greyed) the text stays on screen
+     * through the change, so scrolling on into it is seamless; [prev] and [next] are the
+     * neighbours already known.
+     */
+    private fun load(p: Passage, preset: Chapter? = null, prev: Chapter? = null, next: Chapter? = null) {
         loadJob?.cancel()
+        neighbourJob?.cancel()
         mutable.update {
-            it.copy(passage = p, chapter = if (it.chapter?.book == p.book && it.chapter.chapter == p.chapter && it.chapter.version == p.version) it.chapter else null,
-                loading = true, error = false, selection = if (quiet) emptyList() else listOfNotNull(p.verse), crossRefs = emptyMap(), commentary = null)
+            val same = it.chapter?.book == p.book && it.chapter.chapter == p.chapter && it.chapter.version == p.version
+            it.copy(passage = p, chapter = preset ?: if (same) it.chapter else null,
+                loading = preset == null, error = false, selection = if (quiet) emptyList() else listOfNotNull(p.verse), crossRefs = emptyMap(), commentary = null,
+                prevChapter = prev, nextChapter = next)
         }
         loadJob = viewModelScope.launch {
             graph.content.chapter(p.version, p.book, p.chapter)
@@ -229,10 +241,36 @@ class ReaderViewModel(private val services: AppServices, initial: Passage, compa
         return true
     }
 
+    private var neighbourJob: Job? = null
+
+    /** Loads the chapters either side (from a pack or the cache when it can), for the greyed previews. */
     private fun neighbours(p: Passage) {
         val c = state.value.chapter ?: return
-        c.next?.let { graph.content.prefetch(p.version, it.book, it.chapter) }
-        c.prev?.let { graph.content.prefetch(p.version, it.book, it.chapter) }
+        neighbourJob?.cancel()
+        neighbourJob = viewModelScope.launch {
+            suspend fun get(ref: com.tamilscripture.core.model.ChapterRef?) = ref?.let {
+                graph.content.chapter(p.version, it.book, it.chapter).catch { }.firstOrNull()?.value
+            }
+            if (state.value.nextChapter == null) get(c.next)?.let { n -> mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(nextChapter = n) else s } }
+            if (state.value.prevChapter == null) get(c.prev)?.let { n -> mutable.update { s -> if (s.passage.chapterKey() == p.chapterKey()) s.copy(prevChapter = n) else s } }
+        }
+    }
+
+    /**
+     * Continuous scrolling: the reader scrolled on into the next (or back into the previous)
+     * chapter's greyed preview, which becomes the chapter in place; the one left becomes the
+     * preview on the other side.
+     */
+    fun continueInto(next: Boolean) {
+        val s = state.value
+        val current = s.chapter ?: return
+        val target = (if (next) s.nextChapter else s.prevChapter) ?: return
+        quiet = true
+        load(
+            Passage(s.passage.version, target.book, target.chapter), preset = target,
+            prev = if (next) current else null, next = if (next) null else current,
+        )
+        quiet = false
     }
 
     fun loadCommentary() {

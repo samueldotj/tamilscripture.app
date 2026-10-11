@@ -29,6 +29,13 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -170,6 +177,8 @@ fun ReaderTextList(
     penColor: HighlightColor = HighlightColor.Yellow,
     /** Stylus marks on a verse (M8-9); null where the pen is not offered. */
     onPen: ((verse: Int, stroke: PenStroke, quote: String) -> Unit)? = null,
+    /** Continuous scrolling: true to open the next chapter, false the previous, once scrolled into its preview. */
+    onContinue: ((next: Boolean) -> Unit)? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -179,9 +188,12 @@ fun ReaderTextList(
         if (dualLabels != null && dualColumns) {
             DualHeader(dualLabels, Modifier.padding(start = contentPadding.calculateStartPadding(LayoutDirection.Ltr), end = contentPadding.calculateEndPadding(LayoutDirection.Ltr), top = 8.dp))
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val resistance = rememberChapterEdges(items, listState, onContinue)
+        LazyColumn(Modifier.weight(1f).fillMaxWidth().nestedScroll(resistance), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(items, key = { it.key }) { item ->
                 when (item) {
+                    is ReaderItem.ChapterTitle -> ChapterTitleRow(item, textLocale.tamil())
+                    is ReaderItem.Preview -> PreviewRow(item.item, fontSize, lineHeightEm, textLocale.tamil(), sectionHeadingSize)
                     is ReaderItem.Dual -> VerseInteractionBox(item.verse, interactions) { extra ->
                         DualRow(
                             item, item.verse in selection, item.verse == playingVerse, fontSize, lineHeightEm, dualColumns,
@@ -320,6 +332,94 @@ fun ReaderTextList(
             visibleSince.keys.retainAll(seen)
         }
     }
+}
+
+/** Share of a scroll let through while the list runs into a neighbouring chapter's preview. */
+private const val EDGE_PASS = 0.6f
+
+/**
+ * Continuous scrolling (website and app alike): past a chapter's last verse the next one
+ * starts, greyed, and scrolling slows there; past its first verse the previous one ends,
+ * the same way. When the scroll comes to rest with the next chapter's title above the
+ * middle of the screen (or at the very end), or the current chapter's title below it (or
+ * at the very top): about a second of slowed scrolling. One line for both ways, so a chapter
+ * just opened is never at once on the side that would open the other again., [onContinue] opens that chapter in place.
+ */
+@Composable
+private fun rememberChapterEdges(items: List<ReaderItem>, listState: LazyListState, onContinue: ((Boolean) -> Unit)?): NestedScrollConnection {
+    val nextTitle = items.indexOfFirst { it is ReaderItem.ChapterTitle && it.preview }
+    val mainTitle = items.indexOfFirst { it is ReaderItem.ChapterTitle && !it.preview }
+    val hasPrev = items.firstOrNull() is ReaderItem.Preview
+    val connection = remember(listState, nextTitle, mainTitle, hasPrev) {
+        object : NestedScrollConnection {
+            fun intoNext(dy: Float) = dy < 0 && nextTitle >= 0 && (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= nextTitle
+            fun intoPrev(dy: Float) = dy > 0 && hasPrev && mainTitle >= 0 && listState.firstVisibleItemIndex <= mainTitle
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset =
+                if (intoNext(available.y) || intoPrev(available.y)) Offset(0f, available.y * (1f - EDGE_PASS)) else Offset.Zero
+            override suspend fun onPreFling(available: Velocity): Velocity =
+                if (intoNext(available.y) || intoPrev(available.y)) Velocity(0f, available.y * 0.6f) else Velocity.Zero
+        }
+    }
+    val go by rememberUpdatedState(onContinue)
+    LaunchedEffect(listState, nextTitle, mainTitle, hasPrev) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            val open = go ?: return@collect
+            if (scrolling || mainTitle < 0) return@collect
+            val info = listState.layoutInfo
+            // The middle of the text in view: the list runs under the bars, padded clear of them.
+            val middle = ((info.viewportStartOffset + info.beforeContentPadding) + (info.viewportEndOffset - info.afterContentPadding)) / 2
+            if (nextTitle >= 0) {
+                val title = info.visibleItemsInfo.firstOrNull { it.index == nextTitle }
+                val past = listState.firstVisibleItemIndex > nextTitle
+                if (past || (title != null && (title.offset < middle || !listState.canScrollForward))) { open(true); return@collect }
+            }
+            if (hasPrev) {
+                val title = info.visibleItemsInfo.firstOrNull { it.index == mainTitle }
+                val below = (info.visibleItemsInfo.lastOrNull()?.index ?: Int.MAX_VALUE) < mainTitle
+                if (below || (title != null && (title.offset > middle || !listState.canScrollBackward))) open(false)
+            }
+        }
+    }
+    return connection
+}
+
+/** A chapter's name where it begins, between it and the end of the one before. */
+@Composable
+private fun ChapterTitleRow(item: ReaderItem.ChapterTitle, tamil: Boolean) {
+    if (!item.shown) {
+        Box(Modifier.fillMaxWidth().height(1.dp))
+        return
+    }
+    val c = Ts.colors
+    Column(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 28.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.line))
+        Text(
+            item.text,
+            style = Ts.type.headline.copy(fontFamily = Ts.type.scriptureFamily(tamil)),
+            color = if (item.preview) c.faint else c.ink,
+        )
+    }
+}
+
+/** A neighbouring chapter's row, greyed and plain: no marks, numbers kept, nothing to tap. */
+@Composable
+private fun PreviewRow(item: ReaderItem, fontSize: Int, lineHeightEm: Float, tamil: Boolean, headingSize: Int) {
+    val c = Ts.colors
+    val text: String = when (item) {
+        is ReaderItem.Verse -> item.label + " " + item.text
+        is ReaderItem.Para -> item.runs.joinToString("") { r -> (r.label?.let { "$it " } ?: "") + r.text }
+        is ReaderItem.Heading -> item.text
+        is ReaderItem.Descriptive -> item.text
+        else -> ""
+    }
+    if (text.isEmpty()) return
+    Text(
+        text,
+        style = if (item is ReaderItem.Heading) Ts.type.sectionHeading.copy(fontSize = headingSize.sp, fontFamily = Ts.type.scriptureFamily(tamil))
+        else Ts.type.scripture(fontSize.sp, lineHeightEm, tamil),
+        color = c.faint,
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = if (item is ReaderItem.Heading) 8.dp else 6.dp).clearAndSetSemantics { },
+    )
 }
 
 /** Version names over the two columns (website 3B). */

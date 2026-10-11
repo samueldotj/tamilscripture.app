@@ -201,9 +201,17 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val second = state.second.takeIf { state.dual }
     // Reader and Standard flow in paragraphs; Study Bible and dual view go a verse at a time.
     val paragraphs = second == null && settings.format != ReadingFormat.Study
-    val items = remember(chapter, second, settings.headings, paragraphs) {
-        val a = if (paragraphs) chapter?.toParagraphs(settings.headings).orEmpty() else chapter?.toItems(settings.headings).orEmpty()
-        if (second == null) a else dualItems(a, second.toItems(showHeadings = false))
+    val items = remember(chapter, second, settings.headings, paragraphs, state.prevChapter, state.nextChapter, state.manifest, lang) {
+        fun rows(ch: com.tamilscripture.core.model.Chapter) = if (paragraphs) ch.toParagraphs(settings.headings) else ch.toItems(settings.headings)
+        val a = chapter?.let(::rows).orEmpty()
+        when {
+            second != null -> dualItems(a, second.toItems(showHeadings = false))
+            chapter == null -> a
+            // One version: the neighbouring chapters run on, greyed, past either end.
+            else -> continuousItems(chapter, a, state.prevChapter?.let { it to rows(it) }, state.nextChapter?.let { it to rows(it) }) { ch ->
+                state.manifest?.book(ch.book)?.label(lang, ch.chapter) ?: "${ch.book} ${ch.chapter}"
+            }
+        }
     }
     // Study Bible: cross-references under each verse when the setting is on (the website's fmt-xref).
     val studyXrefs = remember(state.crossRefs, settings.crossRefs, settings.format) {
@@ -220,11 +228,25 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     }
     val sourceName = state.commentarySources.firstOrNull { it.id == settings.commentarySource }?.short
 
-    LaunchedEffect(items, state.passage.verse) {
+    // Not on every change of [items]: the neighbouring chapters arrive after the text.
+    LaunchedEffect(chapter, second, paragraphs, state.passage.verse) {
         val v = state.passage.verse ?: return@LaunchedEffect
         val i = items.indexOfVerse(v)
         if (i >= 0) listState.scrollToItem(i)
     }
+    // A chapter opens at its start (its title, below the previous chapter's greyed end), except
+    // one scrolled into from a neighbour, which stays where it is. Once per chapter, so turning
+    // the phone keeps the place.
+    var continued by remember { mutableStateOf(false) }
+    var positioned by rememberSaveable { mutableStateOf<String?>(null) }
+    val mainStart = items.indexOfFirst { it is ReaderItem.ChapterTitle && !it.preview }
+    LaunchedEffect(state.passage.chapterKey(), mainStart >= 0) {
+        if (mainStart < 0 || positioned == state.passage.chapterKey()) return@LaunchedEffect
+        positioned = state.passage.chapterKey()
+        if (continued) continued = false
+        else if (state.passage.verse == null) listState.scrollToItem(mainStart)
+    }
+    val onContinue: ((Boolean) -> Unit)? = if (state.dual) null else { next -> continued = true; vm.continueInto(next) }
     // Switching between one and two columns keeps the verse at the top in place, instead of a
     // pixel offset that means something else in the other layout.
     var topVerse by remember { mutableStateOf<Int?>(null) }
@@ -403,7 +425,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     state, items, (textSize - 2).coerceAtLeast(15), 1.85f, settings.footnotes, listState, playingVerse, sourceName,
                                     PaddingValues(start = 36.dp, end = 36.dp, top = 8.dp, bottom = 160.dp), vm, nav, Modifier.fillMaxSize(),
                                     showInlineCommentary = false, dualLabels = dualLabels, dualColumns = true, interactions = interactions,
-                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs, signedIn = signedIn, onAskSignIn = { askSignIn = true },
+                                    marks = marks, onOpenNote = { n -> editingNote = n.id }, notesInMargin = tab == null, format = settings.format, xrefs = studyXrefs, signedIn = signedIn, onAskSignIn = { askSignIn = true }, onContinue = onContinue,
                                 )
                             }
                             ActionCardOverlay(state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions, Modifier.align(Alignment.BottomCenter).padding(16.dp), selColor, pickColor)
@@ -467,7 +489,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                         Modifier.widthIn(max = if (state.dual && columns) 1100.dp else 720.dp).fillMaxSize(),
                         showInlineCommentary = !state.dual, dualLabels = dualLabels, dualColumns = columns, interactions = interactions,
                         marks = marks, onOpenNote = { n -> editingNote = n.id }, format = settings.format, xrefs = studyXrefs,
-                        signedIn = signedIn, onAskSignIn = { askSignIn = true },
+                        signedIn = signedIn, onAskSignIn = { askSignIn = true }, onContinue = onContinue,
                     )
                     ActionCardOverlay(
                         state.selection.isNotEmpty(), selectedRef, hasAudio, vm, actions,
@@ -704,6 +726,7 @@ private fun ChapterBody(
     xrefs: Map<Int, List<com.tamilscripture.core.model.CrossRef>> = emptyMap(),
     signedIn: Boolean = false,
     onAskSignIn: () -> Unit = {},
+    onContinue: ((Boolean) -> Unit)? = null,
 ) {
     val c = Ts.colors
     when {
@@ -741,6 +764,7 @@ private fun ChapterBody(
                     val p = Passage(state.passage.version, vid.book, vid.chapter, vid.verse)
                     nav.follow?.invoke(p) ?: vm.open(p)
                 },
+                onContinue = onContinue,
             )
         }
     }

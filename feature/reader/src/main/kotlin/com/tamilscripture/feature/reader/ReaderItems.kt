@@ -30,6 +30,15 @@ sealed interface ReaderItem {
      */
     data class Para(override val key: String, val runs: List<Run>, val poetry: Boolean) : ReaderItem
 
+    /**
+     * Continuous scrolling: a chapter's name where it starts. [preview] for the next chapter's
+     * (greyed); the current chapter's is [shown] only when the previous one's end is above it.
+     */
+    data class ChapterTitle(override val key: String, val text: String, val preview: Boolean, val shown: Boolean = true) : ReaderItem
+
+    /** A row of the previous or next chapter, greyed past the ends; scrolling on opens that chapter. */
+    data class Preview(override val key: String, val item: ReaderItem) : ReaderItem
+
     /** Dual view (A-3.3): one verse in both versions; a null side lacks the verse (A-3.4). */
     data class Dual(
         override val key: String,
@@ -45,6 +54,43 @@ sealed interface ReaderItem {
  * continuation; [verse] null on text outside verses. A run of "\n" breaks a poetry line.
  */
 data class Run(val verse: Int?, val label: String?, val text: String, val notes: List<Note> = emptyList())
+
+/** How many rows of a neighbouring chapter show greyed past each end. */
+internal const val PREVIEW_ROWS = 6
+
+/**
+ * Continuous scrolling: the previous chapter's last rows (greyed), this chapter's title and
+ * rows, then the next chapter's title and first rows (greyed). Every row is keyed by its
+ * chapter, so when a neighbour opens its rows keep their keys and the list its place.
+ */
+fun continuousItems(
+    chapter: com.tamilscripture.core.model.Chapter,
+    rows: List<ReaderItem>,
+    prev: Pair<com.tamilscripture.core.model.Chapter, List<ReaderItem>>?,
+    next: Pair<com.tamilscripture.core.model.Chapter, List<ReaderItem>>?,
+    title: (com.tamilscripture.core.model.Chapter) -> String,
+): List<ReaderItem> = buildList {
+    fun k(c: com.tamilscripture.core.model.Chapter) = "${c.book}.${c.chapter}:"
+    prev?.let { (c, r) -> r.takeLast(PREVIEW_ROWS).forEach { add(ReaderItem.Preview(k(c) + it.key, it)) } }
+    // Genesis 1 has nothing above it to set it apart from.
+    add(ReaderItem.ChapterTitle(k(chapter) + "title", title(chapter), preview = false, shown = chapter.prev != null))
+    rows.forEach { add(it.withKey(k(chapter) + it.key)) }
+    next?.let { (c, r) ->
+        add(ReaderItem.ChapterTitle(k(c) + "title", title(c), preview = true))
+        r.take(PREVIEW_ROWS).forEach { add(ReaderItem.Preview(k(c) + it.key, it)) }
+    }
+}
+
+/** The item under [key]: rows are keyed by chapter, so a preview row keeps its key when its chapter opens. */
+fun ReaderItem.withKey(key: String): ReaderItem = when (this) {
+    is ReaderItem.Heading -> copy(key = key)
+    is ReaderItem.Descriptive -> copy(key = key)
+    is ReaderItem.Verse -> copy(key = key)
+    is ReaderItem.Para -> copy(key = key)
+    is ReaderItem.Dual -> copy(key = key)
+    is ReaderItem.ChapterTitle -> copy(key = key)
+    is ReaderItem.Preview -> copy(key = key)
+}
 
 /** The verse an item shows (a paragraph: its first), for scrolling, selection and read tracking. */
 val ReaderItem.verseNumber: Int?
