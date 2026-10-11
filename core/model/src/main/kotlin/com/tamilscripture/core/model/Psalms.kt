@@ -80,6 +80,8 @@ data class PsalmsIndex(
 data class PsalmTune(
     val id: String, val name: String, val meter: String = "", val key: String = "",
     val composer: String = "", val source: String = "",
+    /** Other names the tune is known by ("French" for Dundee in Scotland). */
+    @SerialName("other_names") val otherNames: List<String> = emptyList(),
 )
 
 @Serializable data class PsalmNt(val authors: List<String>, val ref: String)

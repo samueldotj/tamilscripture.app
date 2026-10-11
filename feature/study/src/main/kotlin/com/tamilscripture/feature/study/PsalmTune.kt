@@ -187,7 +187,9 @@ fun PsalmTuneView(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val credit = listOf(tune.source, tune.composer.takeIf { it != "Anonymous" }).filter { !it.isNullOrBlank() }.joinToString(" · ")
+                // Where the melody comes from, and the other names it goes by.
+                val also = tune.otherNames.takeIf { it.isNotEmpty() }?.let { tr("வேறு பெயர்: ", "also known as ") + it.joinToString(", ") }
+                val credit = listOf(tune.source, tune.composer.takeIf { it != "Anonymous" }, also).filter { !it.isNullOrBlank() }.joinToString(" · ")
                 Text(credit, style = Ts.type.captionSmall, color = c.muted, modifier = Modifier.weight(1f))
                 Text(
                     if (full) tr("முதல் வரி", "First line") else tr("முழுப் பண்", "Full tune"),
