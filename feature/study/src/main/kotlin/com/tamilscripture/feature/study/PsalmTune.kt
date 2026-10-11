@@ -46,6 +46,13 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.tamilscripture.core.designsystem.component.IconBox
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -130,28 +137,47 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<Str
     LaunchedEffect(stanza, line) { onPlace(if (line < 0) null else TunePlace(stanza, line)) }
     DisposableEffect(Unit) { onDispose { onPlace(null) } }
 
+    var big by remember { mutableStateOf(false) }
+    val onToggle: () -> Unit = {
+        if (playing) {
+            player.pause()
+            playing = false
+        } else {
+            scope.launch {
+                val file = withContext(Dispatchers.IO) {
+                    File(context.cacheDir, "psalter/${tune.id}.mp3").takeIf { it.exists() }
+                        ?: graph.study.bytes("psalter/${tune.id}/audio.mp3")?.let { bytes ->
+                            File(context.cacheDir, "psalter").mkdirs()
+                            File(context.cacheDir, "psalter/${tune.id}.mp3").apply { writeBytes(bytes) }
+                        }
+                }
+                if (file != null && player.play(file, rate)) playing = true
+            }
+        }
+    }
+    val onRate: (Float) -> Unit = { rate = it; player.speed(it) }
+
     PsalmTuneView(
         tune, data, playing, position, full, stanza = stanza, stanzas = stanzas,
-        lyrics = lyrics, rate = rate, onRate = { rate = it; player.speed(it) },
-        onToggle = {
-            if (playing) {
-                player.pause()
-                playing = false
-            } else {
-                scope.launch {
-                    val file = withContext(Dispatchers.IO) {
-                        File(context.cacheDir, "psalter/${tune.id}.mp3").takeIf { it.exists() }
-                            ?: graph.study.bytes("psalter/${tune.id}/audio.mp3")?.let { bytes ->
-                                File(context.cacheDir, "psalter").mkdirs()
-                                File(context.cacheDir, "psalter/${tune.id}.mp3").apply { writeBytes(bytes) }
-                            }
-                    }
-                    if (file != null && player.play(file, rate)) playing = true
-                }
-            }
-        },
-        onFull = { full = !full },
+        lyrics = lyrics, rate = rate, onRate = onRate, onToggle = onToggle,
+        onFull = { full = !full }, onBig = { big = true },
     )
+    // Full screen for singing: the whole tune and its words as large as the screen allows,
+    // the same player, the screen kept awake.
+    if (big) {
+        Dialog(onDismissRequest = { big = false }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            val view = LocalView.current
+            DisposableEffect(view) {
+                view.keepScreenOn = true
+                onDispose { view.keepScreenOn = false }
+            }
+            PsalmTuneView(
+                tune, data, playing, position, full = true, stanza = stanza, stanzas = stanzas,
+                lyrics = lyrics, rate = rate, onRate = onRate, onToggle = onToggle, onFull = {},
+                big = true, onBig = { big = false },
+            )
+        }
+    }
 }
 
 /** Where the organ is: the stanza and the line of it being sung. */
@@ -174,14 +200,29 @@ fun PsalmTuneView(
     tune: PsalmTune, data: TuneData?, playing: Boolean, positionMs: Long, full: Boolean,
     stanza: Int = 0, stanzas: Int = 1, lyrics: List<List<List<String>>> = emptyList(),
     rate: Float = 1f, onRate: (Float) -> Unit = {}, onToggle: () -> Unit, onFull: () -> Unit,
+    /** Full screen for singing ([onBig] closes it); otherwise [onBig] opens it. */
+    big: Boolean = false, onBig: (() -> Unit)? = null,
 ) {
     val c = Ts.colors
     val shape = RoundedCornerShape(12.dp)
     val note = data?.events?.takeIf { playing || positionMs > 0 }?.at(positionMs)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Kicker("${tr("சங்கீதப் பண்", "Psalter tune")} · ${tune.name}")
+    Column(
+        if (big) Modifier.fillMaxSize().background(c.surface).systemBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp) else Modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (big) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(tune.name, style = Ts.type.rowTitle.copy(fontSize = 17.sp), color = c.ink)
+                if (stanzas > 1) Text(tr("பத்தி ${stanza + 1} / $stanzas", "Stanza ${stanza + 1} of $stanzas"), style = Ts.type.rowTitle.copy(fontSize = 16.sp), color = c.amber, modifier = Modifier.weight(1f))
+                else Box(Modifier.weight(1f))
+                IconBox(TsIcons.Close, tr("முழுத் திரையிலிருந்து வெளியேறு", "Exit full screen"), { onBig?.invoke() })
+            }
+        } else {
+            Kicker("${tr("சங்கீதப் பண்", "Psalter tune")} · ${tune.name}")
+        }
         Column(
-            Modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.5.dp, c.line, shape).padding(horizontal = 14.dp, vertical = 12.dp),
+            if (big) Modifier.fillMaxWidth().weight(1f)
+            else Modifier.fillMaxWidth().clip(shape).background(c.surface).border(1.5.dp, c.line, shape).padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (data != null) {
@@ -197,7 +238,13 @@ fun PsalmTuneView(
                     val y = if (full) n.fullLyric else n.incipitLyric
                     if (x == null || y == null) null else Word(x, y, text, i == litSyllable)
                 }
-                Score(drawing, if (full) note?.fullId else note?.incipitId, if (full) null else 130f, words)
+                val lit = if (full) note?.fullId else note?.incipitId
+                if (big) {
+                    // As large as the screen allows: the space left after the controls.
+                    Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) { Score(drawing, lit, null, words, fit = true) }
+                } else {
+                    Score(drawing, lit, if (full) null else 130f, words)
+                }
             } else {
                 Box(Modifier.fillMaxWidth().height(64.dp))
             }
@@ -248,10 +295,16 @@ fun PsalmTuneView(
                 val also = tune.otherNames.takeIf { it.isNotEmpty() }?.let { tr("வேறு பெயர்: ", "also known as ") + it.joinToString(", ") }
                 val credit = listOf(tune.source, tune.composer.takeIf { it != "Anonymous" }, also).filter { !it.isNullOrBlank() }.joinToString(" · ")
                 Text(credit, style = Ts.type.captionSmall, color = c.muted, modifier = Modifier.weight(1f))
-                Text(
+                if (!big) Text(
                     if (full) tr("முதல் வரி", "First line") else tr("முழுப் பண்", "Full tune"),
                     style = Ts.type.label, color = c.accent, modifier = Modifier.clickable(onClick = onFull).padding(6.dp),
                 )
+                if (!big && onBig != null && data != null) {
+                    Text(
+                        tr("முழுத் திரை", "Full screen"),
+                        style = Ts.type.label, color = c.accent, modifier = Modifier.clickable(onClick = onBig).padding(6.dp),
+                    )
+                }
             }
         }
     }
@@ -264,15 +317,17 @@ private class Word(val x: Float, val y: Float, val text: String, val lit: Boolea
 
 /** The drawing at the width available (no taller than [maxHeightDp]), the note [lit] in the accent colour, [words] under the notes. */
 @Composable
-private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, words: List<Word> = emptyList()) {
+private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, words: List<Word> = emptyList(), fit: Boolean = false) {
     val c = Ts.colors
     val marks = remember(drawing) { marks(drawing) }
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = if (fit) Alignment.Center else Alignment.TopStart) {
         val ratio = drawing.height / drawing.width
         var w = maxWidth
         if (maxHeightDp != null && w * ratio > maxHeightDp.dp) w = maxHeightDp.dp / ratio
+        // Full screen: no taller than the space given, whichever way the phone is held.
+        if (fit && w * ratio > maxHeight) w = maxHeight / ratio
         Canvas(Modifier.width(w).height(w * ratio).semantics { contentDescription = "Musical notation" }) {
             val s = size.width / drawing.width
             withTransform({ scale(s, s, pivot = androidx.compose.ui.geometry.Offset.Zero) }) {

@@ -78,6 +78,29 @@ class PsalmsScreenshotTest {
         org.junit.Assert.assertTrue(p100.metrical[0].stanzas[0][0].startsWith("¹All people that on earth do dwell"))
     }
 
+    /** Full screen for singing: the whole tune with stanza 2's words, 9.5 s in (its second line). */
+    private fun bigShot(file: String, w: Dp, h: Dp) {
+        val words = cards[23]!!.metrical[0].lyrics
+        compose.setContent {
+            CompositionLocalProvider(LocalUiLang provides UiLang.English) {
+                TsTheme(ThemeMode.Light) {
+                    Box(Modifier.size(w, h)) {
+                        PsalmTuneView(
+                            cards[23]!!.tunes[0], crimond, playing = true, positionMs = 9500, full = true,
+                            stanza = 1, stanzas = 5, lyrics = words, onToggle = {}, onFull = {}, big = true, onBig = {},
+                        )
+                    }
+                }
+            }
+        }
+        compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
+    }
+
+    @Test fun fullScreenPortrait() = bigShot("psalms_fullscreen_portrait", 411.dp, 900.dp)
+
+    @Config(sdk = [35], qualifiers = "w900dp-h411dp-xxhdpi")
+    @Test fun fullScreenLandscape() = bigShot("psalms_fullscreen_landscape", 900.dp, 411.dp)
+
     /** The third note (B-flat, 2.2 s in) is lit while it sounds. */
     @Config(sdk = [35], qualifiers = "w411dp-h1900dp-xxhdpi")
     @Test fun tunePlayingTamil() = cardShot("psalms_tune_playing_light_ta", ThemeMode.Light, UiLang.Tamil, atMs = 2200)
