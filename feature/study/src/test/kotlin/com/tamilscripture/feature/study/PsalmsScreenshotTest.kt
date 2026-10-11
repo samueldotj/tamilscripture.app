@@ -56,8 +56,8 @@ class PsalmsScreenshotTest {
                 TsTheme(mode) {
                     Box(Modifier.size(411.dp, 1900.dp).background(Ts.colors.surface)) {
                         val p = index.psalms[22]
-                        PsalmCardView(index, p, cards[23], verses[23], {}, onRead = {}, onShare = {}, tune = {
-                            PsalmTuneView(cards[23]!!.tunes[0], crimond, playing = atMs > 0, positionMs = atMs, full = full, onToggle = {}, onFull = {})
+                        PsalmCardView(index, p, cards[23], verses[23], {}, onRead = {}, onShare = {}, sing = {
+                            PsalmSing(cards[23]!!) { t -> PsalmTuneView(t, crimond, playing = atMs > 0, positionMs = atMs, full = full, onToggle = {}, onFull = {}) }
                         })
                     }
                 }
@@ -65,6 +65,17 @@ class PsalmsScreenshotTest {
         }
         compose.onNodeWithText(if (full) "First line" else if (lang == UiLang.Tamil) "முழுப் பண்" else "Full tune").assertIsDisplayed()
         compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
+    }
+
+    /** Psalm 100's two versions in the 1650 psalter: L.M. with its traditional tune, C.M. with tunes that fit the metre. */
+    @Test fun metricalVersions() {
+        val p100 = json.decodeFromString<PsalmCardData>(res("100.json"))
+        org.junit.Assert.assertEquals(listOf("L.M.", "C.M."), p100.metrical.map { it.label })
+        org.junit.Assert.assertEquals("old-hundredth", p100.metrical[0].tunes.first())
+        org.junit.Assert.assertFalse(p100.metrical[0].fallback)
+        org.junit.Assert.assertTrue(p100.metrical[1].fallback)
+        org.junit.Assert.assertTrue(p100.metrical[1].tunes.all { p100.tune(it) != null })
+        org.junit.Assert.assertTrue(p100.metrical[0].stanzas[0][0].startsWith("¹All people that on earth do dwell"))
     }
 
     /** The third note (B-flat, 2.2 s in) is lit while it sounds. */
@@ -80,8 +91,8 @@ class PsalmsScreenshotTest {
                 TsTheme(mode) {
                     Box(Modifier.size(w, h)) {
                         PsalmsExplorer(index, loading = false, onBack = {}, initialPsalm = psalm) { idx, p, pick ->
-                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, tune = cards[p.n]?.tunes?.firstOrNull()?.takeIf { p.n == 23 }?.let { t ->
-                                { PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, onToggle = {}, onFull = {}) }
+                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, sing = cards[p.n]?.takeIf { p.n == 23 }?.let { cd ->
+                                { PsalmSing(cd) { t -> PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, onToggle = {}, onFull = {}) } }
                             })
                         }
                     }

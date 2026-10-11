@@ -377,7 +377,7 @@ private fun PsalmDetail(index: PsalmsIndex, psalm: Psalm, links: StudyLinks, onP
         index, psalm, card, verse, onPick,
         onRead = { links.read(Passage(settings.version, "PSA", psalm.n)) },
         onShare = { links.read(Passage(settings.version, "PSA", psalm.n, psalm.keyVerses.first)) },
-        tune = card?.tunes?.firstOrNull()?.let { t -> { PsalmTuneBlock(t) } },
+        sing = card?.takeIf { it.metrical.isNotEmpty() }?.let { cd -> { PsalmSing(cd) { t -> PsalmTuneBlock(t) } } },
     )
 }
 
@@ -392,8 +392,8 @@ fun PsalmCardView(
     onPick: (Int) -> Unit,
     onRead: () -> Unit,
     onShare: () -> Unit,
-    /** The psalter tune block, when the psalm has a tune. */
-    tune: (@Composable () -> Unit)? = null,
+    /** "Sing this psalm" (PsalmSing): the 1650 metrical psalm and its tunes, below the actions. */
+    sing: (@Composable () -> Unit)? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -435,8 +435,6 @@ fun PsalmCardView(
             }
         }
 
-        tune?.invoke()
-
         val related = index.psalms.filter { it.theme == psalm.theme && it.n != psalm.n }.take(8)
         if (related.isNotEmpty() && theme != null) {
             Kicker(tr("${theme.ta} — மேலும்", "More on ${theme.en}"))
@@ -466,6 +464,11 @@ fun PsalmCardView(
                 Icon(TsIcons.Share, null, Modifier.size(16.dp), tint = c.ink)
                 Text(tr("பகிர்", "Share"), style = Ts.type.rowTitle, color = c.ink)
             }
+        }
+
+        if (sing != null) {
+            HDivider(Modifier.padding(vertical = 8.dp))
+            sing()
         }
     }
 }

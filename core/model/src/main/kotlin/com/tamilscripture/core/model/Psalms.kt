@@ -93,6 +93,28 @@ data class PsalmCardData(
     val tags: List<String> = emptyList(),
     val nt: PsalmNt? = null,
     val tunes: List<PsalmTune> = emptyList(),
+    /** The psalm in the 1650 Scottish Psalter: one entry per version, or per part of Psalm 119. */
+    val metrical: List<MetricalVersion> = emptyList(),
+) {
+    fun tune(id: String): PsalmTune? = tunes.firstOrNull { it.id == id }
+}
+
+/**
+ * One version of a psalm in the Scottish Psalter: [label] "C.M.", "L.M.", "10s"…; [stanzas]
+ * as lines, where a line starting with two spaces is indented and superscript digits start
+ * scripture verses; [tunes] the traditional pairings first, or, when [fallback], tunes that
+ * only fit the metre.
+ */
+@Serializable
+data class MetricalVersion(
+    val key: String,
+    val part: Int? = null,
+    val label: String,
+    val meter: String,
+    val argument: String? = null,
+    val stanzas: List<List<String>>,
+    val tunes: List<String> = emptyList(),
+    val fallback: Boolean = false,
 )
 
 /**
