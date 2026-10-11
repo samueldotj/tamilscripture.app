@@ -52,6 +52,7 @@ data class PsalterDrawing(
 data class TuneNote(
     val on: Long, val off: Long, val midi: Int, val fullId: String, val incipitId: String?,
     val fullX: Float? = null, val fullLyric: Float? = null, val incipitX: Float? = null, val incipitLyric: Float? = null,
+    val fullY: Float? = null, val incipitY: Float? = null,
 )
 
 /**
@@ -68,6 +69,36 @@ data class TuneEvents(
 
     /** The line of the stanza sung at [ms], or -1 before the first note and after the last. */
     fun line(ms: Long): Int = if (ms < 0 || ms >= durationMs) -1 else lines.indexOfLast { it <= ms }
+
+    /**
+     * The note nearest a point ([x], [y] in a drawing's units, [width] by [height]): to its
+     * head or to the word under it, whichever is closer, so a tap on either finds it. -1 when
+     * no note is drawn. As the website's seek.ts; noteheads sit 80 units right of their x.
+     */
+    fun nearest(x: Float, y: Float, width: Float, height: Float, full: Boolean): Int {
+        var best = -1
+        var bestD = Float.MAX_VALUE
+        notes.forEachIndexed { i, n ->
+            val hx = (if (full) n.fullX else n.incipitX) ?: return@forEachIndexed
+            val hy = (if (full) n.fullY else n.incipitY) ?: return@forEachIndexed
+            val lyric = if (full) n.fullLyric else n.incipitLyric
+            val dx = hx * width + 80 - x
+            val dy = minOf(kotlin.math.abs(hy * height - y), lyric?.let { kotlin.math.abs(it * height - y) } ?: Float.MAX_VALUE)
+            val d = dx * dx + dy * dy * 4 // a system's height matters more than a note's step
+            if (d < bestD) { bestD = d; best = i }
+        }
+        return best
+    }
+
+    /**
+     * A point [ms] in the whole psalm (the audio's own clock, [stanzas] a [breathMs] apart) as
+     * a stanza and a position in it; a point in a breath goes to the end of the stanza before.
+     */
+    fun place(ms: Long, breathMs: Long, stanzas: Int): Pair<Int, Long> {
+        val per = durationMs + breathMs
+        val stanza = (ms / per).toInt().coerceIn(0, maxOf(0, stanzas - 1))
+        return stanza to (ms - stanza * per).coerceIn(0, durationMs)
+    }
 
     companion object {
         fun parse(text: String): TuneEvents {
@@ -88,6 +119,7 @@ data class TuneEvents(
                         m.getValue("on").jsonPrimitive.long, m.getValue("off").jsonPrimitive.long,
                         m.getValue("midi").jsonPrimitive.double.toInt(), id(m["full"])!!, id(m["incipit"]),
                         num(m["full"], 0), num(m["full"], 3), num(m["incipit"], 0), num(m["incipit"], 3),
+                        num(m["full"], 1), num(m["incipit"], 1),
                     )
                 },
             )

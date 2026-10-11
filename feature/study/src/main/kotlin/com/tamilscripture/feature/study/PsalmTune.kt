@@ -9,6 +9,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,6 +40,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -92,6 +100,7 @@ class TuneData(val incipit: PsalterDrawing, val full: PsalterDrawing, val events
  * in the accent colour. Audio is the website's pre-rendered MP3 (one stanza on organ),
  * played [stanzas] times with a breath between, with MediaPlayer under transient audio
  * focus so the Bible audio pauses meanwhile. [onPlace] hears the stanza and line being sung.
+ * A tap on a note or a word sings from there, and the timeline can be dragged.
  */
 @Composable
 fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<String>>> = emptyList(), onPlace: (TunePlace?) -> Unit = {}) {
@@ -138,21 +147,43 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<Str
     DisposableEffect(Unit) { onDispose { onPlace(null) } }
 
     var big by remember { mutableStateOf(false) }
+    val start: () -> Unit = {
+        scope.launch {
+            val file = withContext(Dispatchers.IO) {
+                File(context.cacheDir, "psalter/${tune.id}.mp3").takeIf { it.exists() }
+                    ?: graph.study.bytes("psalter/${tune.id}/audio.mp3")?.let { bytes ->
+                        File(context.cacheDir, "psalter").mkdirs()
+                        File(context.cacheDir, "psalter/${tune.id}.mp3").apply { writeBytes(bytes) }
+                    }
+            }
+            if (file != null && player.play(file, rate)) playing = true
+        }
+    }
     val onToggle: () -> Unit = {
         if (playing) {
             player.pause()
             playing = false
         } else {
-            scope.launch {
-                val file = withContext(Dispatchers.IO) {
-                    File(context.cacheDir, "psalter/${tune.id}.mp3").takeIf { it.exists() }
-                        ?: graph.study.bytes("psalter/${tune.id}/audio.mp3")?.let { bytes ->
-                            File(context.cacheDir, "psalter").mkdirs()
-                            File(context.cacheDir, "psalter/${tune.id}.mp3").apply { writeBytes(bytes) }
-                        }
-                }
-                if (file != null && player.play(file, rate)) playing = true
-            }
+            start()
+        }
+    }
+    /** Go to [ms] of the whole psalm, in the audio's own clock (stanzas a breath apart). */
+    fun seek(ms: Long) {
+        val ev = data?.events ?: return
+        val (s, at) = ev.place(ms, BREATH_MS, stanzas)
+        stanza = s
+        position = at
+        player.seek(at)
+    }
+    val onSeek: (Float) -> Unit = { f ->
+        val once = data?.events?.durationMs ?: 0
+        seek((f * (stanzas * once + (stanzas - 1) * BREATH_MS)).toLong())
+    }
+    // A tap on a note or its word sings from that note, in the stanza being sung.
+    val onNote: (Int) -> Unit = { i ->
+        data?.events?.let { ev ->
+            seek(stanza * (ev.durationMs + BREATH_MS) + ev.notes[i].on)
+            if (!playing) start()
         }
     }
     val onRate: (Float) -> Unit = { rate = it; player.speed(it) }
@@ -160,7 +191,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<Str
     PsalmTuneView(
         tune, data, playing, position, full, stanza = stanza, stanzas = stanzas,
         lyrics = lyrics, rate = rate, onRate = onRate, onToggle = onToggle,
-        onFull = { full = !full }, onBig = { big = true },
+        onFull = { full = !full }, onBig = { big = true }, onSeek = onSeek, onNote = onNote,
     )
     // Full screen for singing: the whole tune and its words as large as the screen allows,
     // the same player, the screen kept awake.
@@ -174,7 +205,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<Str
             PsalmTuneView(
                 tune, data, playing, position, full = true, stanza = stanza, stanzas = stanzas,
                 lyrics = lyrics, rate = rate, onRate = onRate, onToggle = onToggle, onFull = {},
-                big = true, onBig = { big = false },
+                big = true, onBig = { big = false }, onSeek = onSeek, onNote = onNote,
             )
         }
     }
@@ -192,7 +223,8 @@ val TEMPI = listOf(0.85f, 1f, 1.15f)
 /**
  * The tune block without loading or audio (screenshot tests pass fixtures). [positionMs] is
  * within [stanza], in the audio's own clock; [lyrics] are the version's words, the current
- * stanza's written under the notes; [rate] is the tempo chosen.
+ * stanza's written under the notes; [rate] is the tempo chosen. [onSeek] takes a point of the
+ * timeline (0 to 1) and [onNote] a note tapped in the score.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -202,6 +234,7 @@ fun PsalmTuneView(
     rate: Float = 1f, onRate: (Float) -> Unit = {}, onToggle: () -> Unit, onFull: () -> Unit,
     /** Full screen for singing ([onBig] closes it); otherwise [onBig] opens it. */
     big: Boolean = false, onBig: (() -> Unit)? = null,
+    onSeek: (Float) -> Unit = {}, onNote: (Int) -> Unit = {},
 ) {
     val c = Ts.colors
     val shape = RoundedCornerShape(12.dp)
@@ -239,11 +272,14 @@ fun PsalmTuneView(
                     if (x == null || y == null) null else Word(x, y, text, i == litSyllable)
                 }
                 val lit = if (full) note?.fullId else note?.incipitId
+                val tap: (Float, Float) -> Unit = { x, y ->
+                    ev.nearest(x, y, drawing.width, drawing.height, full).takeIf { it >= 0 }?.let(onNote)
+                }
                 if (big) {
                     // As large as the screen allows: the space left after the controls.
-                    Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) { Score(drawing, lit, null, words, fit = true) }
+                    Box(Modifier.fillMaxWidth().weight(1f), Alignment.Center) { Score(drawing, lit, null, words, fit = true, onTap = tap) }
                 } else {
-                    Score(drawing, lit, if (full) null else 130f, words)
+                    Score(drawing, lit, if (full) null else 130f, words, onTap = tap)
                 }
             } else {
                 Box(Modifier.fillMaxWidth().height(64.dp))
@@ -264,9 +300,33 @@ fun PsalmTuneView(
                         Text("${tune.meter} · ${tune.key}$where", style = Ts.type.caption, color = c.muted, modifier = Modifier.weight(1f))
                         Text("${clock(elapsed)} / ${clock(total)}", style = Ts.type.caption, color = c.muted)
                     }
-                    Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.line)) {
-                        val f = if (total > 0) (elapsed.toFloat() / total).coerceIn(0f, 1f) else 0f
-                        Box(Modifier.fillMaxWidth(f).height(4.dp).background(c.accent))
+                    // The timeline: a 4 dp track in a taller box, so a finger can take hold of it.
+                    val f = if (total > 0) (elapsed.toFloat() / total).coerceIn(0f, 1f) else 0f
+                    val where = tr("பாடலில் இடம்", "Position in the psalm")
+                    val label = "${clock(elapsed)} / ${clock(total)}"
+                    val seek by rememberUpdatedState(onSeek)
+                    BoxWithConstraints(
+                        Modifier.fillMaxWidth().height(24.dp)
+                            .pointerInput(data != null) {
+                                if (data == null) return@pointerInput
+                                detectTapGestures { seek((it.x / size.width).coerceIn(0f, 1f)) }
+                            }
+                            .pointerInput(data != null) {
+                                if (data == null) return@pointerInput
+                                detectHorizontalDragGestures { change, _ -> seek((change.position.x / size.width).coerceIn(0f, 1f)) }
+                            }
+                            .semantics {
+                                contentDescription = where
+                                stateDescription = label
+                                progressBarRangeInfo = ProgressBarRangeInfo(f, 0f..1f)
+                                setProgress { onSeek(it.coerceIn(0f, 1f)); true }
+                            },
+                        Alignment.CenterStart,
+                    ) {
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.line)) {
+                            Box(Modifier.fillMaxWidth(f).height(4.dp).background(c.accent))
+                        }
+                        Box(Modifier.padding(start = (maxWidth - 12.dp) * f).size(12.dp).clip(CircleShape).background(c.accent))
                     }
                 }
             }
@@ -315,9 +375,15 @@ private fun clock(ms: Long) = "${ms / 60000}:${((ms % 60000) / 1000).toString().
 /** A syllable to write under a note: its x and baseline as fractions of the drawing. */
 private class Word(val x: Float, val y: Float, val text: String, val lit: Boolean)
 
-/** The drawing at the width available (no taller than [maxHeightDp]), the note [lit] in the accent colour, [words] under the notes. */
+/**
+ * The drawing at the width available (no taller than [maxHeightDp]), the note [lit] in the
+ * accent colour, [words] under the notes. [onTap] hears a tap in the drawing's units.
+ */
 @Composable
-private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, words: List<Word> = emptyList(), fit: Boolean = false) {
+private fun Score(
+    drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, words: List<Word> = emptyList(), fit: Boolean = false,
+    onTap: ((Float, Float) -> Unit)? = null,
+) {
     val c = Ts.colors
     val marks = remember(drawing) { marks(drawing) }
     val measurer = rememberTextMeasurer()
@@ -328,7 +394,12 @@ private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, wo
         if (maxHeightDp != null && w * ratio > maxHeightDp.dp) w = maxHeightDp.dp / ratio
         // Full screen: no taller than the space given, whichever way the phone is held.
         if (fit && w * ratio > maxHeight) w = maxHeight / ratio
-        Canvas(Modifier.width(w).height(w * ratio).semantics { contentDescription = "Musical notation" }) {
+        // Keyed on the drawing only: the frames of playing must not restart the gesture.
+        val current by rememberUpdatedState(onTap)
+        val tap = Modifier.pointerInput(drawing) {
+            detectTapGestures { p -> current?.invoke(p.x * drawing.width / size.width, p.y * drawing.width / size.width) }
+        }
+        Canvas(Modifier.width(w).height(w * ratio).then(tap).semantics { contentDescription = "Musical notation" }) {
             val s = size.width / drawing.width
             withTransform({ scale(s, s, pivot = androidx.compose.ui.geometry.Offset.Zero) }) {
                 for (m in marks) {
@@ -391,6 +462,8 @@ private class TunePlayer(context: Context) {
             setOnCompletionListener { finished = true; audio.abandonAudioFocusRequest(focus) }
         }.also { mp = it }
         if (finished) p.seekTo(0)
+        pending?.let { p.seekTo(it, MediaPlayer.SEEK_CLOSEST) }
+        pending = null
         finished = false
         p.start()
         speed(rate)
@@ -415,6 +488,15 @@ private class TunePlayer(context: Context) {
     /** Back to the start for the next stanza, still playing. */
     fun restart() {
         mp?.seekTo(0)
+    }
+
+    private var pending: Long? = null
+
+    /** To [ms] of the stanza, playing or not; before the first play, from where play starts. */
+    fun seek(ms: Long) {
+        finished = false
+        val p = mp
+        if (p == null) pending = ms else p.seekTo(ms, MediaPlayer.SEEK_CLOSEST)
     }
 
     fun isPlaying() = mp?.isPlaying == true

@@ -40,4 +40,19 @@ class PsalterTest {
         val ids = PsalterDrawing.parse(res("full.draw.json")).items.mapNotNull { it.note }.toSet()
         assertTrue(e.notes.all { it.fullId in ids })
     }
+
+    @Test fun seeking() {
+        val e = TuneEvents.parse(res("events.json"))
+        // A tap on a notehead, or on the word under it, finds that note.
+        val (w, h) = 20000f to 4000f
+        val n = e.notes[5]
+        assertEquals(5, e.nearest(n.fullX!! * w + 80, n.fullY!! * h, w, h, full = true))
+        assertEquals(5, e.nearest(n.fullX!! * w + 80, n.fullLyric!! * h + 20, w, h, full = true))
+        // The whole psalm as stanzas a breath apart.
+        val per = e.durationMs + 700
+        assertEquals(0 to 0L, e.place(0, 700, 3))
+        assertEquals(1 to 500L, e.place(per + 500, 700, 3))
+        assertEquals(0 to e.durationMs, e.place(e.durationMs + 300, 700, 3))
+        assertEquals(2 to e.durationMs, e.place(10 * per, 700, 3))
+    }
 }
