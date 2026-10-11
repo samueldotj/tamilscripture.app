@@ -164,10 +164,10 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
             ) {
                 Icon(TsIcons.Search, null, Modifier.size(18.dp), tint = c.muted)
                 Box(Modifier.weight(1f)) {
-                    if (query.isEmpty()) Text(tr("வசனம், சொல், இடம்", "Verse, word, place"), style = Ts.type.scripture(18.sp, 1.3f), color = c.muted)
+                    if (query.isEmpty()) tr("வசனம், சொல், இடம்", "Verse, word, place").let { Text(it, style = Ts.type.scripture(18.sp, 1.3f, it), color = c.muted) }
                     BasicTextField(
                         query, { query = it },
-                        textStyle = Ts.type.scripture(18.sp, 1.3f).copy(color = c.ink),
+                        textStyle = Ts.type.scripture(18.sp, 1.3f, query).copy(color = c.ink),
                         cursorBrush = SolidColor(c.accent),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -292,7 +292,7 @@ fun SearchScreen(onOpen: (Passage) -> Unit, autoFocus: Boolean = false, initialQ
                                 style = Ts.type.labelSmall, color = c.accent,
                             )
                             val ranges = remember(h.text, shown) { PackRepository.matchRanges(h.text, shown) }
-                            Text(highlight(h.text, ranges, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f), color = c.ink)
+                            Text(highlight(h.text, ranges, c.accentSoft), style = Ts.type.scripture(16.sp, 1.7f, h.text), color = c.ink)
                         }
                         HDivider(Modifier.padding(horizontal = 20.dp))
                     }

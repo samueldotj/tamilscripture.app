@@ -132,14 +132,12 @@ private fun RefBox(r: CrossRef, manifest: ContentManifest?, version: String, onO
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(refLabel(r, manifest, lang), style = Ts.type.labelSmall, color = c.accent)
-        Text(
-            when {
-                text == null -> "…"
-                text!!.isEmpty() -> tr("இணைப்பின்றி இந்த வசனத்தைத் திறக்க முடியவில்லை.", "This verse needs a connection.")
-                else -> text!!
-            },
-            style = Ts.type.scripture(15.sp, 1.65f), color = c.ink2, maxLines = 6, overflow = TextOverflow.Ellipsis,
-        )
+        val shown = when {
+            text == null -> "…"
+            text!!.isEmpty() -> tr("இணைப்பின்றி இந்த வசனத்தைத் திறக்க முடியவில்லை.", "This verse needs a connection.")
+            else -> text!!
+        }
+        Text(shown, style = Ts.type.scripture(15.sp, 1.65f, shown), color = c.ink2, maxLines = 6, overflow = TextOverflow.Ellipsis)
     }
 }
 

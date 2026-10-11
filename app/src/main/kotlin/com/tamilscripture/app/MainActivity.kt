@@ -109,7 +109,7 @@ open class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                 onDispose { }
             }
-            TsTheme(mode, settings.typeface.toFace()) {
+            TsTheme(mode, settings.typeface.toFace(), tamilUi = settings.uiLang == UiLang.Tamil) {
                 CompositionLocalProvider(LocalAppServices provides services, LocalUiLang provides settings.uiLang) {
                     AppShell(start = start, pending = pendingLink, onPendingHandled = { pendingLink = null })
                 }

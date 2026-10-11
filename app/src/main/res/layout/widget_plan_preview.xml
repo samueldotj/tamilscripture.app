@@ -7,6 +7,7 @@
     android:orientation="vertical"
     android:padding="14dp">
     <TextView
+        style="@style/WidgetPreviewText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/widget_plan_preview_name"
@@ -26,6 +27,7 @@
             android:textColor="#201F1D"
             android:textSize="44sp" />
         <TextView
+            style="@style/WidgetPreviewText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/widget_plan_preview_days"
@@ -37,6 +39,7 @@
         <View android:layout_width="0dp" android:layout_height="1dp" android:layout_gravity="center_vertical" android:layout_weight="23" android:background="#29201F1D" />
     </LinearLayout>
     <TextView
+        style="@style/WidgetPreviewText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"

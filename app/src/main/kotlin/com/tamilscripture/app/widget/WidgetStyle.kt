@@ -3,19 +3,33 @@ package com.tamilscripture.app.widget
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.StrikethroughSpan
+import android.text.style.StyleSpan
+import android.text.style.UnderlineSpan
+import android.util.TypedValue
+import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.action.Action
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
+import androidx.glance.color.DayNightColorProvider
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.ColumnScope
@@ -25,10 +39,15 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.glance.text.FontFamily
+import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.tamilscripture.app.LinkActivity
+import com.tamilscripture.app.R
+import com.tamilscripture.core.data.settings.Typeface as TamilFace
+import com.tamilscripture.core.designsystem.theme.hasTamil
 import com.tamilscripture.core.model.ContentManifest
 import com.tamilscripture.core.model.Passage
 
@@ -62,6 +81,13 @@ internal object W {
     fun kicker(color: ColorProvider = ACCENT_TEXT) = TextStyle(color = color, fontSize = 10.sp)
     fun small(color: ColorProvider = MUTED) = TextStyle(color = color, fontSize = 11.sp)
 
+    /** The layout whose text view carries the reader's Tamil face. */
+    fun tamilLayout(face: TamilFace): Int = when (face) {
+        TamilFace.MuktaMalar -> R.layout.widget_text_mukta
+        TamilFace.NotoSansTamil -> R.layout.widget_text_sans
+        TamilFace.NotoSerifTamil -> R.layout.widget_text_serif
+    }
+
     /** Opens [p] the way a website link does, so MainActivity has one way in. */
     fun open(context: Context, m: ContentManifest?, p: Passage): Action = link(context, passageUrl(m, p))
 
@@ -75,6 +101,40 @@ internal object W {
         val slug = m?.book(p.book)?.slug ?: p.book.lowercase()
         return "https://www.tamilscripture.com/${p.version.lowercase()}/$slug/${p.chapter}" + (p.verse?.let { ".$it" } ?: "")
     }
+}
+
+/** The layout for Tamil text, from [W.tamilLayout]; provided round each widget's content. */
+internal val LocalTamilLayout = staticCompositionLocalOf { R.layout.widget_text_mukta }
+
+/**
+ * Widget text. Tamil is set in the reader's Tamil face, as everywhere on the website; Glance
+ * can only name system fonts, so Tamil goes through a text view whose layout carries the
+ * bundled face. Other text keeps the design's system faces.
+ */
+@Composable
+internal fun WText(text: String, style: TextStyle, modifier: GlanceModifier = GlanceModifier, maxLines: Int = Int.MAX_VALUE) {
+    if (!text.hasTamil()) {
+        Text(text, style = style, maxLines = maxLines, modifier = modifier)
+        return
+    }
+    val context = LocalContext.current
+    val views = RemoteViews(context.packageName, LocalTamilLayout.current)
+    val spans = SpannableString(text)
+    fun span(what: Any) = spans.setSpan(what, 0, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+    // Tamil has no italic, so a style's italic is left out.
+    if ((style.fontWeight ?: FontWeight.Normal) != FontWeight.Normal) span(StyleSpan(Typeface.BOLD))
+    if (style.textDecoration?.contains(TextDecoration.Underline) == true) span(UnderlineSpan())
+    if (style.textDecoration?.contains(TextDecoration.LineThrough) == true) span(StrikethroughSpan())
+    views.setTextViewText(R.id.widget_text, spans)
+    style.fontSize?.let { views.setTextViewTextSize(R.id.widget_text, TypedValue.COMPLEX_UNIT_SP, it.value) }
+    views.setInt(R.id.widget_text, "setMaxLines", maxLines)
+    // The widget's colours are all day and night pairs (see [W]).
+    (style.color as? DayNightColorProvider)?.let { color ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) views.setColorInt(R.id.widget_text, "setTextColor", color.day.toArgb(), color.night.toArgb())
+        else views.setTextColor(R.id.widget_text, color.getColor(context).toArgb())
+    }
+    // In a Box of its own: a row drops its other children when one is the remote view itself.
+    Box(modifier) { AndroidRemoteViews(views) }
 }
 
 /** The widget's card: a 1 dp hairline frame round the paper, then [content] padded inside. */
@@ -99,7 +159,7 @@ internal fun Rule(color: ColorProvider = W.DIVIDER) {
 @Composable
 internal fun Underlined(text: String, style: TextStyle, gap: Dp = 5.dp) {
     Column {
-        Text(text, style = style, maxLines = 1)
+        WText(text, style, maxLines = 1)
         Box(GlanceModifier.height(gap)) {}
         Rule(W.ACCENT)
     }

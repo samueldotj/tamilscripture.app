@@ -295,7 +295,7 @@ private fun UnitSection(u: CommentaryUnit, chapter: Chapter?, open: Boolean, tam
                         append(" ")
                         append(quote.substringAfter(' ').take(240) + if (quote.length > 240) "…" else "")
                     },
-                    style = Ts.type.scripture(15.sp, 1.7f), color = c.muted,
+                    style = Ts.type.scripture(15.sp, 1.7f, quote), color = c.muted,
                     modifier = Modifier.fillMaxWidth()
                         .drawBehind { drawLine(leftLine, Offset(0f, 0f), Offset(0f, size.height), 2.dp.toPx()) }
                         .padding(horizontal = 12.dp, vertical = 8.dp),

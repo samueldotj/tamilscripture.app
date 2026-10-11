@@ -8,6 +8,7 @@
     android:paddingHorizontal="18dp"
     android:paddingVertical="16dp">
     <TextView
+        style="@style/WidgetPreviewText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingBottom="6dp"
@@ -21,11 +22,12 @@
         android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:ellipsize="end"
-        android:fontFamily="serif"
+        android:fontFamily="@font/widget_tamil_mukta"
         android:text="@string/widget_preview_verse"
         android:textColor="#201F1D"
         android:textSize="18sp" />
     <TextView
+        style="@style/WidgetPreviewText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/widget_preview_reference"

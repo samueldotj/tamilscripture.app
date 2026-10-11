@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tamilscripture.core.designsystem.theme.NotoSans
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.UserNote
 
@@ -62,7 +63,7 @@ fun ParagraphText(
                 val bookmarked = marks[v]?.bookmarked == true
                 withStyle(
                     SpanStyle(
-                        fontSize = 12.sp, fontWeight = FontWeight.Bold, baselineShift = BaselineShift.Superscript,
+                        fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = NotoSans, baselineShift = BaselineShift.Superscript,
                         color = if (bookmarked) c.onAccent else c.accent, background = if (bookmarked) c.accent else Color.Unspecified,
                     ),
                 ) { append(r.label) }
@@ -85,7 +86,7 @@ fun ParagraphText(
                 }
                 if (before >= 0) consumed[v] = before + r.text.codePointCount(0, r.text.length) + 1
                 if (numbers && showNotes) r.notes.forEach { n ->
-                    withStyle(SpanStyle(fontSize = 11.sp, color = c.muted, baselineShift = BaselineShift.Superscript)) {
+                    withStyle(SpanStyle(fontSize = 11.sp, color = c.muted, fontFamily = NotoSans, baselineShift = BaselineShift.Superscript)) {
                         append(" " + ('a' + footnotes.size))
                     }
                     footnotes += n.text
@@ -111,7 +112,7 @@ fun ParagraphText(
         Column(Modifier.weight(1f)) {
             Text(
                 text,
-                style = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
+                style = Ts.type.scripture(fontSize.sp, lineHeightEm, textLocale.tamil()).copy(localeList = textLocale),
                 color = c.ink,
                 modifier = Modifier
                     .fillMaxWidth()

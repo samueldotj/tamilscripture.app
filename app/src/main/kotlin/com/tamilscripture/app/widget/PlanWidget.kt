@@ -2,6 +2,7 @@ package com.tamilscripture.app.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
@@ -98,7 +99,8 @@ class PlanWidget : GlanceAppWidget() {
             )
         }
         val empty = if (tamil) "வாசிப்புத் திட்டம் இல்லை" to "ஒரு திட்டத்தைத் தொடங்குங்கள் ›" else "No reading plan" to "Choose a plan ›"
-        provideContent { PlanWidgetContent(data, empty, openPlans) }
+        val tamilLayout = W.tamilLayout(settings.typeface)
+        provideContent { CompositionLocalProvider(LocalTamilLayout provides tamilLayout) { PlanWidgetContent(data, empty, openPlans) } }
     }
 }
 
@@ -123,8 +125,8 @@ internal fun PlanWidgetContent(d: PlanDay?, empty: Pair<String, String>, openPla
     val medium = size.width >= W.MEDIUM
     ClassicalCard(openPlans, medium) {
         if (d == null) {
-            Text(empty.first, style = TextStyle(color = W.TEXT, fontSize = 20.sp, fontFamily = W.serif), modifier = GlanceModifier.defaultWeight())
-            Text(empty.second, style = TextStyle(color = W.ACCENT_TEXT, fontSize = 12.sp, fontStyle = FontStyle.Italic))
+            WText(empty.first, TextStyle(color = W.TEXT, fontSize = 20.sp, fontFamily = W.serif), GlanceModifier.defaultWeight())
+            WText(empty.second, TextStyle(color = W.ACCENT_TEXT, fontSize = 12.sp, fontStyle = FontStyle.Italic))
             return@ClassicalCard
         }
         if (!medium) {
@@ -132,8 +134,8 @@ internal fun PlanWidgetContent(d: PlanDay?, empty: Pair<String, String>, openPla
             ProgressRule(d.percent / 100f, size.width - 30.dp)
             Box(GlanceModifier.height(8.dp)) {}
             Row(GlanceModifier.fillMaxWidth()) {
-                Text(d.done, style = TextStyle(color = W.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Bold), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                Text(d.left, style = W.small(), maxLines = 1)
+                WText(d.done, TextStyle(color = W.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Bold), GlanceModifier.defaultWeight(), maxLines = 1)
+                WText(d.left, W.small(), maxLines = 1)
             }
             return@ClassicalCard
         }
@@ -146,14 +148,14 @@ internal fun PlanWidgetContent(d: PlanDay?, empty: Pair<String, String>, openPla
                 ProgressRule(d.percent / 100f, leftW - 18.dp)
                 d.streak?.let {
                     Box(GlanceModifier.height(8.dp)) {}
-                    Text(it, style = W.small().copy(fontStyle = FontStyle.Italic), maxLines = 1)
+                    WText(it, W.small().copy(fontStyle = FontStyle.Italic), maxLines = 1)
                 }
             }
             Box(GlanceModifier.width(1.dp).fillMaxHeight().background(W.DIVIDER)) {}
             Column(GlanceModifier.defaultWeight().fillMaxHeight().padding(start = 18.dp)) {
                 Row(GlanceModifier.fillMaxWidth()) {
-                    Text(d.todays, style = W.kicker(W.MUTED), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                    Text(d.done, style = W.kicker(W.MUTED), maxLines = 1)
+                    WText(d.todays, W.kicker(W.MUTED), GlanceModifier.defaultWeight(), maxLines = 1)
+                    WText(d.done, W.kicker(W.MUTED), maxLines = 1)
                 }
                 Box(GlanceModifier.height(6.dp)) {}
                 d.readings.take(3).forEach { r -> ReadingRow(r, d.min) }
@@ -164,10 +166,10 @@ internal fun PlanWidgetContent(d: PlanDay?, empty: Pair<String, String>, openPla
 
 @Composable
 private fun androidx.glance.layout.ColumnScope.DayFigure(d: PlanDay, withPercent: Boolean) {
-    Text(d.name, style = W.kicker(), maxLines = 1)
+    WText(d.name, W.kicker(), maxLines = 1)
     Column(GlanceModifier.defaultWeight().fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text("${d.day}", style = TextStyle(color = W.TEXT, fontSize = 44.sp, fontFamily = W.serif), maxLines = 1)
-        Text(d.ofDays + if (withPercent) " · ${d.percent}%" else "", style = W.small(), maxLines = 1)
+        WText(d.ofDays + if (withPercent) " · ${d.percent}%" else "", W.small(), maxLines = 1)
     }
 }
 
@@ -180,15 +182,15 @@ private fun ReadingRow(r: Reading, min: String) {
                 GlanceModifier.size(15.dp), colorFilter = ColorFilter.tint(if (r.done) W.ACCENT else W.RING),
             )
             Box(GlanceModifier.width(10.dp)) {}
-            Text(
+            WText(
                 r.name,
-                style = TextStyle(
+                TextStyle(
                     color = if (r.done) W.DONE else W.TEXT, fontSize = 15.sp, fontFamily = W.serif, fontWeight = FontWeight.Bold,
                     textDecoration = if (r.done) TextDecoration.LineThrough else TextDecoration.None,
                 ),
-                maxLines = 1, modifier = GlanceModifier.defaultWeight(),
+                GlanceModifier.defaultWeight(), maxLines = 1,
             )
-            Text("${r.minutes} $min", style = W.small(), maxLines = 1)
+            WText("${r.minutes} $min", W.small(), maxLines = 1)
         }
         Rule()
     }

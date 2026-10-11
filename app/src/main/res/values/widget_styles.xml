@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Picker previews: Tamil labels in the Tamil face, as the widgets set them. -->
+    <style name="WidgetPreviewText">
+        <item name="android:fontFamily">@font/widget_tamil_mukta</item>
+    </style>
+</resources>

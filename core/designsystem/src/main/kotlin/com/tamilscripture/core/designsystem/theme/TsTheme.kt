@@ -17,6 +17,8 @@ enum class ThemeMode { System, Dark, Light }
 fun TsTheme(
     mode: ThemeMode = ThemeMode.System,
     scriptureFace: ScriptureFace = ScriptureFace.MuktaMalar,
+    /** A Tamil interface sets its text in [scriptureFace]; an English one in Noto Sans, as the website. */
+    tamilUi: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val dark = when (mode) {
@@ -25,7 +27,9 @@ fun TsTheme(
         ThemeMode.Light -> false
     }
     val colors = if (dark) DarkTsColors else LightTsColors
-    val type = remember(scriptureFace) { TsType(scripture = scriptureFace.family) }
+    val type = remember(scriptureFace, tamilUi) {
+        TsType(scripture = scriptureFace.family, ui = if (tamilUi) scriptureFace.family else NotoSans)
+    }
     val scheme = if (dark) {
         darkColorScheme(
             primary = colors.accent, onPrimary = colors.onAccent,

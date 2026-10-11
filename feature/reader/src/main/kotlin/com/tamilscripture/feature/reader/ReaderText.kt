@@ -54,6 +54,7 @@ import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsPillButton
 import com.tamilscripture.core.designsystem.icon.TsIcons
 import com.tamilscripture.core.data.settings.ReadingFormat
+import com.tamilscripture.core.designsystem.theme.NotoSans
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.model.CommentaryChapter
 import com.tamilscripture.core.model.HighlightColor
@@ -77,6 +78,9 @@ internal fun String.clusterEnd(i: Int): Int {
     return if (it.isBoundary(i)) i else it.following(i)
 }
 
+/** True unless the text's language is known and is not Tamil. */
+internal fun LocaleList?.tamil(): Boolean = this?.firstOrNull()?.language?.let { it == "ta" } ?: true
+
 /** The UTF-16 index [n] code points in, clamped to the text. */
 internal fun String.offsetByCodePointsSafe(n: Int): Int =
     if (n >= codePointCount(0, length)) length else offsetByCodePoints(0, n.coerceAtLeast(0))
@@ -90,9 +94,9 @@ fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Bool
     return buildAnnotatedString {
         if (leading) {
             // Study Bible: a bold number at the start of the line, as the website's fmt-xref.
-            withStyle(SpanStyle(fontSize = (numberSize + 2).sp, color = c.accent, fontWeight = FontWeight.Bold)) { append(item.label) }
+            withStyle(SpanStyle(fontSize = (numberSize + 2).sp, color = c.accent, fontWeight = FontWeight.Bold, fontFamily = NotoSans)) { append(item.label) }
         } else {
-            withStyle(SpanStyle(fontSize = numberSize.sp, color = c.accent, fontWeight = FontWeight.Bold, baselineShift = BaselineShift.Superscript)) {
+            withStyle(SpanStyle(fontSize = numberSize.sp, color = c.accent, fontWeight = FontWeight.Bold, fontFamily = NotoSans, baselineShift = BaselineShift.Superscript)) {
                 append(item.label)
             }
         }
@@ -108,7 +112,7 @@ fun verseAnnotated(item: ReaderItem.Verse, numberSize: Int = 12, showNotes: Bool
         }
         if (showNotes) {
             item.notes.forEachIndexed { i, _ ->
-                withStyle(SpanStyle(fontSize = 11.sp, color = c.muted, baselineShift = BaselineShift.Superscript)) {
+                withStyle(SpanStyle(fontSize = 11.sp, color = c.muted, fontFamily = NotoSans, baselineShift = BaselineShift.Superscript)) {
                     append(" " + ('a' + i))
                 }
             }
@@ -187,7 +191,7 @@ fun ReaderTextList(
                     }
                     is ReaderItem.Heading -> Text(
                         item.text,
-                        style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scripture),
+                        style = Ts.type.sectionHeading.copy(fontSize = sectionHeadingSize.sp, fontFamily = Ts.type.scriptureFamily(textLocale.tamil())),
                         color = c.amber,
                         modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 6.dp),
                     )
@@ -206,7 +210,7 @@ fun ReaderTextList(
                     }
                     is ReaderItem.Descriptive -> Text(
                         item.text,
-                        style = Ts.type.scripture((fontSize - 3).sp, lineHeightEm).copy(fontWeight = FontWeight.SemiBold),
+                        style = Ts.type.scripture((fontSize - 3).sp, lineHeightEm, textLocale.tamil()).copy(fontWeight = FontWeight.SemiBold),
                         color = c.muted,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
@@ -229,7 +233,7 @@ fun ReaderTextList(
                         }
                         VerseInteractionBox(item.verse, interactions) { extra -> TextWithTrailer(
                             verseAnnotated(item, numberSize = 12, showNotes = showNotes, words = mark?.words.orEmpty() + listOfNotNull(penPreview?.let { WordMark(it.start, it.end, if (it.erase) HighlightColor.Pink else penColor) }), leading = format == ReadingFormat.Study),
-                            mainStyle = Ts.type.scripture(fontSize.sp, lineHeightEm).copy(localeList = textLocale),
+                            mainStyle = Ts.type.scripture(fontSize.sp, lineHeightEm, textLocale.tamil()).copy(localeList = textLocale),
                             color = c.ink,
                             trailer = trailer,
                             trailerStyle = Ts.type.caption.copy(fontSize = 12.sp, lineHeight = 22.sp),
@@ -357,7 +361,7 @@ private fun DualRow(
         if (v == null) {
             Text("—", style = Ts.type.body, color = c.muted, modifier = modifier.semantics { contentDescription = missing })
         } else {
-            Text(v.text, style = Ts.type.scripture(size.sp, lineHeightEm).copy(localeList = locale), color = c.ink, modifier = modifier)
+            Text(v.text, style = Ts.type.scripture(size.sp, lineHeightEm, locale.tamil()).copy(localeList = locale), color = c.ink, modifier = modifier)
         }
     }
     val shape = RoundedCornerShape(14.dp)

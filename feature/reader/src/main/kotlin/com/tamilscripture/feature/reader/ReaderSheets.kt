@@ -219,7 +219,7 @@ fun CrossRefsSheet(
                 ) {
                     Text(book?.label(lang, vid.chapter, vid.verse, endVerse) ?: r.to, style = Ts.type.labelSmall, color = c.accent)
                     Text(
-                        text ?: "…", style = Ts.type.scripture(16.sp, 1.7f), color = c.ink, maxLines = 3,
+                        text ?: "…", style = Ts.type.scripture(16.sp, 1.7f, text ?: ""), color = c.ink, maxLines = 3,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
                 }

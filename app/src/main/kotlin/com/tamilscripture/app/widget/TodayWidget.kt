@@ -2,6 +2,7 @@ package com.tamilscripture.app.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,7 +80,8 @@ class TodayWidget : GlanceAppWidget() {
         )
         val openVerse = W.open(context, manifest, Passage(settings.version, daily.book, daily.chapter, daily.verse))
         val openChapter = W.open(context, manifest, Passage(settings.version, daily.book, daily.chapter))
-        provideContent { VerseWidget(v, openVerse, openChapter) }
+        val tamilLayout = W.tamilLayout(settings.typeface)
+        provideContent { CompositionLocalProvider(LocalTamilLayout provides tamilLayout) { VerseWidget(v, openVerse, openChapter) } }
     }
 
     companion object {
@@ -128,8 +130,8 @@ internal fun VerseWidget(v: VerseOfDay, openVerse: Action, openChapter: Action) 
     ClassicalCard(openVerse, medium) {
         if (medium) {
             Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                Text(v.kicker, style = W.kicker(), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                Text(v.date, style = W.small(), maxLines = 1)
+                WText(v.kicker, W.kicker(), GlanceModifier.defaultWeight(), maxLines = 1)
+                WText(v.date, W.small(), maxLines = 1)
             }
             Box(GlanceModifier.height(6.dp)) {}
             Rule()
@@ -141,27 +143,27 @@ internal fun VerseWidget(v: VerseOfDay, openVerse: Action, openChapter: Action) 
         val inner = size.width - (if (medium) 38.dp else 30.dp)
         val room = size.height - (if (medium) 34.dp + 21.dp + 10.dp + 18.dp else 30.dp + 22.dp + 10.dp + 16.dp)
         val (fontSize, lines) = fitText(v.verse, v.tamilText, inner, room, if (medium) listOf(23, 21, 19, 17, 15, 14, 13, 12) else listOf(16, 15, 14, 13, 12))
-        Text(
+        WText(
             v.verse,
-            style = TextStyle(
+            TextStyle(
                 color = W.TEXT, fontSize = fontSize.sp, fontFamily = W.serif,
                 fontStyle = if (!medium && !v.tamilText) FontStyle.Italic else FontStyle.Normal,
             ),
+            GlanceModifier.defaultWeight(),
             maxLines = lines,
-            modifier = GlanceModifier.defaultWeight(),
         )
         Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             if (medium) {
-                Text(v.reference, style = TextStyle(color = W.TEXT, fontSize = 12.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+                WText(v.reference, TextStyle(color = W.TEXT, fontSize = 12.sp, fontWeight = FontWeight.Bold), maxLines = 1)
                 // The version only when the row has room for it beside a long Tamil reference and the link.
                 val perChar = if (v.tamilUi) 12 * 0.62f else 12 * 0.55f
                 val used = (v.reference.length + v.version.length + 1 + v.readChapter.length) * perChar + 17
                 if (used <= inner.value) Text(" " + v.version, style = W.small().copy(fontSize = 12.sp), maxLines = 1)
                 Box(GlanceModifier.defaultWeight()) {}
                 Row(GlanceModifier.clickable(openChapter), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
+                    WText(
                         v.readChapter,
-                        style = TextStyle(
+                        TextStyle(
                             color = W.ACCENT_TEXT, fontSize = 12.sp, textDecoration = TextDecoration.Underline,
                             fontStyle = if (v.tamilUi) FontStyle.Normal else FontStyle.Italic,
                         ),
@@ -171,8 +173,8 @@ internal fun VerseWidget(v: VerseOfDay, openVerse: Action, openChapter: Action) 
                     Image(ImageProvider(R.drawable.widget_arrow), null, GlanceModifier.size(13.dp), colorFilter = ColorFilter.tint(W.ACCENT_TEXT))
                 }
             } else {
-                Text(v.reference, style = TextStyle(color = W.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Bold), maxLines = 1, modifier = GlanceModifier.defaultWeight())
-                Text(v.version, style = W.small(), maxLines = 1)
+                WText(v.reference, TextStyle(color = W.TEXT, fontSize = 11.sp, fontWeight = FontWeight.Bold), GlanceModifier.defaultWeight(), maxLines = 1)
+                WText(v.version, W.small(), maxLines = 1)
             }
         }
     }

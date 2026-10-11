@@ -65,36 +65,52 @@ enum class ScriptureFace(val family: FontFamily) {
 
 private val trimmed = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None)
 
-/** Named text styles from the design. Sizes are in sp so they follow the system font scale. */
+/** True when [this] has Tamil letters, so it is set in the Tamil face rather than Noto Sans. */
+fun CharSequence.hasTamil(): Boolean = any { it in '\u0B80'..'\u0BFF' }
+
+/**
+ * Named text styles from the design. Sizes are in sp so they follow the system font scale.
+ * Faces follow the website: Tamil in the reader's Tamil face (its --tamil, Mukta Malar unless
+ * changed in settings), Latin in Noto Sans (its --sans and --en), kickers in the sans face.
+ */
 @Immutable
 data class TsType(
+    /** The reader's Tamil face. */
     val scripture: FontFamily = MuktaMalar,
+    /** The interface face: [scripture] for a Tamil interface, Noto Sans for English. */
+    val ui: FontFamily = scripture,
     /** Screen title, "வாசிப்புத் திட்டங்கள்" (26/700). */
-    val screenTitle: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.Bold, fontSize = 26.sp),
+    val screenTitle: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 26.sp),
     /** App bar title, "யோவான் 3" (18/600). */
-    val barTitle: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.SemiBold, fontSize = 18.sp),
+    val barTitle: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.SemiBold, fontSize = 18.sp),
     /** Card headline, "யோவான் 3" in continue reading (24/700). */
-    val headline: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.Bold, fontSize = 24.sp),
+    val headline: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 24.sp),
     /** Sheet title (22/700). */
-    val sheetTitle: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.Bold, fontSize = 22.sp),
-    /** Card title in Mukta (17–18/700). */
-    val cardTitle: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.Bold, fontSize = 17.sp),
+    val sheetTitle: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 22.sp),
+    /** Card title (17–18/700). */
+    val cardTitle: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 17.sp),
     /** Section heading inside scripture (15/600, amber). */
-    val sectionHeading: TextStyle = TextStyle(fontFamily = MuktaMalar, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
-    /** Kicker: 11/700, tracking 0.12em, uppercase. */
+    val sectionHeading: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
+    /** Kicker: 11/700, tracking 0.12em, uppercase; the website sets it in the sans face. */
     val kicker: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.12.em),
     /** Body (15, line height 1.75). */
-    val body: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontSize = 15.sp, lineHeight = 26.sp, lineHeightStyle = trimmed),
+    val body: TextStyle = TextStyle(fontFamily = ui, fontSize = 15.sp, lineHeight = 26.sp, lineHeightStyle = trimmed),
     /** Row title (15–16/600–700). */
-    val rowTitle: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontWeight = FontWeight.Bold, fontSize = 15.sp),
-    val label: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontWeight = FontWeight.Bold, fontSize = 13.sp),
-    val labelSmall: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontWeight = FontWeight.Bold, fontSize = 12.sp),
-    val caption: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontSize = 12.sp),
-    val captionSmall: TextStyle = TextStyle(fontFamily = NotoSansTamil, fontSize = 11.sp),
+    val rowTitle: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 15.sp),
+    val label: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 13.sp),
+    val labelSmall: TextStyle = TextStyle(fontFamily = ui, fontWeight = FontWeight.Bold, fontSize = 12.sp),
+    val caption: TextStyle = TextStyle(fontFamily = ui, fontSize = 12.sp),
+    val captionSmall: TextStyle = TextStyle(fontFamily = ui, fontSize = 11.sp),
     val greek: TextStyle = TextStyle(fontFamily = NotoSans, fontSize = 19.sp),
 ) {
-    fun scripture(size: TextUnit, lineHeightEm: Float = 1.8f): TextStyle =
-        TextStyle(fontFamily = scripture, fontSize = size, lineHeight = (size.value * lineHeightEm).sp, lineHeightStyle = trimmed)
+    /** The face for scripture: the Tamil face for Tamil, Noto Sans for English and other Latin versions. */
+    fun scriptureFamily(tamil: Boolean): FontFamily = if (tamil) scripture else NotoSans
+
+    fun scripture(size: TextUnit, lineHeightEm: Float = 1.8f, tamil: Boolean = true): TextStyle =
+        TextStyle(fontFamily = scriptureFamily(tamil), fontSize = size, lineHeight = (size.value * lineHeightEm).sp, lineHeightStyle = trimmed)
+
+    /** [scripture] in the face for [text]'s script. */
+    fun scripture(size: TextUnit, lineHeightEm: Float, text: CharSequence): TextStyle = scripture(size, lineHeightEm, text.hasTamil())
 }
 
 val LocalTsType = staticCompositionLocalOf { TsType() }

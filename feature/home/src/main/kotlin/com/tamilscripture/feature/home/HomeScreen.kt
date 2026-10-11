@@ -214,7 +214,7 @@ fun HomeScreen(nav: HomeNav) {
             }
             TsCard(cardMod) {
                 Kicker(tr("இன்றைய வசனம்", "Verse of the day") + " · " + (vBook?.label(lang, parts[1].toInt(), parts[2].toInt()) ?: ""), color = c.amber)
-                Text(vText ?: "…", style = Ts.type.scripture(19.sp, 1.7f), color = c.ink, modifier = Modifier.padding(vertical = 8.dp))
+                Text(vText ?: "…", style = Ts.type.scripture(19.sp, 1.7f, vText ?: ""), color = c.ink, modifier = Modifier.padding(vertical = 8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TsPillButton("▶ " + tr("கேள்", "Listen"), {
                         vBook?.let { services.audio.play(settings.version, it, parts[1].toInt(), parts[2].toInt()) }
