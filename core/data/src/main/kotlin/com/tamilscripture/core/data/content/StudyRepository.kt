@@ -54,17 +54,28 @@ class StudyRepository(
     suspend fun file(path: String): String? {
         val pack = packFor(path)
         if (pack != null && packs.store.isInstalled(pack)) packs.studyFile(pack, path)?.let { return it }
+        return online(path)?.decodeToString()
+    }
+
+    /** One binary entities/ file (a tune's audio.mp3): the pack's `blob` table, then cache, then the network. */
+    suspend fun bytes(path: String): ByteArray? {
+        val pack = packFor(path)
+        if (pack != null && packs.store.isInstalled(pack)) packs.studyBlob(pack, path)?.let { return it }
+        return online(path)
+    }
+
+    private suspend fun online(path: String): ByteArray? {
         val key = "study/$path"
         val cached = cache.get(key)
         val build = content.manifest.value?.build ?: content.refreshManifest()?.build
-        if (cached != null && (build == null || cached.tag == build)) return cached.bytes.decodeToString()
-        if (build == null) return cached?.bytes?.decodeToString()
+        if (cached != null && (build == null || cached.tag == build)) return cached.bytes
+        if (build == null) return cached?.bytes
         return try {
             val bytes = http.get(Origin.Content, "content/$build/entities/$path")
             cache.put(key, bytes, build)
-            bytes.decodeToString()
+            bytes
         } catch (e: IOException) {
-            cached?.bytes?.decodeToString()
+            cached?.bytes
         }
     }
 

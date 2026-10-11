@@ -1,20 +1,25 @@
 package com.tamilscripture.feature.study
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.tamilscripture.core.designsystem.theme.ThemeMode
+import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.designsystem.theme.TsTheme
 import com.tamilscripture.core.model.PsalmCardData
 import com.tamilscripture.core.model.PsalmsIndex
+import com.tamilscripture.core.model.PsalterDrawing
+import com.tamilscripture.core.model.TuneEvents
 import com.tamilscripture.core.model.UiLang
 import com.tamilscripture.core.services.LocalUiLang
 import kotlinx.serialization.json.Json
@@ -41,13 +46,43 @@ class PsalmsScreenshotTest {
         121 to ("மலைகளுக்கு நேராக என் கண்களை ஏறெடுக்கிறேன்; எனக்கு உதவி எங்கேயிருந்து வரும்?" to "I will lift up mine eyes unto the hills, from whence cometh my help."),
     )
 
+    private fun tuneRes(f: String) = javaClass.getResource("/entities/psalter/crimond/$f")!!.readText()
+    private val crimond = TuneData(PsalterDrawing.parse(tuneRes("incipit.draw.json")), PsalterDrawing.parse(tuneRes("full.draw.json")), TuneEvents.parse(tuneRes("events.json")))
+
+    /** The card alone, with Crimond [atMs] into playing (0: stopped). */
+    private fun cardShot(file: String, mode: ThemeMode, lang: UiLang, atMs: Long, full: Boolean = false) {
+        compose.setContent {
+            CompositionLocalProvider(LocalUiLang provides lang) {
+                TsTheme(mode) {
+                    Box(Modifier.size(411.dp, 1900.dp).background(Ts.colors.surface)) {
+                        val p = index.psalms[22]
+                        PsalmCardView(index, p, cards[23], verses[23], {}, onRead = {}, onShare = {}, tune = {
+                            PsalmTuneView(cards[23]!!.tunes[0], crimond, playing = atMs > 0, positionMs = atMs, full = full, onToggle = {}, onFull = {})
+                        })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText(if (full) "First line" else if (lang == UiLang.Tamil) "முழுப் பண்" else "Full tune").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
+    }
+
+    /** The third note (B-flat, 2.2 s in) is lit while it sounds. */
+    @Config(sdk = [35], qualifiers = "w411dp-h1900dp-xxhdpi")
+    @Test fun tunePlayingTamil() = cardShot("psalms_tune_playing_light_ta", ThemeMode.Light, UiLang.Tamil, atMs = 2200)
+
+    @Config(sdk = [35], qualifiers = "w411dp-h1900dp-xxhdpi")
+    @Test fun tuneFullDark() = cardShot("psalms_tune_full_dark_en", ThemeMode.Dark, UiLang.English, atMs = 0, full = true)
+
     private fun shot(file: String, mode: ThemeMode, lang: UiLang, w: Dp, h: Dp, psalm: Int = 23, tap: String? = null) {
         compose.setContent {
             CompositionLocalProvider(LocalUiLang provides lang) {
                 TsTheme(mode) {
                     Box(Modifier.size(w, h)) {
                         PsalmsExplorer(index, loading = false, onBack = {}, initialPsalm = psalm) { idx, p, pick ->
-                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {})
+                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, tune = cards[p.n]?.tunes?.firstOrNull()?.takeIf { p.n == 23 }?.let { t ->
+                                { PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, onToggle = {}, onFull = {}) }
+                            })
                         }
                     }
                 }

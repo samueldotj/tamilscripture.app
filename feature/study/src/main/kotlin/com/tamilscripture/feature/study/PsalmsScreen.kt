@@ -377,6 +377,7 @@ private fun PsalmDetail(index: PsalmsIndex, psalm: Psalm, links: StudyLinks, onP
         index, psalm, card, verse, onPick,
         onRead = { links.read(Passage(settings.version, "PSA", psalm.n)) },
         onShare = { links.read(Passage(settings.version, "PSA", psalm.n, psalm.keyVerses.first)) },
+        tune = card?.tunes?.firstOrNull()?.let { t -> { PsalmTuneBlock(t) } },
     )
 }
 
@@ -391,6 +392,8 @@ fun PsalmCardView(
     onPick: (Int) -> Unit,
     onRead: () -> Unit,
     onShare: () -> Unit,
+    /** The psalter tune block, when the psalm has a tune. */
+    tune: (@Composable () -> Unit)? = null,
 ) {
     val c = Ts.colors
     val lang = LocalUiLang.current
@@ -431,6 +434,8 @@ fun PsalmCardView(
                 if (v.first.isBlank() && v.second.isBlank()) Text(tr("வசனத்தை ஏற்ற முடியவில்லை.", "Could not load the verse."), style = Ts.type.caption, color = c.muted)
             }
         }
+
+        tune?.invoke()
 
         val related = index.psalms.filter { it.theme == psalm.theme && it.n != psalm.n }.take(8)
         if (related.isNotEmpty() && theme != null) {

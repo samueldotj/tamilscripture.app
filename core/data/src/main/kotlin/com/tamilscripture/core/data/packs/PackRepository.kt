@@ -151,6 +151,17 @@ class PackRepository(
             }
         }
 
+    /** A binary file (a psalter tune's MP3) from a study pack's `blob` table; null when the pack predates it. */
+    suspend fun studyBlob(pack: String, path: String): ByteArray? =
+        runCatching {
+            store.query(pack) { c ->
+                c.prepare("SELECT body FROM blob WHERE path = ?").use { st ->
+                    st.bindText(1, path)
+                    if (st.step()) st.getBlob(0) else null
+                }
+            }
+        }.getOrNull()
+
     /** A chapter of a downloaded commentary, as the JSON the commentary CDN serves (chapter 0: the book's introduction). */
     suspend fun commentaryChapter(source: String, book: String, chapter: Int): ByteArray? =
         store.query("commentary.$source") { c ->

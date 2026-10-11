@@ -76,7 +76,11 @@ data class PsalmsIndex(
     }
 }
 
-@Serializable data class PsalmTune(val id: String, val name: String, val meter: String = "", val key: String = "")
+@Serializable
+data class PsalmTune(
+    val id: String, val name: String, val meter: String = "", val key: String = "",
+    val composer: String = "", val source: String = "",
+)
 
 @Serializable data class PsalmNt(val authors: List<String>, val ref: String)
 
