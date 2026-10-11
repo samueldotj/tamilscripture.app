@@ -57,7 +57,7 @@ class PsalmsScreenshotTest {
                     Box(Modifier.size(411.dp, 1900.dp).background(Ts.colors.surface)) {
                         val p = index.psalms[22]
                         PsalmCardView(index, p, cards[23], verses[23], {}, onRead = {}, onShare = {}, sing = {
-                            PsalmSing(cards[23]!!) { t -> PsalmTuneView(t, crimond, playing = atMs > 0, positionMs = atMs, full = full, onToggle = {}, onFull = {}) }
+                            PsalmSing(cards[23]!!) { t, n, _ -> PsalmTuneView(t, crimond, playing = atMs > 0, positionMs = atMs, full = full, stanzas = n, onToggle = {}, onFull = {}) }
                         })
                     }
                 }
@@ -92,7 +92,7 @@ class PsalmsScreenshotTest {
                     Box(Modifier.size(w, h)) {
                         PsalmsExplorer(index, loading = false, onBack = {}, initialPsalm = psalm) { idx, p, pick ->
                             PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, sing = cards[p.n]?.takeIf { p.n == 23 }?.let { cd ->
-                                { PsalmSing(cd) { t -> PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, onToggle = {}, onFull = {}) } }
+                                { PsalmSing(cd) { t, n, _ -> PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, stanzas = n, onToggle = {}, onFull = {}) } }
                             })
                         }
                     }

@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -67,11 +68,12 @@ class TuneData(val incipit: PsalterDrawing, val full: PsalterDrawing, val events
 /**
  * The psalter tune on the psalm's card (design: "Psalter tune"): the first line in notation,
  * play and pause, metre, key, time and progress, and "Full tune". The note sounding is drawn
- * in the accent colour. Audio is the website's pre-rendered MP3, played with MediaPlayer
- * under transient audio focus so the Bible audio pauses meanwhile.
+ * in the accent colour. Audio is the website's pre-rendered MP3 (one stanza on organ),
+ * played [stanzas] times with a breath between, with MediaPlayer under transient audio
+ * focus so the Bible audio pauses meanwhile. [onPlace] hears the stanza and line being sung.
  */
 @Composable
-fun PsalmTuneBlock(tune: PsalmTune) {
+fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, onPlace: (TunePlace?) -> Unit = {}) {
     val graph = LocalAppServices.current.graph
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -87,20 +89,34 @@ fun PsalmTuneBlock(tune: PsalmTune) {
     var playing by remember { mutableStateOf(false) }
     var position by remember { mutableLongStateOf(0L) }
     var full by remember { mutableStateOf(false) }
+    var stanza by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(playing) {
         while (playing) {
             withFrameNanos { }
             position = player.position()
+            val once = data?.events?.durationMs ?: Long.MAX_VALUE
+            // The stanza is sung; after the breath the next one starts (the organ's tail is cut).
+            if (position >= once + BREATH_MS && stanza + 1 < stanzas) {
+                stanza += 1
+                player.restart()
+                position = 0
+            }
             if (!player.isPlaying()) {
                 playing = false
-                if (player.finished) position = 0
+                if (player.finished) {
+                    position = 0
+                    stanza = 0
+                }
             }
         }
     }
+    val line = data?.events?.takeIf { playing || position > 0 }?.line(position) ?: -1
+    LaunchedEffect(stanza, line) { onPlace(if (line < 0) null else TunePlace(stanza, line)) }
+    DisposableEffect(Unit) { onDispose { onPlace(null) } }
 
     PsalmTuneView(
-        tune, data, playing, position, full,
+        tune, data, playing, position, full, stanza = stanza, stanzas = stanzas,
         onToggle = {
             if (playing) {
                 player.pause()
@@ -122,9 +138,18 @@ fun PsalmTuneBlock(tune: PsalmTune) {
     )
 }
 
-/** The tune block without loading or audio (screenshot tests pass fixtures). */
+/** Where the organ is: the stanza and the line of it being sung. */
+data class TunePlace(val stanza: Int, val line: Int)
+
+/** A breath between stanzas, about a beat, as a congregation takes. */
+const val BREATH_MS = 700L
+
+/** The tune block without loading or audio (screenshot tests pass fixtures). [positionMs] is within [stanza]. */
 @Composable
-fun PsalmTuneView(tune: PsalmTune, data: TuneData?, playing: Boolean, positionMs: Long, full: Boolean, onToggle: () -> Unit, onFull: () -> Unit) {
+fun PsalmTuneView(
+    tune: PsalmTune, data: TuneData?, playing: Boolean, positionMs: Long, full: Boolean,
+    stanza: Int = 0, stanzas: Int = 1, onToggle: () -> Unit, onFull: () -> Unit,
+) {
     val c = Ts.colors
     val shape = RoundedCornerShape(12.dp)
     val note = data?.events?.takeIf { playing || positionMs > 0 }?.at(positionMs)
@@ -147,13 +172,16 @@ fun PsalmTuneView(tune: PsalmTune, data: TuneData?, playing: Boolean, positionMs
                     Alignment.Center,
                 ) { Icon(if (playing) TsIcons.Pause else TsIcons.Play, null, Modifier.size(18.dp), tint = c.onAccent) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val total = data?.events?.durationMs ?: 0
+                    val once = data?.events?.durationMs ?: 0
+                    val total = stanzas * once + (stanzas - 1) * BREATH_MS
+                    val elapsed = stanza * (once + BREATH_MS) + positionMs.coerceAtMost(once + BREATH_MS)
                     Row {
-                        Text("${tune.meter} · ${tune.key}", style = Ts.type.caption, color = c.muted, modifier = Modifier.weight(1f))
-                        Text("${clock(positionMs)} / ${clock(total)}", style = Ts.type.caption, color = c.muted)
+                        val where = if (stanzas > 1) " · " + tr("பத்தி ${stanza + 1}/$stanzas", "stanza ${stanza + 1} of $stanzas") else ""
+                        Text("${tune.meter} · ${tune.key}$where", style = Ts.type.caption, color = c.muted, modifier = Modifier.weight(1f))
+                        Text("${clock(elapsed)} / ${clock(total)}", style = Ts.type.caption, color = c.muted)
                     }
                     Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.line)) {
-                        val f = if (total > 0) (positionMs.toFloat() / total).coerceIn(0f, 1f) else 0f
+                        val f = if (total > 0) (elapsed.toFloat() / total).coerceIn(0f, 1f) else 0f
                         Box(Modifier.fillMaxWidth(f).height(4.dp).background(c.accent))
                     }
                 }
@@ -240,6 +268,11 @@ private class TunePlayer(context: Context) {
     fun pause() {
         mp?.takeIf { it.isPlaying }?.pause()
         audio.abandonAudioFocusRequest(focus)
+    }
+
+    /** Back to the start for the next stanza, still playing. */
+    fun restart() {
+        mp?.seekTo(0)
     }
 
     fun isPlaying() = mp?.isPlaying == true

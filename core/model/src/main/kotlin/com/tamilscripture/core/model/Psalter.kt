@@ -48,9 +48,13 @@ data class PsalterDrawing(
 /** When each note sounds (ms), its pitch, and its head in each drawing: [x, y] as fractions, and its id. */
 data class TuneNote(val on: Long, val off: Long, val midi: Int, val fullId: String, val incipitId: String?)
 
-data class TuneEvents(val durationMs: Long, val incipitNotes: Int, val notes: List<TuneNote>) {
+/** [lines]: when each line of a stanza starts (ms), for lighting the line being sung. */
+data class TuneEvents(val durationMs: Long, val incipitNotes: Int, val notes: List<TuneNote>, val lines: List<Long> = emptyList()) {
     /** The note sounding at [ms], or null between notes and after the end. */
     fun at(ms: Long): TuneNote? = notes.firstOrNull { ms >= it.on && ms < it.off }
+
+    /** The line of the stanza sung at [ms], or -1 before the first note and after the last. */
+    fun line(ms: Long): Int = if (ms < 0 || ms >= durationMs) -1 else lines.indexOfLast { it <= ms }
 
     companion object {
         fun parse(text: String): TuneEvents {
@@ -60,6 +64,7 @@ data class TuneEvents(val durationMs: Long, val incipitNotes: Int, val notes: Li
             return TuneEvents(
                 durationMs = o.getValue("duration").jsonPrimitive.long,
                 incipitNotes = o.getValue("incipit_notes").jsonPrimitive.double.toInt(),
+                lines = o["lines"]?.jsonArray?.map { it.jsonPrimitive.long }.orEmpty(),
                 notes = o.getValue("notes").jsonArray.map { n ->
                     val m = n.jsonObject
                     TuneNote(

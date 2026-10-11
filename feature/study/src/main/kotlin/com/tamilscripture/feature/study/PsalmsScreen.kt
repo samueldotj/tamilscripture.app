@@ -377,7 +377,7 @@ private fun PsalmDetail(index: PsalmsIndex, psalm: Psalm, links: StudyLinks, onP
         index, psalm, card, verse, onPick,
         onRead = { links.read(Passage(settings.version, "PSA", psalm.n)) },
         onShare = { links.read(Passage(settings.version, "PSA", psalm.n, psalm.keyVerses.first)) },
-        sing = card?.takeIf { it.metrical.isNotEmpty() }?.let { cd -> { PsalmSing(cd) { t -> PsalmTuneBlock(t) } } },
+        sing = card?.takeIf { it.metrical.isNotEmpty() }?.let { cd -> { PsalmSing(cd) { t, n, onPlace -> PsalmTuneBlock(t, n, onPlace) } } },
     )
 }
 

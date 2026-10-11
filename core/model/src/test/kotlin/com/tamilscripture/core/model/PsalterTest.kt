@@ -25,6 +25,12 @@ class PsalterTest {
         assertNull(e.at(e.durationMs + 1))
         assertTrue(e.notes.take(e.incipitNotes).all { it.incipitId != null })
         assertTrue(e.notes.drop(e.incipitNotes).all { it.incipitId == null })
+        // Crimond's four lines (C.M.), and the line sung at a moment of the stanza.
+        assertEquals(listOf(0L, 8571L, 15000L, 21429L), e.lines)
+        assertEquals(0, e.line(0))
+        assertEquals(1, e.line(9000))
+        assertEquals(3, e.line(e.durationMs - 1))
+        assertEquals(-1, e.line(e.durationMs + 300))
         // Every note the timings name is drawn, so it can be lit.
         val ids = PsalterDrawing.parse(res("full.draw.json")).items.mapNotNull { it.note }.toSet()
         assertTrue(e.notes.all { it.fullId in ids })

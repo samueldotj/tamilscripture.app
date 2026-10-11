@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,15 +39,17 @@ import com.tamilscripture.core.services.tr
 /**
  * பாடுங்கள் · Sing this psalm (website docs/feature_psalms_explorer.md §9): the psalm in the
  * 1650 Scottish Psalter. Chips pick the version (C.M. or L.M., or a part of Psalm 119) and
- * its tune; [tuneBlock] plays the tune; the first stanza opens out into all of them.
+ * its tune; [tuneBlock] plays it for every stanza and reports where it is, and the line being
+ * sung is lit; the first stanza opens out into all of them.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (PsalmTune) -> Unit) {
+fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (tune: PsalmTune, stanzas: Int, onPlace: (TunePlace?) -> Unit) -> Unit) {
     val c = Ts.colors
     var vi by rememberSaveable(card.n) { mutableIntStateOf(0) }
     var ti by rememberSaveable(card.n, vi) { mutableIntStateOf(0) }
     var all by rememberSaveable(card.n, vi) { mutableStateOf(false) }
+    var place by remember(card.n, vi) { mutableStateOf<TunePlace?>(null) }
     val v = card.metrical[vi]
     val tunes = v.tunes.mapNotNull(card::tune)
     val tune = tunes.getOrNull(ti.coerceAtMost(tunes.lastIndex))
@@ -71,7 +74,12 @@ fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (PsalmTune) -> Unit) {
                     tunes.forEachIndexed { i, t -> Pill(t.name, t == tune) { ti = i } }
                 }
             }
-            key(v.key, tune.id) { tuneBlock(tune) }
+            key(v.key, tune.id) {
+                tuneBlock(tune, v.stanzas.size) { p ->
+                    place = p
+                    if (p != null && p.stanza > 0) all = true
+                }
+            }
         }
         Text(
             when {
@@ -86,10 +94,15 @@ fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (PsalmTune) -> Unit) {
                 Text(it, style = Ts.type.caption.copy(fontFamily = NotoSans, fontStyle = FontStyle.Italic), color = c.muted)
             }
             val english = Ts.type.body.copy(fontFamily = NotoSans, fontSize = 15.sp, lineHeight = 24.sp)
-            (if (all) v.stanzas else v.stanzas.take(1)).forEach { stanza ->
+            (if (all) v.stanzas else v.stanzas.take(1)).forEachIndexed { si, stanza ->
                 Column {
-                    stanza.forEach { line ->
-                        Text(line.trim(), style = english, color = c.ink, modifier = Modifier.padding(start = if (line.startsWith("  ")) 24.dp else 0.dp))
+                    stanza.forEachIndexed { li, line ->
+                        val sung = place?.stanza == si && place?.line == li
+                        Text(
+                            line.trim(), style = english, color = c.ink,
+                            modifier = Modifier.padding(start = if (line.startsWith("  ")) 24.dp else 0.dp)
+                                .background(if (sung) c.verseSelected else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(4.dp)),
+                        )
                     }
                 }
             }
