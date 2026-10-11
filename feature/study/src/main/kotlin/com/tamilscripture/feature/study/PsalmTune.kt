@@ -100,7 +100,8 @@ class TuneData(val incipit: PsalterDrawing, val full: PsalterDrawing, val events
  * in the accent colour. Audio is the website's pre-rendered MP3 (one stanza on organ),
  * played [stanzas] times with a breath between, with MediaPlayer under transient audio
  * focus so the Bible audio pauses meanwhile. [onPlace] hears the stanza and line being sung.
- * A tap on a note or a word sings from there, and the timeline can be dragged.
+ * A tap on a note or a word sings from there, and the timeline can be dragged. Play on the
+ * card opens full screen; closing it carries on playing on the card.
  */
 @Composable
 fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<String>>> = emptyList(), onPlace: (TunePlace?) -> Unit = {}) {
@@ -190,7 +191,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<Str
 
     PsalmTuneView(
         tune, data, playing, position, full, stanza = stanza, stanzas = stanzas,
-        lyrics = lyrics, rate = rate, onRate = onRate, onToggle = onToggle,
+        lyrics = lyrics, rate = rate, onRate = onRate, onToggle = { if (!playing && data != null) big = true; onToggle() },
         onFull = { full = !full }, onBig = { big = true }, onSeek = onSeek, onNote = onNote,
     )
     // Full screen for singing: the whole tune and its words as large as the screen allows,
