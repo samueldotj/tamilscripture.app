@@ -45,6 +45,8 @@ fun SchematicMap(
     tamil: Boolean,
     modifier: Modifier = Modifier,
     selected: String? = null,
+    /** More places drawn as chosen: the places a selected verse names. */
+    marked: Set<String> = emptySet(),
     description: String = "",
     onPlace: ((String) -> Unit)? = null,
 ) {
@@ -91,7 +93,7 @@ fun SchematicMap(
         }
         drawing.places.forEach { p ->
             val centre = Offset(p.x * k, p.y * k)
-            val on = p.id == selected
+            val on = p.id == selected || p.id in marked
             val r = (if (on) 7f else p.r) * k
             drawCircle(c.surface, r + 1.6f * k, centre)
             drawCircle(if (p.em || on) c.amber else c.accent, r, centre)
@@ -106,7 +108,7 @@ fun SchematicMap(
         // large maps (800 units wide) would otherwise shrink them below reading size on a phone.
         val labelPx = max((if (tamil) 12.5f else 12f) * k, 11.sp.toPx())
         drawing.places.forEach { p ->
-            val on = p.id == selected
+            val on = p.id == selected || p.id in marked
             if (!p.crowded || on) {
                 (if (tamil) p.ta ?: p.en else p.en ?: p.ta)?.let { label ->
                     drawLabel(measurer, label, k, TextStyle(fontFamily = labelFamily, fontSize = labelPx.toSp(), fontWeight = FontWeight.SemiBold), if (on) c.amber else c.ink, c.mapLand)

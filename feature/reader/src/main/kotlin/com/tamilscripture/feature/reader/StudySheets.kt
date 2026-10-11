@@ -108,12 +108,17 @@ fun PeoplePlacesSheet(
     onPerson: (String) -> Unit,
     onPlace: (String) -> Unit,
     onAtlas: ((List<String>) -> Unit)? = null,
+    only: StudyAid? = null,
+    verses: List<Int> = listOfNotNull(verse),
     onDismiss: () -> Unit,
 ) {
     TsSheet(onDismiss) {
-        PeoplePlacesContent(title, book, chapter, verse, onPerson, onPlace, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp), onAtlas)
+        PeoplePlacesContent(title, book, chapter, verse, onPerson, onPlace, Modifier.heightIn(max = 560.dp).padding(start = 22.dp, end = 22.dp, bottom = 16.dp), onAtlas, only, verses)
     }
 }
+
+/** One study aid on its own, as the verse card's map and people buttons open it (the website's `only`). */
+enum class StudyAid { Map, People }
 
 /** The people-and-places list itself, in a sheet on phones or the study pane on wide windows. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,6 +133,10 @@ fun PeoplePlacesContent(
     modifier: Modifier,
     /** M8-5e: opens the atlas fitted to the chapter's places. */
     onAtlas: ((List<String>) -> Unit)? = null,
+    /** Just the map (the selected verses' places marked) or just the people (theirs first). */
+    only: StudyAid? = null,
+    /** The selected verses: their names are marked and listed first. */
+    verses: List<Int> = listOfNotNull(verse),
 ) {
     val graph = LocalAppServices.current.graph
     val c = Ts.colors
@@ -139,7 +148,12 @@ fun PeoplePlacesContent(
         value = state.second?.takeIf { it.map }?.let { graph.study.file("maps/$book/$chapter.svg") }?.let(MapSvg::parse)
     }
     Column(modifier.verticalScroll(rememberScrollState())) {
-        Text(tr("நபர்கள் · இடங்கள்", "People and places") + " · " + title, style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
+        val heading = when (only) {
+            StudyAid.Map -> tr("வரைபடம்", "Map")
+            StudyAid.People -> tr("நபர்கள்", "People")
+            null -> tr("நபர்கள் · இடங்கள்", "People and places")
+        }
+        Text("$heading · $title", style = Ts.type.sheetTitle, color = c.ink, modifier = Modifier.padding(bottom = 10.dp))
         val m = state.second
         if (state.first) {
             CircularProgressIndicator(color = c.accent)
@@ -153,15 +167,24 @@ fun PeoplePlacesContent(
             )
             return@Column
         }
-        map?.let { d ->
-            SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), description = title, onPlace = onPlace)
+        val keys = verses.map { "$book.$chapter.$it" }.toSet()
+        val named = m.verses.filter { it.verse in keys }
+        val markedPlaces = named.flatMap { it.places }.filter { it in m.places }.toSet()
+        val markedPeople = named.flatMap { it.people }.filter { it in m.people }.distinct()
+        if (only != StudyAid.People) {
+            map?.let { d ->
+                SchematicMap(d, tamil, Modifier.padding(bottom = 6.dp), marked = markedPlaces, description = title, onPlace = onPlace)
+            }
+            if (onAtlas != null && m.places.isNotEmpty()) {
+                // From the map aid, the atlas fits the verse's places; otherwise the chapter's.
+                val fit = if (only == StudyAid.Map && markedPlaces.isNotEmpty()) markedPlaces.toList() else m.places.keys.toList()
+                TsPillButton(
+                    tr("வரைபடத்தில் திற", "Open in the atlas"), { onAtlas(fit) },
+                    height = 36.dp, style = PillStyle.Tinted, modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
         }
-        if (onAtlas != null && m.places.isNotEmpty()) {
-            TsPillButton(
-                tr("வரைபடத்தில் திற", "Open in the atlas"), { onAtlas(m.places.keys.toList()) },
-                height = 36.dp, style = PillStyle.Tinted, modifier = Modifier.padding(bottom = 8.dp),
-            )
-        }
+        if (only == StudyAid.Map) return@Column
         val here = verse?.let { v -> m.verses.firstOrNull { it.verse == "$book.$chapter.$v" } }
         val pad = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
         @Composable
@@ -189,6 +212,14 @@ fun PeoplePlacesContent(
                     TsChip("⌖ " + (if (tamil) p.nameTa.ifBlank { p.nameEn } else p.nameEn), false, { onPlace(id) }, contentPadding = pad)
                 }
             }
+        }
+        if (only == StudyAid.People) {
+            // The verse's people first, then the rest of the chapter's.
+            val label = if (verses.size == 1) tr("வசனம் ${verses[0]}", "Verse ${verses[0]}") else tr("தெரிந்த வசனங்கள்", "Selected verses")
+            group(label, markedPeople, emptyList())
+            group(tr("இந்த அதிகாரத்தில் மற்றவர்கள்", "Others in this chapter"),
+                m.people.entries.sortedByDescending { it.value.mentions }.map { it.key }.filterNot { it in markedPeople }, emptyList())
+            return@Column
         }
         if (here != null && verse != null) group(tr("வசனம் $verse", "Verse $verse"), here.people, here.places)
         group(tr("இந்த அதிகாரம்", "This chapter"), m.people.entries.sortedByDescending { it.value.mentions }.map { it.key },

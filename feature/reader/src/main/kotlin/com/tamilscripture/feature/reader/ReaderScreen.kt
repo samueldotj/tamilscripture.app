@@ -176,7 +176,9 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     var showCrossRefs by rememberSaveable { mutableStateOf(false) }
     var showVersions by rememberSaveable { mutableStateOf(false) }
     var showOriginal by rememberSaveable { mutableStateOf(false) }
+    /** The people-and-places sheet: everything, or one aid from the verse card. */
     var showPeople by rememberSaveable { mutableStateOf(false) }
+    var studyOnly by rememberSaveable { mutableStateOf<StudyAid?>(null) }
     var showHighlight by rememberSaveable { mutableStateOf(false) }
     // The size while two fingers pinch; the saved setting otherwise.
     var pinchSize by remember { mutableStateOf<Int?>(null) }
@@ -266,13 +268,22 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val mentions by produceState<com.tamilscripture.core.model.ChapterMentions?>(null, state.passage.book, state.passage.chapter) {
         value = runCatching { services.graph.study.mentions(state.passage.book, state.passage.chapter) }.getOrNull()
     }
-    val named = remember(mentions, state.selection) {
-        val sel = state.selection.map { it.toString() }.toSet()
-        mentions?.verses?.filter { it.verse.takeWhile(Char::isDigit) in sel }
+    // As on the website: names the study data knows, in the selected verses ("EXO.1.5").
+    val aids = remember(mentions, state.selection) {
+        val m = mentions
+        val keys = state.selection.map { "${state.passage.book}.${state.passage.chapter}.$it" }.toSet()
+        val named = m?.verses?.filter { it.verse in keys }.orEmpty()
+        Triple(
+            named.flatMap { it.places }.filter { m?.places?.containsKey(it) == true }.distinct(),
+            named.any { v -> v.people.any { m?.people?.containsKey(it) == true } },
+            m?.map == true,
+        )
     }
-    val versePeople = named?.flatMap { it.people }?.distinct()
-    val versePlaces = named?.flatMap { it.places }?.distinct().orEmpty()
-    val openPeople: () -> Unit = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
+    val (versePlaces, versePeople, chapterMap) = aids
+    val openAid: (StudyAid) -> Unit = { aid ->
+        vm.recordVerseAction(if (aid == StudyAid.Map) "map" else "people")
+        if (wide) paneTab = PANE_PEOPLE else { studyOnly = aid; showPeople = true }
+    }
     val actions = VerseActions(
         onPlayHere = { vm.recordVerseAction("listen"); play(state.selection.firstOrNull()) },
         onCommentary = {
@@ -292,14 +303,14 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
         onNote = { if (signedIn) editingNote = vm.noteForSelection()?.id ?: NEW_NOTE else askSignIn = true },
         onHighlight = { if (signedIn) showHighlight = true else askSignIn = true },
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
-        // Unknown (offline, no pack): the sheet says why; nobody named: no button; one person: their page.
-        onPeople = when {
-            versePeople == null -> openPeople
-            versePeople.isEmpty() -> null
-            versePeople.size == 1 -> { { vm.recordVerseAction("people"); nav.person(versePeople.first()) } }
-            else -> openPeople
+        // Shown only when the selected verses name someone, or somewhere (the website's selectedAids).
+        onPeople = if (versePeople) ({ openAid(StudyAid.People) }) else null,
+        // The chapter map with the verse's places marked; with no chapter map, the atlas fitted to them.
+        onMap = when {
+            versePlaces.isEmpty() -> null
+            chapterMap -> ({ openAid(StudyAid.Map) })
+            else -> nav.atlas?.let { open -> { vm.recordVerseAction("atlas"); open(versePlaces) } }
         },
-        onMap = nav.atlas?.takeIf { versePlaces.isNotEmpty() }?.let { open -> { vm.recordVerseAction("atlas"); open(versePlaces) } },
         bookmarked = state.selection.firstOrNull()?.let { v ->
             userData.bookmarks.any { it.book == state.passage.book && it.chapter == state.passage.chapter && it.verse == v }
         } == true,
@@ -320,7 +331,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             Entry(tr("விளக்கவுரை", "Commentary")) { vm.recordVerseAction("commentary"); nav.commentary(state.passage.copy(verse = v)) }
             Entry(tr("தொடர்புள்ள வசனங்கள்", "Cross-references")) { vm.recordVerseAction("xref"); showCrossRefs = true }
             Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true }
-            Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
+            Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else { studyOnly = null; showPeople = true } }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
             Entry(tr("படமாகப் பகிர்", "Share as image")) {
                 vm.recordVerseAction("share-image")
@@ -410,7 +421,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
                                     PANE_PEOPLE -> PeoplePlacesContent(
                                         title, state.passage.book, state.passage.chapter, v, nav.person, nav.place,
                                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 16.dp),
-                                        onAtlas = nav.atlas,
+                                        onAtlas = nav.atlas, verses = state.selection,
                                     )
                                     else -> OriginalWordsContent(
                                         book?.label(lang, state.passage.chapter, v ?: 1) ?: "", state.passage.book, state.passage.chapter, v ?: 1, nav.strongs,
@@ -516,6 +527,7 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             onPerson = { id -> showPeople = false; nav.person(id) },
             onPlace = { id -> showPeople = false; nav.place(id) },
             onAtlas = nav.atlas?.let { open -> { ids: List<String> -> showPeople = false; open(ids) } },
+            only = studyOnly, verses = state.selection,
         ) { showPeople = false }
     }
     if (askSignIn) {
