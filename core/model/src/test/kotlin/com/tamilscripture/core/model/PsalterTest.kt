@@ -31,6 +31,11 @@ class PsalterTest {
         assertEquals(1, e.line(9000))
         assertEquals(3, e.line(e.durationMs - 1))
         assertEquals(-1, e.line(e.durationMs + 300))
+        // Where the words go: a syllable slot per line, and a baseline under every note.
+        assertEquals(84, e.bpm)
+        assertEquals(4, e.slots.size)
+        assertEquals(0, e.slots[0][0])
+        assertTrue(e.notes.all { it.fullX != null && it.fullLyric != null && it.fullLyric!! > 0f })
         // Every note the timings name is drawn, so it can be lit.
         val ids = PsalterDrawing.parse(res("full.draw.json")).items.mapNotNull { it.note }.toSet()
         assertTrue(e.notes.all { it.fullId in ids })

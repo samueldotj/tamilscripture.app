@@ -45,11 +45,24 @@ data class PsalterDrawing(
     }
 }
 
-/** When each note sounds (ms), its pitch, and its head in each drawing: [x, y] as fractions, and its id. */
-data class TuneNote(val on: Long, val off: Long, val midi: Int, val fullId: String, val incipitId: String?)
+/**
+ * When each note sounds (ms), its pitch, and in each drawing its id, its head's x and the
+ * baseline for the words under it, as fractions of the drawing (null when not drawn).
+ */
+data class TuneNote(
+    val on: Long, val off: Long, val midi: Int, val fullId: String, val incipitId: String?,
+    val fullX: Float? = null, val fullLyric: Float? = null, val incipitX: Float? = null, val incipitLyric: Float? = null,
+)
 
-/** [lines]: when each line of a stanza starts (ms), for lighting the line being sung. */
-data class TuneEvents(val durationMs: Long, val incipitNotes: Int, val notes: List<TuneNote>, val lines: List<Long> = emptyList()) {
+/**
+ * [lines]: when each line of a stanza starts (ms), for lighting the line being sung.
+ * [slots]: per line, the notes that start a syllable, where the words go. [bpm]: the tempo
+ * the audio was rendered at.
+ */
+data class TuneEvents(
+    val durationMs: Long, val incipitNotes: Int, val notes: List<TuneNote>,
+    val lines: List<Long> = emptyList(), val slots: List<List<Int>> = emptyList(), val bpm: Int = 84,
+) {
     /** The note sounding at [ms], or null between notes and after the end. */
     fun at(ms: Long): TuneNote? = notes.firstOrNull { ms >= it.on && ms < it.off }
 
@@ -61,15 +74,20 @@ data class TuneEvents(val durationMs: Long, val incipitNotes: Int, val notes: Li
             val o = Json.parseToJsonElement(text).jsonObject
             fun id(e: kotlinx.serialization.json.JsonElement?): String? =
                 (e as? JsonArray)?.getOrNull(2)?.takeIf { it !is JsonNull }?.jsonPrimitive?.content
+            fun num(e: kotlinx.serialization.json.JsonElement?, i: Int): Float? =
+                (e as? JsonArray)?.getOrNull(i)?.takeIf { it !is JsonNull }?.jsonPrimitive?.double?.toFloat()
             return TuneEvents(
                 durationMs = o.getValue("duration").jsonPrimitive.long,
                 incipitNotes = o.getValue("incipit_notes").jsonPrimitive.double.toInt(),
                 lines = o["lines"]?.jsonArray?.map { it.jsonPrimitive.long }.orEmpty(),
+                slots = o["slots"]?.jsonArray?.map { l -> l.jsonArray.map { it.jsonPrimitive.double.toInt() } }.orEmpty(),
+                bpm = o["bpm"]?.jsonPrimitive?.double?.toInt() ?: 84,
                 notes = o.getValue("notes").jsonArray.map { n ->
                     val m = n.jsonObject
                     TuneNote(
                         m.getValue("on").jsonPrimitive.long, m.getValue("off").jsonPrimitive.long,
                         m.getValue("midi").jsonPrimitive.double.toInt(), id(m["full"])!!, id(m["incipit"]),
+                        num(m["full"], 0), num(m["full"], 3), num(m["incipit"], 0), num(m["incipit"], 3),
                     )
                 },
             )

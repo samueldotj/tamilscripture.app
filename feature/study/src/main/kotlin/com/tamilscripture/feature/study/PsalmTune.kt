@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,19 @@ import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import com.tamilscripture.core.designsystem.theme.NotoSans
+import com.tamilscripture.core.model.Lyrics
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,7 +87,7 @@ class TuneData(val incipit: PsalterDrawing, val full: PsalterDrawing, val events
  * focus so the Bible audio pauses meanwhile. [onPlace] hears the stanza and line being sung.
  */
 @Composable
-fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, onPlace: (TunePlace?) -> Unit = {}) {
+fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, lyrics: List<List<List<String>>> = emptyList(), onPlace: (TunePlace?) -> Unit = {}) {
     val graph = LocalAppServices.current.graph
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,6 +104,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, onPlace: (TunePlace?) -> U
     var position by remember { mutableLongStateOf(0L) }
     var full by remember { mutableStateOf(false) }
     var stanza by remember { mutableIntStateOf(0) }
+    var rate by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(playing) {
         while (playing) {
@@ -117,6 +132,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, onPlace: (TunePlace?) -> U
 
     PsalmTuneView(
         tune, data, playing, position, full, stanza = stanza, stanzas = stanzas,
+        lyrics = lyrics, rate = rate, onRate = { rate = it; player.speed(it) },
         onToggle = {
             if (playing) {
                 player.pause()
@@ -130,7 +146,7 @@ fun PsalmTuneBlock(tune: PsalmTune, stanzas: Int = 1, onPlace: (TunePlace?) -> U
                                 File(context.cacheDir, "psalter/${tune.id}.mp3").apply { writeBytes(bytes) }
                             }
                     }
-                    if (file != null && player.play(file)) playing = true
+                    if (file != null && player.play(file, rate)) playing = true
                 }
             }
         },
@@ -144,11 +160,20 @@ data class TunePlace(val stanza: Int, val line: Int)
 /** A breath between stanzas, about a beat, as a congregation takes. */
 const val BREATH_MS = 700L
 
-/** The tune block without loading or audio (screenshot tests pass fixtures). [positionMs] is within [stanza]. */
+/** Slower, as written, faster: the playback speed, pitch kept. */
+val TEMPI = listOf(0.85f, 1f, 1.15f)
+
+/**
+ * The tune block without loading or audio (screenshot tests pass fixtures). [positionMs] is
+ * within [stanza], in the audio's own clock; [lyrics] are the version's words, the current
+ * stanza's written under the notes; [rate] is the tempo chosen.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun PsalmTuneView(
     tune: PsalmTune, data: TuneData?, playing: Boolean, positionMs: Long, full: Boolean,
-    stanza: Int = 0, stanzas: Int = 1, onToggle: () -> Unit, onFull: () -> Unit,
+    stanza: Int = 0, stanzas: Int = 1, lyrics: List<List<List<String>>> = emptyList(),
+    rate: Float = 1f, onRate: (Float) -> Unit = {}, onToggle: () -> Unit, onFull: () -> Unit,
 ) {
     val c = Ts.colors
     val shape = RoundedCornerShape(12.dp)
@@ -161,7 +186,18 @@ fun PsalmTuneView(
         ) {
             if (data != null) {
                 val drawing = if (full) data.full else data.incipit
-                Score(drawing, if (full) note?.fullId else note?.incipitId, if (full) null else 110f)
+                val ev = data.events
+                // The stanza's words under their notes; the syllable being sung is lit.
+                val onNotes = lyrics.getOrNull(stanza)?.let { Lyrics.stanzaOnNotes(it, ev.slots) }.orEmpty()
+                val sounding = note?.let { ev.notes.indexOf(it) } ?: -1
+                val litSyllable = if (sounding < 0) -1 else onNotes.keys.filter { it <= sounding }.maxOrNull() ?: -1
+                val words = onNotes.mapNotNull { (i, text) ->
+                    val n = ev.notes.getOrNull(i) ?: return@mapNotNull null
+                    val x = if (full) n.fullX else n.incipitX
+                    val y = if (full) n.fullLyric else n.incipitLyric
+                    if (x == null || y == null) null else Word(x, y, text, i == litSyllable)
+                }
+                Score(drawing, if (full) note?.fullId else note?.incipitId, if (full) null else 130f, words)
             } else {
                 Box(Modifier.fillMaxWidth().height(64.dp))
             }
@@ -172,9 +208,10 @@ fun PsalmTuneView(
                     Alignment.Center,
                 ) { Icon(if (playing) TsIcons.Pause else TsIcons.Play, null, Modifier.size(18.dp), tint = c.onAccent) }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // In the audio's own clock, shown in the listener's: divided by the rate.
                     val once = data?.events?.durationMs ?: 0
-                    val total = stanzas * once + (stanzas - 1) * BREATH_MS
-                    val elapsed = stanza * (once + BREATH_MS) + positionMs.coerceAtMost(once + BREATH_MS)
+                    val total = ((stanzas * once + (stanzas - 1) * BREATH_MS) / rate).toLong()
+                    val elapsed = ((stanza * (once + BREATH_MS) + positionMs.coerceAtMost(once + BREATH_MS)) / rate).toLong()
                     Row {
                         val where = if (stanzas > 1) " · " + tr("பத்தி ${stanza + 1}/$stanzas", "stanza ${stanza + 1} of $stanzas") else ""
                         Text("${tune.meter} · ${tune.key}$where", style = Ts.type.caption, color = c.muted, modifier = Modifier.weight(1f))
@@ -183,6 +220,26 @@ fun PsalmTuneView(
                     Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(c.line)) {
                         val f = if (total > 0) (elapsed.toFloat() / total).coerceIn(0f, 1f) else 0f
                         Box(Modifier.fillMaxWidth(f).height(4.dp).background(c.accent))
+                    }
+                }
+            }
+            data?.events?.bpm?.let { bpm ->
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                    Text(tr("வேகம்", "Tempo"), style = Ts.type.captionSmall, color = c.muted)
+                    TEMPI.forEach { r ->
+                        val on = r == rate
+                        val label = when {
+                            r < 1f -> tr("மெதுவாக", "Slower")
+                            r > 1f -> tr("வேகமாக", "Faster")
+                            else -> tr("இயல்பு", "Normal")
+                        }
+                        Text(
+                            "$label ♩ = ${(bpm * r).roundToInt()}", style = Ts.type.labelSmall, color = if (on) c.onAccent else c.ink,
+                            modifier = Modifier.clip(CircleShape).background(if (on) c.accent else c.surface)
+                                .border(1.5.dp, if (on) c.accent else c.line2, CircleShape)
+                                .clickable(role = Role.Tab) { onRate(r) }.semantics { selected = on }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                        )
                     }
                 }
             }
@@ -202,11 +259,16 @@ fun PsalmTuneView(
 
 private fun clock(ms: Long) = "${ms / 60000}:${((ms % 60000) / 1000).toString().padStart(2, '0')}"
 
-/** The drawing at the width available (no taller than [maxHeightDp]), the note [lit] in the accent colour. */
+/** A syllable to write under a note: its x and baseline as fractions of the drawing. */
+private class Word(val x: Float, val y: Float, val text: String, val lit: Boolean)
+
+/** The drawing at the width available (no taller than [maxHeightDp]), the note [lit] in the accent colour, [words] under the notes. */
 @Composable
-private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?) {
+private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?, words: List<Word> = emptyList()) {
     val c = Ts.colors
     val marks = remember(drawing) { marks(drawing) }
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val ratio = drawing.height / drawing.width
         var w = maxWidth
@@ -219,6 +281,17 @@ private fun Score(drawing: PsalterDrawing, lit: String?, maxHeightDp: Float?) {
                     drawPath(m.path, color, style = Fill)
                     if (m.stroke != null) drawPath(m.path, color, style = Stroke(m.stroke))
                 }
+            }
+            // Words in the drawing's units (300 high, as on the website), placed under each notehead.
+            val size = with(density) { (300 * s).toSp() }
+            for (w in words) {
+                val layout = measurer.measure(
+                    w.text,
+                    TextStyle(fontFamily = NotoSans, fontSize = size, fontWeight = if (w.lit) FontWeight.Bold else FontWeight.Normal, color = if (w.lit) c.accent else c.ink2),
+                )
+                val cx = (w.x * drawing.width + 80) * s
+                val baseline = w.y * drawing.height * s
+                drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, baseline - layout.firstBaseline))
             }
         }
     }
@@ -253,7 +326,8 @@ private class TunePlayer(context: Context) {
     var finished = false
         private set
 
-    fun play(file: File): Boolean {
+    /** Plays at [rate] (1 is as written), pitch kept. */
+    fun play(file: File, rate: Float = 1f): Boolean {
         if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return false
         val p = mp ?: MediaPlayer().apply {
             setAudioAttributes(attributes)
@@ -264,12 +338,23 @@ private class TunePlayer(context: Context) {
         if (finished) p.seekTo(0)
         finished = false
         p.start()
+        speed(rate)
         return true
     }
 
     fun pause() {
         mp?.takeIf { it.isPlaying }?.pause()
         audio.abandonAudioFocusRequest(focus)
+    }
+
+    private var rate = 1f
+
+    /** The tempo: applied now while playing, else when play starts (setting it on a paused
+     *  MediaPlayer would start it). */
+    fun speed(r: Float) {
+        rate = r
+        val p = mp ?: return
+        if (p.isPlaying) p.playbackParams = p.playbackParams.setSpeed(r)
     }
 
     /** Back to the start for the next stanza, still playing. */

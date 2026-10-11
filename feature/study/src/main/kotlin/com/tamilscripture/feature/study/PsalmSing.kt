@@ -44,7 +44,7 @@ import com.tamilscripture.core.services.tr
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (tune: PsalmTune, stanzas: Int, onPlace: (TunePlace?) -> Unit) -> Unit) {
+fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (tune: PsalmTune, stanzas: Int, lyrics: List<List<List<String>>>, onPlace: (TunePlace?) -> Unit) -> Unit) {
     val c = Ts.colors
     var vi by rememberSaveable(card.n) { mutableIntStateOf(0) }
     var ti by rememberSaveable(card.n, vi) { mutableIntStateOf(0) }
@@ -75,7 +75,7 @@ fun PsalmSing(card: PsalmCardData, tuneBlock: @Composable (tune: PsalmTune, stan
                 }
             }
             key(v.key, tune.id) {
-                tuneBlock(tune, v.stanzas.size) { p ->
+                tuneBlock(tune, v.stanzas.size, v.lyrics) { p ->
                     place = p
                     if (p != null && p.stanza > 0) all = true
                 }

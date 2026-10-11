@@ -117,6 +117,8 @@ data class MetricalVersion(
     val stanzas: List<List<String>>,
     val tunes: List<String> = emptyList(),
     val fallback: Boolean = false,
+    /** The stanzas as syllables (stanza → line → syllable), for the words under the notes. */
+    val lyrics: List<List<List<String>>> = emptyList(),
 )
 
 /**
