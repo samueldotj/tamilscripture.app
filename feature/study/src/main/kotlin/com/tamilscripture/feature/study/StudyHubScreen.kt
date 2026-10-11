@@ -70,9 +70,6 @@ fun StudyHubScreen(nav: StudyNav) {
                 val contrib = tr("என் பங்களிப்புகள்", "My contributions")
                 Tile(contrib, tr("உள்நுழைவுடன்", "With sign-in"), Modifier.weight(1f), soon = true) { nav.soon(contrib) }
             }
-            Row(mod) {
-                Tile(tr("விளக்கக்காட்சி", "Presentations"), tr("கணினியில் மட்டும்", "Desktop only"), Modifier.weight(1f), dashed = true) {}
-            }
         }
     }
 }

@@ -14,9 +14,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
-import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
-import com.github.takahirom.roborazzi.captureScreenRoboImage
 import com.tamilscripture.core.designsystem.component.VerseImage
 import com.tamilscripture.core.designsystem.theme.ThemeMode
 import com.tamilscripture.core.designsystem.theme.Ts
@@ -30,7 +28,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Design 3a and 3b: the verse card's share menu and the share-as-image sheet. */
+/** Design 3b: the share-as-image sheet (opened from a verse's long-press menu). */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w402dp-h874dp-xxhdpi")
@@ -85,25 +83,5 @@ class ShareImageScreenshotTest {
         compose.onNodeWithText("Status").performScrollTo()
         drawn()
         compose.onRoot().captureRoboImage("src/test/screenshots/share_image_sheet_story_dark_en.png")
-    }
-
-    @OptIn(ExperimentalRoborazziApi::class)
-    @Test fun shareMenu() {
-        compose.setContent {
-            TsTheme(ThemeMode.Light) {
-                CompositionLocalProvider(LocalUiLang provides UiLang.Tamil) {
-                    Box(Modifier.size(402.dp, 874.dp).background(Ts.colors.bg).padding(12.dp), contentAlignment = Alignment.BottomCenter) {
-                        VerseActionCard(
-                            "யோவான் 3:16", hasAudio = true, onClose = {}, onPlayHere = {}, onCommentary = {}, onCrossRefs = {},
-                            onBookmark = {}, onCopy = {}, onShare = {}, onNote = {}, onHighlight = {}, onOriginal = {}, onPeople = {}, onShareImage = {},
-                        )
-                    }
-                }
-            }
-        }
-        compose.onNodeWithText("பகிர் ▾").performClick()
-        compose.waitForIdle()
-        compose.onNodeWithText("படமாகப் பகிர்").assertExists()
-        captureScreenRoboImage("src/test/screenshots/share_menu_ta.png")
     }
 }

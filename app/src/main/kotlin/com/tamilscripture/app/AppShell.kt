@@ -56,7 +56,6 @@ import com.tamilscripture.feature.home.HomeScreen
 import com.tamilscripture.feature.plans.PlansScreen
 import com.tamilscripture.feature.reader.BookPickerScreen
 import com.tamilscripture.feature.reader.CommentaryScreen
-import com.tamilscripture.feature.reader.PresentScreen
 import com.tamilscripture.feature.reader.ReaderNav
 import com.tamilscripture.feature.reader.ReaderScreen
 import com.tamilscripture.feature.search.SearchScreen
@@ -171,7 +170,6 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                                 strongs = studyLinks.strongs,
                                 person = studyLinks.person,
                                 place = studyLinks.place,
-                                present = { p -> backStack.add(PresentRoute(p)) },
                                 account = { backStack.add(AccountRoute) },
                                 follow = { p -> backStack.add(ReaderRoute(p)) },
                                 atlas = { places -> backStack.add(AtlasRoute(fit = places)) },
@@ -204,7 +202,6 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
                     entry<DictionaryRoute> { DictionaryScreen(studyLinks) }
                     entry<RootWordsRoute> { RootWordsScreen(studyLinks) }
                     entry<AtlasRoute> { r -> AtlasScreen(r.focus, studyLinks, startJourney = r.journey, fitPlaces = r.fit) }
-                    entry<PresentRoute> { r -> PresentScreen(r.passage, onExit = { backStack.removeAt(backStack.lastIndex) }) }
                     entry<AccountRoute> { AccountScreen(onBack = { backStack.removeAt(backStack.lastIndex) }, onMine = { backStack.add(MineRoute()) }) }
                     entry<MineRoute> { r -> MineScreen(r.tab, onBack = { backStack.removeAt(backStack.lastIndex) }, onRead = ::read) }
                     entry<DownloadsRoute> { DownloadsScreen(onBack = { backStack.removeAt(backStack.lastIndex) }) }

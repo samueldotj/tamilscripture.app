@@ -78,4 +78,16 @@ object TsIcons {
     val Highlight = line("highlight", "M4 20h7", "M14.5 4.5l5 5L10 19H5v-5z")
     val ListView = line("list", "M9 6h11M9 12h11M9 18h11", "M4.5 6h.01M4.5 12h.01M4.5 18h.01")
     val MapView = line("map", "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z", "M9 4v14M15 6v14")
+    private const val STAR = "M12 2.5l2.9 5.9 6.6.9-4.8 4.6 1.1 6.5L12 17.3l-5.8 3.1 1.1-6.5-4.8-4.6 6.6-.9z"
+    /** Bookmark: a star, filled once the verse is bookmarked. */
+    val Star = line("star", STAR)
+    val StarFilled = line("star_filled", STAR, filled = setOf(0))
+    /** Write or edit a note. */
+    val Edit = line("edit", "M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z", "M15 5l4 4")
+    val People = line(
+        "people",
+        "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2",
+        "M13 7a4 4 0 1 1-8 0a4 4 0 1 1 8 0z",
+        "M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+    )
 }

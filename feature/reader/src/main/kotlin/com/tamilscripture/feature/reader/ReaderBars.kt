@@ -5,7 +5,6 @@ import androidx.compose.ui.semantics.contentDescription
 import com.tamilscripture.core.services.LocalUiLang
 import com.tamilscripture.core.model.HighlightColor
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -27,9 +26,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -202,7 +207,12 @@ fun PlayerBar(state: AudioState, title: String, onToggle: () -> Unit, onSpeed: (
 
 private fun formatSpeed(s: Float): String = (if (s % 1f == 0f) s.toInt().toString() else s.toString()) + "×"
 
-/** The floating verse action card (1B). */
+/**
+ * The floating verse action card (1B), compact: a row or two of icon buttons, each with
+ * a spoken label (and a tooltip on long press). Highlight is one dot in the verse's colour
+ * (green when it has none) that opens the four colours; the root-words button shows Aleph
+ * or Alpha by testament. Map and people are left out when the verse names no place or no one.
+ */
 @Composable
 fun VerseActionCard(
     reference: String,
@@ -213,23 +223,27 @@ fun VerseActionCard(
     onCrossRefs: () -> Unit,
     onBookmark: () -> Unit,
     onCopy: () -> Unit,
+    /** The share-as-image sheet: the verse as a picture, sent with its text and link. */
     onShare: () -> Unit,
     onNote: () -> Unit,
+    /** Without [onColor] (signed out), the highlight dot calls this instead. */
     onHighlight: () -> Unit,
     /** One tap highlights in a colour (null removes); the selection's current colour is ringed. */
     currentColor: HighlightColor? = null,
     onColor: ((HighlightColor?) -> Unit)? = null,
     onOriginal: () -> Unit,
-    onPeople: () -> Unit,
-    onShareImage: () -> Unit,
-    onWebsite: () -> Unit = {},
-    onLarge: () -> Unit = {},
-    /** "Large text" in the share menu: the reference and the single-verse page's link. */
-    onShareLarge: () -> Unit = {},
+    /** Who the verse names; null when it names no one. */
+    onPeople: (() -> Unit)?,
+    /** The atlas fitted to the verse's places; null when it names none. */
+    onMap: (() -> Unit)? = null,
+    bookmarked: Boolean = false,
+    /** Old Testament: the root-words button shows א, else α. */
+    oldTestament: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val c = Ts.colors
     val shape = RoundedCornerShape(22.dp)
+    var colours by remember { mutableStateOf(false) }
     Column(
         modifier
             .shadow(16.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
@@ -238,118 +252,94 @@ fun VerseActionCard(
             .border(1.5.dp, c.line2, shape)
             // A phone on its side has less height than the card: it scrolls rather than clips.
             .verticalScroll(rememberScrollState())
-            .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(reference, style = Ts.type.label, color = c.accent, modifier = Modifier.weight(1f))
-            Icon(TsIcons.Close, tr("மூடு", "Close"), Modifier.size(20.dp).clip(CircleShape).clickable(onClick = onClose), tint = c.muted)
+        Row(Modifier.fillMaxWidth().padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(reference, style = Ts.type.label, color = c.accent, modifier = Modifier.weight(1f), maxLines = 1)
+            IconBox(TsIcons.Close, tr("மூடு", "Close"), onClose, tint = c.muted, iconSize = 20.dp)
         }
-        if (onColor != null) HighlightSwatches(currentColor, onColor)
-        // Four across, or two by two when the card is narrow (the text column beside a wide
-        // study pane), where four would cut long Tamil labels.
+        if (colours && onColor != null) HighlightSwatches(currentColor) { colours = false; onColor(it) }
+        val tools: List<@Composable (Modifier) -> Unit> = listOfNotNull(
+            if (hasAudio) {
+                { m -> ToolButton(tr("இந்த வசனத்திலிருந்து கேள்", "Play from this verse"), onPlayHere, m, primary = true) { ToolIcon(TsIcons.Play, it, 20.dp) } }
+            } else null,
+            { m ->
+                ToolButton(tr("முனைப்பு", "Highlight"), { if (onColor != null) colours = !colours else onHighlight() }, m, selected = colours) {
+                    Box(
+                        Modifier.size(22.dp).clip(CircleShape).background(swatch(currentColor ?: HighlightColor.Green))
+                            .border(if (currentColor != null) 2.dp else 0.dp, if (currentColor != null) c.ink else Color.Transparent, CircleShape),
+                    )
+                }
+            },
+            { m -> ToolButton(tr("குறிப்பு எழுது", "Write a note"), onNote, m) { ToolIcon(TsIcons.Edit, it) } },
+            { m ->
+                ToolButton(if (bookmarked) tr("குறியை நீக்கு", "Remove bookmark") else tr("குறி", "Bookmark"), onBookmark, m) {
+                    ToolIcon(if (bookmarked) TsIcons.StarFilled else TsIcons.Star, if (bookmarked) c.accent else it)
+                }
+            },
+            { m -> ToolButton(tr("நகலெடு", "Copy"), onCopy, m) { ToolIcon(TsIcons.Copy, it) } },
+            { m -> ToolButton(tr("பகிர்", "Share"), onShare, m) { ToolIcon(TsIcons.Share, it) } },
+            { m ->
+                ToolButton(tr("மூல மொழிச் சொற்கள்", "Hebrew and Greek words"), onOriginal, m) {
+                    Text(if (oldTestament) "א" else "α", fontSize = 22.sp, lineHeight = 22.sp, color = it, fontFamily = FontFamily.Serif)
+                }
+            },
+            onMap?.let { open -> { m: Modifier -> ToolButton(tr("வரைபடத்தில் காட்டு", "Show on the map"), open, m) { ToolIcon(TsIcons.MapView, it) } } },
+            onPeople?.let { open -> { m: Modifier -> ToolButton(tr("இவ்வசனத்தின் நபர்கள்", "People in this verse"), open, m) { ToolIcon(TsIcons.People, it) } } },
+            { m -> ToolButton(tr("விளக்கவுரை", "Commentary"), onCommentary, m) { ToolIcon(TsIcons.Commentary, it) } },
+            { m -> ToolButton(tr("தொடர்புள்ள வசனங்கள்", "Cross-references"), onCrossRefs, m) { ToolIcon(TsIcons.Link, it) } },
+        )
+        // As many across as fit at about 48 dp, in even rows (6 and 6 on a phone).
         BoxWithConstraints {
-            val big: List<@Composable (Modifier) -> Unit> = listOfNotNull(
-                if (hasAudio) { m -> BigAction(TsIcons.Play, tr("இங்கே", "From here"), primary = true, onClick = onPlayHere, modifier = m) } else null,
-                { m -> BigAction(TsIcons.Commentary, tr("விளக்கவுரை", "Commentary"), onClick = onCommentary, modifier = m) },
-                { m -> BigAction(TsIcons.Link, tr("தொடர்பு", "Cross-refs"), onClick = onCrossRefs, modifier = m) },
-                { m -> BigAction(TsIcons.Bookmark, tr("குறி", "Bookmark"), onClick = onBookmark, modifier = m) },
-            )
-            val perRow = if (maxWidth < 400.dp) 2 else big.size
+            val fit = ((maxWidth + 6.dp) / 54.dp).toInt().coerceIn(4, tools.size)
+            val rows = (tools.size + fit - 1) / fit
+            val perRow = (tools.size + rows - 1) / rows
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                big.chunked(perRow).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { row.forEach { it(Modifier.weight(1f)) } }
+                tools.chunked(perRow).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        row.forEach { it(Modifier.weight(1f)) }
+                        repeat(perRow - row.size) { Box(Modifier.weight(1f)) }
+                    }
                 }
             }
         }
-        Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallAction(tr("நகல்", "Copy"), onCopy, Modifier.weight(1f))
-            ShareMenu(onShare, onShareLarge, onShareImage, onWebsite, Modifier.weight(1f))
-            SmallAction(tr("குறிப்பு", "Note"), onNote, Modifier.weight(1f))
-            if (onColor == null) SmallAction(tr("முனைப்பு", "Highlight"), onHighlight, Modifier.weight(1f))
-        }
-        // M8-2, M8-4: the verse in Hebrew or Greek; who and where it names.
-        Row(Modifier.padding(horizontal = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            SmallAction(tr("மூல மொழி", "Original words"), onOriginal, Modifier.weight(1f))
-            SmallAction(tr("நபர்கள் · இடங்கள்", "People · places"), onPeople, Modifier.weight(1f))
-            // M8-6: the verse large on its own (present mode, from this verse).
-            SmallAction(tr("பெரிதாக", "Large view"), onLarge, Modifier.weight(1f))
-        }
     }
 }
 
-/**
- * Share ▾ (design 3a): the verse with its chapter's link, the reference with the
- * single-verse page's link, the share-as-image sheet, or that page in the browser (M6-9c).
- */
+/** One icon button of the verse card: 48 dp high, its [label] spoken and shown on long press. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ShareMenu(onChapter: () -> Unit, onLarge: () -> Unit, onImage: () -> Unit, onWebsite: () -> Unit, modifier: Modifier = Modifier) {
-    val c = Ts.colors
-    var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        SmallAction(tr("பகிர் ▾", "Share ▾"), { open = true }, Modifier.fillMaxWidth(), selected = open)
-        DropdownMenu(
-            expanded = open,
-            onDismissRequest = { open = false },
-            shape = RoundedCornerShape(18.dp),
-            containerColor = c.surface,
-            border = BorderStroke(1.5.dp, c.line),
-            modifier = Modifier.widthIn(max = 288.dp),
-        ) {
-            @Composable
-            fun Item(title: String, sub: String?, action: () -> Unit, color: Color = c.ink) = DropdownMenuItem(
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(title, style = Ts.type.body.copy(fontWeight = FontWeight.SemiBold), color = color)
-                        if (sub != null) Text(sub, style = Ts.type.caption, color = c.muted)
-                    }
-                },
-                onClick = { open = false; action() },
-                modifier = Modifier.padding(horizontal = 6.dp).clip(RoundedCornerShape(8.dp)),
-            )
-            Item(tr("அதிகாரத்தில் வசனம்", "Verse in its chapter"), tr("சுற்றியுள்ள வசனங்களுடன்", "With the verses around it"), onChapter)
-            Item(tr("பெரிய எழுத்தில்", "Large text"), tr("இந்த வசனம் மட்டும், தமிழும் ஆங்கிலமும்", "Just this verse, in Tamil and English"), onLarge)
-            Item(tr("படமாகப் பகிர்", "Share as image"), tr("பகிர்வதற்கேற்ற வசனப் படம்", "A picture of the verse to post or send"), onImage)
-            HDivider(Modifier.padding(top = 4.dp))
-            Item(tr("பெரிய எழுத்தில் திற ↗", "Open large text ↗"), null, onWebsite, color = c.accent)
-        }
-    }
-}
-
-@Composable
-private fun BigAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false) {
+private fun ToolButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    primary: Boolean = false,
+    selected: Boolean = false,
+    content: @Composable (Color) -> Unit,
+) {
     val c = Ts.colors
     val shape = RoundedCornerShape(14.dp)
-    Column(
-        // At large text sizes (M2-12) the button grows and its label wraps rather than clipping.
-        modifier.heightIn(min = 64.dp).clip(shape).background(if (primary) c.accent else c.surface2).clickable(role = Role.Button, onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-    ) {
-        val fg = if (primary) c.onAccent else c.ink
-        Icon(icon, null, Modifier.size(if (primary) 16.dp else 20.dp), tint = fg)
-        BasicText(
-            label, style = Ts.type.labelSmall.copy(color = fg, textAlign = TextAlign.Center), maxLines = labelLines(label),
-            autoSize = TextAutoSize.StepBased(minFontSize = (8f / LocalDensity.current.fontScale).sp, maxFontSize = 12.sp),
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
+    // The row's weight sizes this box; the tooltip's anchor fills it.
+    Box(modifier) {
+        TooltipBox(
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+            tooltip = { PlainTooltip { Text(label) } },
+            state = rememberTooltipState(),
+        ) {
+            Box(
+                Modifier.fillMaxWidth().height(48.dp).clip(shape)
+                    .background(if (primary) c.accent else if (selected) c.accentSoft else c.surface2)
+                    .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+                    .semantics { contentDescription = label },
+                contentAlignment = Alignment.Center,
+            ) { content(if (primary) c.onAccent else c.ink) }
+        }
     }
 }
 
 @Composable
-private fun SmallAction(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, selected: Boolean = false) {
-    Box(
-        modifier.clip(RoundedCornerShape(10.dp)).background(if (selected) Ts.colors.surface2 else Color.Transparent)
-            .clickable(role = Role.Button, onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        BasicText(
-            label, style = Ts.type.label.copy(color = Ts.colors.ink2, textAlign = TextAlign.Center), maxLines = labelLines(label),
-            autoSize = TextAutoSize.StepBased(minFontSize = (8f / LocalDensity.current.fontScale).sp, maxFontSize = 13.sp),
-        )
-    }
-}
+private fun ToolIcon(icon: ImageVector, tint: Color, size: Dp = 22.dp) = Icon(icon, null, Modifier.size(size), tint = tint)
 
 /** 14″ top bar (2D): mark, reference, search, listen, study settings, avatar. */
 @Composable
@@ -429,12 +419,6 @@ fun KeyHintStrip(hints: List<Hint>, trailing: Hint?) {
         }
     }
 }
-
-/**
- * A label wraps only between words; a single word shrinks to fit instead of breaking, down
- * to 8 sp on screen whatever the text-size setting (the minimum above is divided by it).
- */
-private fun labelLines(label: String) = if (label.trim().contains(' ')) 2 else 1
 
 /**
  * The four highlight colours as circles, and a fifth that removes the highlight: one tap

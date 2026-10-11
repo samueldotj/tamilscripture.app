@@ -469,11 +469,19 @@ private suspend fun cached(context: Context, o: VerseImage.Options, name: String
     FileProvider.getUriForFile(context, context.packageName + ".share", file)
 }
 
+/**
+ * What goes with the picture, as on the website: each version's verses and its reference,
+ * then the link (in the text, since apps that take a picture often drop a separate link).
+ */
+internal fun shareText(o: VerseImage.Options, url: String): String =
+    (o.passages.map { p -> p.verses.joinToString(" ") { (if (o.many) "${it.n} " else "") + it.text } + "\n— " + p.ref } + url)
+        .joinToString("\n\n")
+
 private suspend fun shareImage(context: Context, o: VerseImage.Options, name: String, ref: String, url: String) {
     val uri = cached(context, o, name)
     val send = Intent(Intent.ACTION_SEND).setType("image/png")
         .putExtra(Intent.EXTRA_STREAM, uri)
-        .putExtra(Intent.EXTRA_TEXT, "$ref\n$url")
+        .putExtra(Intent.EXTRA_TEXT, shareText(o, url))
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     // The chooser shows the picture as its preview.
     send.clipData = ClipData.newRawUri(ref, uri)

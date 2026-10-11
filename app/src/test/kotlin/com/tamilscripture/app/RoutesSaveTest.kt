@@ -35,6 +35,5 @@ class RoutesSaveTest {
         roundTrip(DictionaryRoute, DictionaryRoute.serializer())
         roundTrip(RootWordsRoute, RootWordsRoute.serializer())
         roundTrip(AtlasRoute("paul-2"), AtlasRoute.serializer())
-        roundTrip(PresentRoute(p), PresentRoute.serializer())
     }
 }

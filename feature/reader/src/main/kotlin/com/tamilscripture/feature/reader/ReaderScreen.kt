@@ -55,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -126,8 +127,6 @@ class ReaderNav(
     val strongs: (String) -> Unit,
     val person: (String) -> Unit,
     val place: (String) -> Unit,
-    /** Present mode from a verse (M8-8). */
-    val present: (Passage) -> Unit,
     /** The account screen, to sign in (highlights and notes need an account, design §13.2). */
     val account: () -> Unit = {},
     /** A cross-reference opened as its own reader, so Back returns to the verse it came from. */
@@ -141,18 +140,19 @@ private class VerseActions(
     val onCommentary: () -> Unit,
     val onCrossRefs: () -> Unit,
     val onCopy: () -> Unit,
+    /** The verses as a picture (the share-as-image sheet), sent with their text and link. */
     val onShare: () -> Unit,
-    val onShareLarge: () -> Unit,
     /** The reader's own marks (M6): kept on the device, and in the account when signed in. */
     val onBookmark: () -> Unit,
     val onNote: () -> Unit,
     val onHighlight: () -> Unit,
-    val onShareImage: () -> Unit,
     val onOriginal: () -> Unit,
-    val onPeople: () -> Unit,
-    /** M6-9c: the same passage on tamilscripture.com, in the browser. */
-    val onWebsite: () -> Unit,
-    val onLarge: () -> Unit,
+    /** Who the selection names (one person opens their page); null when it names no one. */
+    val onPeople: (() -> Unit)?,
+    /** M8-5e: the atlas fitted to the places the selection names; null when it names none. */
+    val onMap: (() -> Unit)?,
+    val bookmarked: Boolean,
+    val oldTestament: Boolean,
 )
 
 /** "2 கொரி", "2 Cor": the book's first short form, or its name. */
@@ -262,6 +262,17 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
     val pickColor: (com.tamilscripture.core.model.HighlightColor?) -> Unit = { color ->
         if (signedIn) { vm.highlight(color); vm.clearSelection() } else askSignIn = true
     }
+    // Who and where the selected verses name (the study data's mentions), for the card's map and people buttons.
+    val mentions by produceState<com.tamilscripture.core.model.ChapterMentions?>(null, state.passage.book, state.passage.chapter) {
+        value = runCatching { services.graph.study.mentions(state.passage.book, state.passage.chapter) }.getOrNull()
+    }
+    val named = remember(mentions, state.selection) {
+        val sel = state.selection.map { it.toString() }.toSet()
+        mentions?.verses?.filter { it.verse.takeWhile(Char::isDigit) in sel }
+    }
+    val versePeople = named?.flatMap { it.people }?.distinct()
+    val versePlaces = named?.flatMap { it.places }?.distinct().orEmpty()
+    val openPeople: () -> Unit = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
     val actions = VerseActions(
         onPlayHere = { vm.recordVerseAction("listen"); play(state.selection.firstOrNull()) },
         onCommentary = {
@@ -273,28 +284,26 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             vm.recordVerseAction("copy")
             copyVerses(context, selectedRef, state.selection.map { chapter?.verseText(it).orEmpty() })
         },
-        onShare = {
-            vm.recordVerseAction("share")
-            shareVerses(context, selectedRef, state.selection.map { chapter?.verseText(it).orEmpty() }, chapterUrl(state.passage, book, state.selection))
-        },
-        onShareLarge = {
-            vm.recordVerseAction("share-large")
-            shareLink(context, selectedRef ?: "", shareUrl(state.passage, book, state.selection))
-        },
+        onShare = { vm.recordVerseAction("share-image"); imageVerses = state.selection.sorted() },
         onBookmark = {
             val on = vm.toggleBookmark()
             Toast.makeText(context, if (on) tr2(lang, "குறிக்கப்பட்டது", "Bookmarked") else tr2(lang, "குறி நீக்கப்பட்டது", "Bookmark removed"), Toast.LENGTH_SHORT).show()
         },
         onNote = { if (signedIn) editingNote = vm.noteForSelection()?.id ?: NEW_NOTE else askSignIn = true },
         onHighlight = { if (signedIn) showHighlight = true else askSignIn = true },
-        onShareImage = {
-            vm.recordVerseAction("share-image")
-            imageVerses = state.selection.sorted()
-        },
         onOriginal = { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true },
-        onPeople = { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true },
-        onWebsite = { vm.recordVerseAction("website"); openInBrowser(context, shareUrl(state.passage, book, state.selection)) },
-        onLarge = { vm.recordVerseAction("large"); nav.present(state.passage.copy(verse = state.selection.firstOrNull())) },
+        // Unknown (offline, no pack): the sheet says why; nobody named: no button; one person: their page.
+        onPeople = when {
+            versePeople == null -> openPeople
+            versePeople.isEmpty() -> null
+            versePeople.size == 1 -> { { vm.recordVerseAction("people"); nav.person(versePeople.first()) } }
+            else -> openPeople
+        },
+        onMap = nav.atlas?.takeIf { versePlaces.isNotEmpty() }?.let { open -> { vm.recordVerseAction("atlas"); open(versePlaces) } },
+        bookmarked = state.selection.firstOrNull()?.let { v ->
+            userData.bookmarks.any { it.book == state.passage.book && it.chapter == state.passage.chapter && it.verse == v }
+        } == true,
+        oldTestament = book?.isNewTestament == false,
     )
 
     // Right-click menu and drag-out (M2-7, M2-8); each acts on the verse it was opened on.
@@ -313,7 +322,6 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             Entry(tr("மூல மொழி", "Original words")) { vm.recordVerseAction("original"); if (wide) paneTab = PANE_ORIGINAL else showOriginal = true }
             Entry(tr("நபர்கள் · இடங்கள்", "People and places")) { vm.recordVerseAction("people"); if (wide) paneTab = PANE_PEOPLE else showPeople = true }
             Entry(tr("நகலெடு", "Copy")) { vm.recordVerseAction("copy"); copyVerses(context, verseRef(v), listOf(verseText(v))) }
-            Entry(tr("இங்கிருந்து காட்சிப்படுத்து", "Present from here")) { nav.present(state.passage.copy(verse = v)) }
             Entry(tr("படமாகப் பகிர்", "Share as image")) {
                 vm.recordVerseAction("share-image")
                 imageVerses = listOf(v)
@@ -350,10 +358,6 @@ fun ReaderScreen(passage: Passage, wide: Boolean, compare: Boolean = false, nav:
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
-                if (e.type == KeyEventType.KeyDown && !e.isCtrlPressed && e.key == Key.P) {
-                    nav.present(state.passage.copy(verse = state.selection.firstOrNull()))
-                    return@onPreviewKeyEvent true
-                }
                 if (e.type == KeyEventType.KeyDown && e.isCtrlPressed && e.key == Key.N) {
                     nav.newWindow(state.passage.copy(verse = state.selection.firstOrNull()))
                     return@onPreviewKeyEvent true
@@ -649,8 +653,8 @@ private fun ActionCardOverlay(
             reference ?: "", hasAudio, vm::clearSelection, a.onPlayHere, a.onCommentary, a.onCrossRefs,
             onBookmark = a.onBookmark, onCopy = a.onCopy, onShare = a.onShare, onNote = a.onNote, onHighlight = a.onHighlight,
             currentColor = currentColor, onColor = onColor,
-            onOriginal = a.onOriginal, onPeople = a.onPeople, onShareImage = a.onShareImage, onWebsite = a.onWebsite, onLarge = a.onLarge,
-            onShareLarge = a.onShareLarge,
+            onOriginal = a.onOriginal, onPeople = a.onPeople, onMap = a.onMap,
+            bookmarked = a.bookmarked, oldTestament = a.oldTestament,
             // Never more than about half the window, so the verse it is about stays in view.
             modifier = Modifier.heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.55f).dp),
         )
@@ -949,17 +953,6 @@ private fun Modifier.swipeChapters(onPrev: () -> Unit, onNext: () -> Unit): Modi
     ) { _, dx -> total += dx }
 }
 
-/** The verses in their chapter on the website ("…/irvtam/john/3/16"). */
-private fun chapterUrl(p: Passage, book: Book?, sel: List<Int>): String {
-    val slug = book?.slug ?: p.book.lowercase()
-    val range = when {
-        sel.size > 1 -> "/${sel.min()}-${sel.max()}"
-        sel.size == 1 -> "/${sel.first()}"
-        else -> ""
-    }
-    return "https://www.tamilscripture.com/${p.version.lowercase()}/$slug/${p.chapter}$range"
-}
-
 private fun shareUrl(p: Passage, book: Book?, sel: List<Int>): String {
     val slug = book?.slug ?: p.book.lowercase()
     val range = when {
@@ -969,25 +962,9 @@ private fun shareUrl(p: Passage, book: Book?, sel: List<Int>): String {
     return "https://www.tamilscripture.com/${p.version.lowercase()}/$slug/${p.chapter}" + (range?.let { ".$it" } ?: "")
 }
 
-/**
- * Opens [url] in the browser, never in this app: tamilscripture.com links are the app's own
- * App Links, so a plain VIEW intent would come straight back here.
- */
-private fun openInBrowser(context: Context, url: String) {
-    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE)
-    intent.selector = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)
-    runCatching { context.startActivity(intent) }
-        .onFailure { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))) } }
-}
-
 private fun copyVerses(context: Context, ref: String?, texts: List<String>) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     cm.setPrimaryClip(ClipData.newPlainText(ref, texts.joinToString(" ") + "\n— " + (ref ?: "")))
-}
-
-/** The reference and a link alone (the share menu's "Large text"). */
-private fun shareLink(context: Context, ref: String, url: String) {
-    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "$ref\n$url"), ref))
 }
 
 private fun shareVerses(context: Context, ref: String?, texts: List<String>, url: String) {
