@@ -1460,7 +1460,7 @@ Production promotion (internal → closed → production, staged 10% → 50% →
 
 - Gradle version catalog, Kotlin DSL, convention plugins in `build-logic/`, configuration cache on.
 - Flavors: `dev` (local Supabase and fake CDN on `localhost` / `*.test`), `staging` (staging Supabase project and a staging pack bucket), `prod`.
-- `versionCode` from the CI run number; `versionName` from the git tag.
+- The version lives in `version.properties` (MAJOR.MINOR.PATCH: PATCH for fixes, MINOR for a new feature, MAJOR by decision). `versionName` is that version and `versionCode` is MAJOR * 10000 + MINOR * 100 + PATCH; the release tag must be `v` plus the version.
 
 ---
 

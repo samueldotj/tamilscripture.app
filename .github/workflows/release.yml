@@ -16,6 +16,10 @@ jobs:
       HAS_PLAY_ACCOUNT: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Tag matches version.properties
+        run: |
+          want="v$(sed -n 's/^version=//p' version.properties)"
+          [ "$GITHUB_REF_NAME" = "$want" ] || { echo "::error::tag $GITHUB_REF_NAME, but version.properties says $want"; exit 1; }
       - id: pin
         run: echo "ref=$(cat rust/website.ref)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
@@ -47,8 +51,6 @@ jobs:
           TS_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
           TS_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           TS_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
-          TS_VERSION_NAME: ${{ github.ref_name }}
-          TS_VERSION_CODE: ${{ github.run_number }}
       - name: Signed bundle
         run: ./gradlew bundleRelease
         env:
@@ -56,13 +58,12 @@ jobs:
           TS_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
           TS_KEY_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
           TS_KEY_PASSWORD: ${{ secrets.UPLOAD_KEY_PASSWORD }}
-          TS_VERSION_NAME: ${{ github.ref_name }}
-          TS_VERSION_CODE: ${{ github.run_number }}
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/app-release.aab
             app/build/outputs/mapping/release/mapping.txt
           generate_release_notes: true
       - name: Play internal track

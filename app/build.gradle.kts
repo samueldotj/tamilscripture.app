@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -9,6 +11,17 @@ plugins {
 // keystore from a secret; a developer machine has none and falls back to the debug key.
 val uploadKeystore: String? = System.getenv("TS_KEYSTORE")?.takeIf { it.isNotBlank() && file(it).exists() }
 
+// The version is kept in version.properties (MAJOR.MINOR.PATCH) and bumped with each
+// release: PATCH for fixes, MINOR when a feature is added, MAJOR by hand. Play's versionCode
+// follows from it, MAJOR * 10000 + MINOR * 100 + PATCH, so it always increases.
+val appVersion: String = Properties()
+    .apply { rootProject.file("version.properties").inputStream().use { load(it) } }
+    .getProperty("version")
+val appVersionCode: Int = appVersion.split('.').map { it.toInt() }.let { (major, minor, patch) ->
+    require(minor < 100 && patch < 100) { "version.properties: MINOR and PATCH must be below 100" }
+    major * 10000 + minor * 100 + patch
+}
+
 android {
     namespace = "com.tamilscripture.app"
     compileSdk = 37
@@ -17,8 +30,8 @@ android {
         applicationId = "com.tamilscripture.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("TS_VERSION_CODE")?.toIntOrNull() ?: 1
-        versionName = System.getenv("TS_VERSION_NAME")?.removePrefix("v") ?: "0.1.0-dev"
+        versionCode = appVersionCode
+        versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEV_PACKS_BASE", "\"\"")
     }

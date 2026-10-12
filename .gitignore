@@ -39,3 +39,6 @@ core/rust/src/main/jniLibs/
 core/rust/src/main/kotlin/uniffi/
 # Local pack builds for testing (tools/serve-packs.py)
 build-packs/
+
+# Signed bundles built by scripts/release-local.sh
+/release/
