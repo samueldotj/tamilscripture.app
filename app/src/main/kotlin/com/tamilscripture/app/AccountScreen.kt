@@ -40,8 +40,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tamilscripture.core.data.net.HttpException
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.Kicker
@@ -71,6 +73,8 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
     val data by graph.userData.data.collectAsStateWithLifecycle()
     var email by rememberSaveable { mutableStateOf("") }
     var sentTo by rememberSaveable { mutableStateOf<String?>(null) }
+    var usePassword by rememberSaveable { mutableStateOf(false) }
+    var password by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var confirm by remember { mutableStateOf<String?>(null) }
@@ -108,7 +112,7 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                         ),
                         style = Ts.type.body, color = c.ink2, modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
                     )
-                    Kicker(tr("மின்னஞ்சல் இணைப்பு", "Email link"), Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp))
+                    Kicker(if (usePassword) tr("மின்னஞ்சலும் கடவுச்சொல்லும்", "Email and password") else tr("மின்னஞ்சல் இணைப்பு", "Email link"), Modifier.padding(start = 22.dp, top = 8.dp, bottom = 8.dp))
                     Box(
                         Modifier.padding(horizontal = 22.dp).fillMaxWidth().background(c.surface, RoundedCornerShape(14.dp))
                             .border(1.dp, c.line2, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 14.dp),
@@ -117,12 +121,42 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                         BasicTextField(
                             email, { email = it.trim() }, singleLine = true,
                             textStyle = Ts.type.body.copy(color = c.ink), cursorBrush = SolidColor(c.accent),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Send),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = if (usePassword) ImeAction.Next else ImeAction.Send),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    Row(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        TsPillButton(t("இணைப்பை அனுப்பு", "Send link"), {
+                    if (usePassword) {
+                        Box(
+                            Modifier.padding(start = 22.dp, end = 22.dp, top = 10.dp).fillMaxWidth().background(c.surface, RoundedCornerShape(14.dp))
+                                .border(1.dp, c.line2, RoundedCornerShape(14.dp)).padding(horizontal = 14.dp, vertical = 14.dp),
+                        ) {
+                            if (password.isEmpty()) Text(t("கடவுச்சொல்", "Password"), style = Ts.type.body, color = c.faint)
+                            BasicTextField(
+                                password, { password = it }, singleLine = true,
+                                textStyle = Ts.type.body.copy(color = c.ink), cursorBrush = SolidColor(c.accent),
+                                visualTransformation = PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                    Row(Modifier.padding(horizontal = 22.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (usePassword) TsPillButton(t("உள்நுழை", "Sign in"), {
+                            if (busy || !email.contains('@') || password.isEmpty()) return@TsPillButton
+                            busy = true
+                            scope.launch {
+                                runCatching { graph.account.signInWithPassword(email, password) }
+                                    .onSuccess { password = "" }
+                                    .onFailure { e ->
+                                        toast(
+                                            if (e is HttpException && e.code == 400) t("மின்னஞ்சல் அல்லது கடவுச்சொல் தவறு.", "The email or password is not right.")
+                                            else t("உள்நுழைய முடியவில்லை. இணைப்பைச் சரிபார்த்து மீண்டும் முயலுங்கள்.", "Could not sign in. Check the connection and try again."),
+                                        )
+                                    }
+                                busy = false
+                            }
+                        }, style = PillStyle.Filled)
+                        else TsPillButton(t("இணைப்பை அனுப்பு", "Send link"), {
                             if (busy || !email.contains('@')) return@TsPillButton
                             busy = true
                             scope.launch {
@@ -132,8 +166,14 @@ fun AccountScreen(onBack: () -> Unit, onMine: () -> Unit) {
                                 busy = false
                             }
                         }, style = PillStyle.Filled)
+                        TextButton({ usePassword = !usePassword; password = "" }) {
+                            Text(
+                                if (usePassword) t("இணைப்பை அனுப்புக", "Email me a link instead") else t("கடவுச்சொல் பயன்படுத்து", "Use a password"),
+                                style = Ts.type.caption, color = c.accent,
+                            )
+                        }
                     }
-                    sentTo?.let { to ->
+                    if (!usePassword) sentTo?.let { to ->
                         Text(
                             t("$to முகவரிக்கு இணைப்பு அனுப்பப்பட்டது. இந்தத் தொலைபேசியிலேயே அதைத் திறங்கள்.", "A link is on its way to $to. Open it on this phone."),
                             style = Ts.type.caption, color = c.accent, modifier = Modifier.padding(horizontal = 22.dp),

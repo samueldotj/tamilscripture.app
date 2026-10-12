@@ -113,6 +113,21 @@ class AccountRepository(private val dir: File, private val api: Supabase, privat
         s
     }
 
+    /**
+     * Signs in with an email and password, for accounts that have one (the Play review account
+     * is made in the Supabase dashboard). Throws HttpException 400 when they do not match.
+     */
+    suspend fun signInWithPassword(email: String, password: String): Session = lock.withLock {
+        val body = buildJsonObject {
+            put("email", email.trim())
+            put("password", password)
+        }
+        val res = json.decodeFromString<TokenResponse>(api.request("POST", "/auth/v1/token?grant_type=password", body.toString()))
+        val s = res.toSession()
+        withContext(Dispatchers.IO) { write(s) }
+        s
+    }
+
     /** A valid access token, refreshed when it is within a minute of expiry; null when signed out. */
     suspend fun accessToken(): String? = lock.withLock {
         val s = state.value ?: return@withLock null
