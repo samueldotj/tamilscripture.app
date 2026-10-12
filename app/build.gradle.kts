@@ -45,6 +45,8 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
+            // libts_mobile.so carries a symbol table; ship it in the bundle so Play symbolicates native crashes.
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
         }
         // M1-26: release code, debug-signed and profileable, for :benchmark to measure.
         create("benchmark") {
