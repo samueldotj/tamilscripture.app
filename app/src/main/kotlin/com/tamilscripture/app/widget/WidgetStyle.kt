@@ -3,6 +3,7 @@ package com.tamilscripture.app.widget
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
@@ -29,7 +30,6 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
-import androidx.glance.color.DayNightColorProvider
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.ColumnScope
@@ -58,19 +58,27 @@ import com.tamilscripture.core.model.Passage
  * of the shared verse images.
  */
 internal object W {
-    val BG = ColorProvider(day = Color(0xFFF3F2F2), night = Color(0xFF1F1D1C))
-    val TEXT = ColorProvider(day = Color(0xFF201F1D), night = Color(0xFFF3F2F2))
+    /** Each colour's pair, for text Glance cannot draw itself (see [WText]). */
+    private val pairs = HashMap<ColorProvider, Pair<Color, Color>>()
+
+    private fun dayNight(day: Color, night: Color): ColorProvider =
+        ColorProvider(day = day, night = night).also { pairs[it] = day to night }
+
+    fun pair(color: ColorProvider?): Pair<Color, Color>? = color?.let { pairs[it] }
+
+    val BG = dayNight(Color(0xFFF3F2F2), Color(0xFF1F1D1C))
+    val TEXT = dayNight(Color(0xFF201F1D), Color(0xFFF3F2F2))
     /** neutral-700 */
-    val MUTED = ColorProvider(day = Color(0xFF605D5D), night = Color(0xFFBAB6B6))
+    val MUTED = dayNight(Color(0xFF605D5D), Color(0xFFBAB6B6))
     /** neutral-600, for readings already done. */
-    val DONE = ColorProvider(day = Color(0xFF7D7979), night = Color(0xFF9B9797))
+    val DONE = dayNight(Color(0xFF7D7979), Color(0xFF9B9797))
     /** neutral-500, an unread reading's ring. */
-    val RING = ColorProvider(day = Color(0xFF9B9797), night = Color(0xFF7D7979))
-    val ACCENT = ColorProvider(day = Color(0xFFB68235), night = Color(0xFFE1AD66))
+    val RING = dayNight(Color(0xFF9B9797), Color(0xFF7D7979))
+    val ACCENT = dayNight(Color(0xFFB68235), Color(0xFFE1AD66))
     /** accent-700, gold dark enough for small text. */
-    val ACCENT_TEXT = ColorProvider(day = Color(0xFF7D5411), night = Color(0xFFFACB8D))
+    val ACCENT_TEXT = dayNight(Color(0xFF7D5411), Color(0xFFFACB8D))
     /** Ink at 16% over the paper. */
-    val DIVIDER = ColorProvider(day = Color(0x29201F1D), night = Color(0x33F3F2F2))
+    val DIVIDER = dayNight(Color(0x29201F1D), Color(0x33F3F2F2))
 
     /** Widths at or above this get the medium layout (the design's 364 dp; a 4×2 cell). */
     val MEDIUM: Dp = 250.dp
@@ -129,9 +137,12 @@ internal fun WText(text: String, style: TextStyle, modifier: GlanceModifier = Gl
     style.fontSize?.let { views.setTextViewTextSize(R.id.widget_text, TypedValue.COMPLEX_UNIT_SP, it.value) }
     views.setInt(R.id.widget_text, "setMaxLines", maxLines)
     // The widget's colours are all day and night pairs (see [W]).
-    (style.color as? DayNightColorProvider)?.let { color ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) views.setColorInt(R.id.widget_text, "setTextColor", color.day.toArgb(), color.night.toArgb())
-        else views.setTextColor(R.id.widget_text, color.getColor(context).toArgb())
+    W.pair(style.color)?.let { (day, night) ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) views.setColorInt(R.id.widget_text, "setTextColor", day.toArgb(), night.toArgb())
+        else {
+            val isNight = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+            views.setTextColor(R.id.widget_text, (if (isNight) night else day).toArgb())
+        }
     }
     // In a Box of its own: a row drops its other children when one is the remote view itself.
     Box(modifier) { AndroidRemoteViews(views) }
