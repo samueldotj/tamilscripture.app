@@ -45,6 +45,17 @@ class PsalmsTest {
         assertEquals(anon.size, index.psalms.count { it.authors.isEmpty() })
     }
 
+    @Test fun stepsWrapAmongTheKeptPsalms() {
+        assertEquals(22 to 24, index.steps(PsalmSelection(), 23))
+        assertEquals(150 to 2, index.steps(PsalmSelection(), 1))
+        val asaph = PsalmSelection(authors = listOf("asaph"))
+        assertEquals(50 to 74, index.steps(asaph, 73))
+        assertEquals(83 to 73, index.steps(asaph, 50))
+        // The open psalm left behind by the filters steps through all 150.
+        assertEquals(22 to 24, index.steps(asaph, 23))
+        assertEquals(3, PsalmSelection(themes = listOf("lament"), genres = listOf("ascents"), authors = listOf("asaph")).count)
+    }
+
     @Test fun toggling() {
         assertEquals(listOf("a", "b"), listOf("a").toggled("b"))
         assertEquals(listOf("a"), listOf("a", "b").toggled("b"))

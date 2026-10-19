@@ -37,7 +37,11 @@ class TsApplication : Application(), GraphHost {
             StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())
         }
-        val graph = AppGraph(this, packsBaseOverride = BuildConfig.DEV_PACKS_BASE.ifBlank { null })
+        val graph = AppGraph(
+            this,
+            packsBaseOverride = BuildConfig.DEV_PACKS_BASE.ifBlank { null },
+            commentaryBaseOverride = BuildConfig.DEV_COMMENTARY_BASE.ifBlank { null },
+        )
         val audio = AudioController(this, graph.content, graph.origins, graph.stats, graph.appScope, graph.audio)
         services = AppServices(graph, audio)
 

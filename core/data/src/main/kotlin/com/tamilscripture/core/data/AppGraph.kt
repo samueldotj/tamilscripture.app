@@ -29,14 +29,20 @@ import java.io.File
  * start-up free of reflection and code generation (NF-2).
  *
  * [packsBaseOverride] points the `packs` origin at a local pack server in debug builds
- * (tools/serve-packs.py); release builds always use the bootstrap.
+ * (tools/serve-packs.py), and [commentaryBaseOverride] the `commentary` origin at a local
+ * commentary build (bible-commentaries' tools/serve.py); release builds always use the bootstrap.
  */
-class AppGraph(context: Context, packsBaseOverride: String? = null) {
+class AppGraph(context: Context, packsBaseOverride: String? = null, commentaryBaseOverride: String? = null) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val json = Json { ignoreUnknownKeys = true; explicitNulls = false; coerceInputValues = true }
     val origins = OriginResolver(
-        if (packsBaseOverride.isNullOrBlank()) BuiltInBootstrap.value
-        else BuiltInBootstrap.value.copy(origins = BuiltInBootstrap.value.origins + ("packs" to listOf(packsBaseOverride))),
+        BuiltInBootstrap.value.copy(
+            origins = BuiltInBootstrap.value.origins +
+                listOfNotNull(
+                    packsBaseOverride?.takeIf { it.isNotBlank() }?.let { "packs" to listOf(it) },
+                    commentaryBaseOverride?.takeIf { it.isNotBlank() }?.let { "commentary" to listOf(it) },
+                ),
+        ),
     )
     val http = Http(origins)
     val onlineCache = OnlineCache(File(context.filesDir, "online_cache"))

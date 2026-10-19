@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onRoot
@@ -16,6 +18,8 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import com.tamilscripture.core.designsystem.theme.ThemeMode
 import com.tamilscripture.core.designsystem.theme.Ts
 import com.tamilscripture.core.designsystem.theme.TsTheme
+import com.tamilscripture.core.model.CommentaryChapter
+import com.tamilscripture.core.model.CommentarySource
 import com.tamilscripture.core.model.PsalmCardData
 import com.tamilscripture.core.model.PsalmsIndex
 import com.tamilscripture.core.model.PsalterDrawing
@@ -45,6 +49,10 @@ class PsalmsScreenshotTest {
         23 to ("யெகோவா என் மேய்ப்பராக இருக்கிறார்; நான் தாழ்ச்சி அடையமாட்டேன்." to "The LORD is my shepherd; I shall not want."),
         121 to ("மலைகளுக்கு நேராக என் கண்களை ஏறெடுக்கிறேன்; எனக்கு உதவி எங்கேயிருந்து வரும்?" to "I will lift up mine eyes unto the hills, from whence cometh my help."),
     )
+
+    /** Spurgeon on Psalm 23, from the bible-commentaries build 688efa97ac53 (English only). */
+    private val spurgeon = json.decodeFromString<CommentaryChapter>(javaClass.getResource("/commentary/spurgeon/PSA/23.json")!!.readText())
+    private val spurgeonSource = CommentarySource("spurgeon", "C. H. Spurgeon", "Spurgeon", "1885", "The Treasury of David", licence = "Public domain")
 
     private fun tuneRes(f: String) = javaClass.getResource("/entities/psalter/crimond/$f")!!.readText()
     private val crimond = TuneData(PsalterDrawing.parse(tuneRes("incipit.draw.json")), PsalterDrawing.parse(tuneRes("full.draw.json")), TuneEvents.parse(tuneRes("events.json")))
@@ -108,13 +116,15 @@ class PsalmsScreenshotTest {
     @Config(sdk = [35], qualifiers = "w411dp-h1900dp-xxhdpi")
     @Test fun tuneFullDark() = cardShot("psalms_tune_full_dark_en", ThemeMode.Dark, UiLang.English, atMs = 0, full = true)
 
-    private fun shot(file: String, mode: ThemeMode, lang: UiLang, w: Dp, h: Dp, psalm: Int = 23, tap: String? = null) {
+    private fun shot(file: String, mode: ThemeMode, lang: UiLang, w: Dp, h: Dp, psalm: Int = 23, vararg taps: String) {
         compose.setContent {
             CompositionLocalProvider(LocalUiLang provides lang) {
                 TsTheme(mode) {
                     Box(Modifier.size(w, h)) {
-                        PsalmsExplorer(index, loading = false, onBack = {}, initialPsalm = psalm) { idx, p, pick ->
-                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, sing = cards[p.n]?.takeIf { p.n == 23 }?.let { cd ->
+                        PsalmsExplorer(index, loading = false, onBack = {}, initialPsalm = psalm) { idx, p, steps, pick ->
+                            PsalmCardView(idx, p, cards[p.n], verses[p.n], pick, onRead = {}, onShare = {}, steps = steps, verseCount = if (p.n == 23) 6 else 8,
+                                commentary = if (p.n == 23) ({ SpurgeonSection(spurgeon, spurgeonSource, 23) }) else null,
+                                sing = cards[p.n]?.takeIf { p.n == 23 }?.let { cd ->
                                 { PsalmSing(cd) { t, n, words, _ -> PsalmTuneView(t, crimond, playing = false, positionMs = 0, full = false, stanzas = n, lyrics = words, onToggle = {}, onFull = {}) } }
                             })
                         }
@@ -122,17 +132,47 @@ class PsalmsScreenshotTest {
                 }
             }
         }
-        if (tap != null) {
+        taps.forEach { tap ->
             compose.onNodeWithText(tap).performClick()
             compose.waitForIdle()
         }
         compose.onRoot().captureRoboImage("src/test/screenshots/$file.png")
     }
 
+    /** The psalm first, with the bar at the foot. */
     @Test fun compactTamil() = shot("psalms_compact_light_ta", ThemeMode.Light, UiLang.Tamil, 411.dp, 900.dp)
 
-    /** A theme tile narrows the grid to its psalms. */
-    @Test fun compactLamentEnglish() = shot("psalms_compact_lament_dark_en", ThemeMode.Dark, UiLang.English, 411.dp, 900.dp, tap = "Lament")
+    /** The map sheet: a theme fades the psalms outside it, and Author opens its chips. */
+    @Test fun compactLamentEnglish() = shot("psalms_compact_lament_dark_en", ThemeMode.Dark, UiLang.English, 411.dp, 900.dp, 23, "All 150 psalms", "Lament", "Author")
+
+    /** Spurgeon's notes, folded by verse, with verse 1 opened. */
+    @Config(sdk = [35], qualifiers = "w411dp-h2400dp-xxhdpi")
+    @Test fun spurgeonNotes() {
+        compose.setContent {
+            CompositionLocalProvider(LocalUiLang provides UiLang.English) {
+                TsTheme(ThemeMode.Light) {
+                    Box(Modifier.size(411.dp, 2400.dp).background(Ts.colors.surface)) {
+                        SpurgeonSection(spurgeon, spurgeonSource, 23)
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("Read the whole overview").assertIsDisplayed()
+        compose.onNodeWithText("Notes and sayings").performClick()
+        compose.onNodeWithText("Verse 1").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithText("John Hull, B.D.").assertIsDisplayed()
+        compose.onRoot().captureRoboImage("src/test/screenshots/psalms_spurgeon_notes_light_en.png")
+    }
+
+    /** Stepping on from the bar keeps to the psalms the filters keep. */
+    @Test fun dockSteps() {
+        shot("psalms_compact_step_light_en", ThemeMode.Light, UiLang.English, 411.dp, 900.dp)
+        compose.onAllNodesWithContentDescription("Psalm 24").onLast().performClick()
+        compose.waitForIdle()
+        compose.onAllNodesWithContentDescription("Psalm 25").onLast().assertIsDisplayed()
+        compose.onNodeWithText("24").assertIsDisplayed()
+    }
 
     @Config(sdk = [35], qualifiers = "w1280dp-h800dp-xhdpi")
     @Test fun wideEnglish() = shot("psalms_wide_light_en", ThemeMode.Light, UiLang.English, 1280.dp, 800.dp, psalm = 121)

@@ -78,9 +78,18 @@ data class CommentaryParagraph(
     val anchor: String? = null,
     @SerialName("anchor_ta") val anchorTa: String? = null,
     val verse: Int? = null,
+    /** Spurgeon: the last verse of a label such as "Verses 1, 2." */
+    @SerialName("verse_end") val verseEnd: Int? = null,
+    /** Spurgeon: overview, exposition, notes (Explanatory Notes and Quaint Sayings) or hints (Hints to the Village Preacher). */
+    val section: String? = null,
     val label: String? = null,
     val footnote: Boolean = false,
     val refs: List<CommentaryRef> = emptyList(),
+    /** A quotation (Spurgeon's notes): who is quoted, from which work, which quotation of the unit. */
+    val author: String? = null,
+    val work: String? = null,
+    val via: String? = null,
+    val quote: Int? = null,
 ) {
     fun text(preferTamil: Boolean): String = if (preferTamil && !ta.isNullOrBlank()) ta else text
     fun anchor(preferTamil: Boolean): String? = if (preferTamil && !anchorTa.isNullOrBlank()) anchorTa else anchor

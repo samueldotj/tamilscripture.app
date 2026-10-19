@@ -134,8 +134,8 @@ data class PsalmSelection(
 ) {
     val isEmpty: Boolean get() = themes.isEmpty() && genres.isEmpty() && authors.isEmpty()
 
-    /** Selected values outside the theme tiles: the Filters button's badge. */
-    val panelCount: Int get() = genres.size + authors.size
+    /** Every selected value: the badge on the map button. */
+    val count: Int get() = themes.size + genres.size + authors.size
 
     fun matcher(index: PsalmsIndex): (Psalm) -> Boolean {
         val inCollection = index.collections.filter { it.id in genres }.flatMap { it.psalms }.toSet()
@@ -149,6 +149,17 @@ data class PsalmSelection(
     companion object {
         const val ANONYMOUS = "anonymous"
     }
+}
+
+/**
+ * The psalms before and after [open] among those [sel] keeps, wrapping at the ends; among
+ * all 150 when the open psalm is not one of them.
+ */
+fun PsalmsIndex.steps(sel: PsalmSelection, open: Int): Pair<Int, Int> {
+    val kept = if (sel.isEmpty) psalms else psalms.filter(sel.matcher(this))
+    val list = if (kept.any { it.n == open }) kept else psalms
+    val i = list.indexOfFirst { it.n == open }.coerceAtLeast(0)
+    return list[(i - 1 + list.size) % list.size].n to list[(i + 1) % list.size].n
 }
 
 /** [this] with [value] added, or removed when already there. */

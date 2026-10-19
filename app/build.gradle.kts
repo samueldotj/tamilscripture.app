@@ -34,6 +34,7 @@ android {
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEV_PACKS_BASE", "\"\"")
+        buildConfigField("String", "DEV_COMMENTARY_BASE", "\"\"")
     }
 
     signingConfigs {
@@ -52,6 +53,9 @@ android {
             // ./gradlew installDebug -PdevPacksBase=http://127.0.0.1:8790/ with tools/serve-packs.py and adb reverse.
             val devPacks = (project.findProperty("devPacksBase") as String?).orEmpty()
             buildConfigField("String", "DEV_PACKS_BASE", "\"$devPacks\"")
+            // -PdevCommentaryBase=http://127.0.0.1:8790/ with bible-commentaries' tools/serve.py and adb reverse.
+            val devCommentary = (project.findProperty("devCommentaryBase") as String?).orEmpty()
+            buildConfigField("String", "DEV_COMMENTARY_BASE", "\"$devCommentary\"")
         }
         release {
             isMinifyEnabled = true
