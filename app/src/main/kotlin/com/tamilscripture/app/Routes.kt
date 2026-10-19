@@ -37,7 +37,7 @@ import kotlinx.serialization.Serializable
 /** [focus] a place to centre on; [journey] a journey to show (the website's /atlas/{journey}). */
 @Serializable data class AtlasRoute(val focus: String? = null, val journey: String? = null, val fit: List<String> = emptyList()) : NavKey
 
-/** Home is the landing page (the cross); Bible opens the reader at the last chapter read. */
+/** Home is the landing page (the pin); Bible opens the reader at the last chapter read. */
 enum class Tab { Home, Bible, Plans, Study, Search }
 
 /** The tab a screen is the root of; the reader is reached through Bible but opens over the tabs. */

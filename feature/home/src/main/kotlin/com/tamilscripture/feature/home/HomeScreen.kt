@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tamilscripture.core.data.settings.Settings
 import com.tamilscripture.core.designsystem.component.Avatar
-import com.tamilscripture.core.designsystem.component.CrossMark
+import com.tamilscripture.core.designsystem.component.PinMark
 import com.tamilscripture.core.designsystem.component.Kicker
 import com.tamilscripture.core.designsystem.component.PillStyle
 import com.tamilscripture.core.designsystem.component.TsCard
@@ -83,7 +83,7 @@ fun HomeScreen(nav: HomeNav) {
     Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f).padding(end = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CrossMark()
+                PinMark()
                 // Shrinks to fit on a narrow phone rather than wrapping onto a second line.
                 BasicText(
                     tr("தமிழ் வேதாகமம்", "Tamil Scripture"), style = Ts.type.cardTitle.copy(fontSize = 22.sp, color = c.ink), maxLines = 1,

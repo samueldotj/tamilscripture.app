@@ -54,7 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tamilscripture.core.designsystem.component.Avatar
-import com.tamilscripture.core.designsystem.component.CrossMark
+import com.tamilscripture.core.designsystem.component.PinMark
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.IconBox
 import com.tamilscripture.core.designsystem.component.KeyHint
@@ -367,7 +367,7 @@ fun WideTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                CrossMark(height = 20.dp)
+                PinMark(height = 20.dp)
                 BasicText(
                     tr("தமிழ் வேதாகமம்", "Tamil Scripture"), style = Ts.type.cardTitle.copy(fontSize = 20.sp, color = c.ink), maxLines = 1,
                     autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 20.sp),

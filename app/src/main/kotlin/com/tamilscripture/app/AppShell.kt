@@ -40,7 +40,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.tamilscripture.core.data.settings.Settings
-import com.tamilscripture.core.designsystem.component.CrossMark
+import com.tamilscripture.core.designsystem.component.PinMark
 import com.tamilscripture.core.designsystem.component.HDivider
 import com.tamilscripture.core.designsystem.component.Pill
 import com.tamilscripture.core.designsystem.component.VDivider
@@ -226,7 +226,7 @@ fun AppShell(start: List<NavKey>, pending: NavKey?, onPendingHandled: () -> Unit
     }
 }
 
-/** [icon] null draws the cross, the site's mark, for Home. */
+/** [icon] null draws the map pin, the site's mark, for Home. */
 private data class TabSpec(val tab: Tab, val icon: ImageVector?, val ta: String, val en: String)
 
 private val HOME = TabSpec(Tab.Home, null, "முகப்பு", "Home")
@@ -263,7 +263,7 @@ private fun NavItem(t: TabSpec, selected: Boolean, modifier: Modifier, onClick: 
             contentAlignment = Alignment.Center,
         ) {
             if (t.icon != null) Icon(t.icon, null, Modifier.size(22.dp), tint = if (selected) c.accent else c.muted)
-            else CrossMark(height = 20.dp, color = if (selected) c.accent else c.muted)
+            else PinMark(height = 20.dp, color = if (selected) c.accent else c.muted)
         }
         // One line always: with five tabs on a phone, "திட்டங்கள்" shrinks a little rather than wrap.
         androidx.compose.foundation.text.BasicText(
@@ -280,7 +280,7 @@ private fun NavItem(t: TabSpec, selected: Boolean, modifier: Modifier, onClick: 
     }
 }
 
-/** Navigation rail for medium and wider windows. The cross goes to the landing page, as the site's logo does. */
+/** Navigation rail for medium and wider windows. The pin goes to the landing page, as the site's logo does. */
 @Composable
 private fun NavRail(current: Tab?, onSelect: (Tab) -> Unit, onHome: () -> Unit) {
     val c = Ts.colors
@@ -293,7 +293,7 @@ private fun NavRail(current: Tab?, onSelect: (Tab) -> Unit, onHome: () -> Unit) 
             Modifier.size(48.dp).clip(Pill).background(if (current == Tab.Home) c.navIndicator else Color.Transparent)
                 .clickable(role = Role.Tab, onClickLabel = tr("முகப்பு", "Home"), onClick = onHome),
             contentAlignment = Alignment.Center,
-        ) { CrossMark() }
+        ) { PinMark() }
         TABS.forEach { t -> NavItem(t, t.tab == current, Modifier.fillMaxWidth()) { onSelect(t.tab) } }
     }
 }

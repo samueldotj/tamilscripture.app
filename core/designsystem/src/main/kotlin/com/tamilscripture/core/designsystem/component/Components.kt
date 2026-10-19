@@ -3,6 +3,7 @@ package com.tamilscripture.core.designsystem.component
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,8 +35,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -289,14 +296,36 @@ fun SheetHandle(modifier: Modifier = Modifier) {
     }
 }
 
-/** The gold cross mark next to "தமிழ் வேதாகமம்". */
+// The launcher icon's Bible-shaped map pin (app/src/main/res/drawable/ic_launcher_foreground.xml), cropped to
+// the pin: x 32..80, y 20..88 of its 108 canvas.
+private val pinPages = PathParser().parsePathString("M42,26H74A4,4 0 0 1 78,30V52A4,4 0 0 1 74,56H42A4,4 0 0 1 38,52V30A4,4 0 0 1 42,26Z").toPath()
+private val pinCover = PathParser().parsePathString("M38,22H70A4,4 0 0 1 74,26V58L54,86L34,58V26A4,4 0 0 1 38,22Z").toPath()
+private val pinCross = PathParser().parsePathString("M51.5,32H56.5V38H63V43H56.5V54H51.5V43H45V38H51.5Z").toPath()
+private val pinRibbon = PathParser().parsePathString("M65.5,22V33L67.5,31L69.5,33V22Z").toPath()
+private val pinCutout = Path().apply { addPath(pinCover); addPath(pinCross); fillType = PathFillType.EvenOdd }
+private val PinRed = Color(0xFFEC3013)
+private val PinLight = Color(0xFFF3F2F2)
+
+/**
+ * The Bible-shaped map pin next to "தமிழ் வேதாகமம்": red with a light cross, as on the launcher icon and the
+ * website. With [color] it is one-colour instead, the cross cut out, for a tinted navigation item.
+ */
 @Composable
-fun CrossMark(modifier: Modifier = Modifier, height: Dp = 22.dp, color: Color = Ts.colors.accent) {
-    val w = height * (16f / 22f)
-    val bar = height * (4f / 22f)
-    Box(modifier.size(w, height)) {
-        Box(Modifier.align(Alignment.TopCenter).size(bar, height).clip(RoundedCornerShape(1.dp)).background(color))
-        Box(Modifier.offset(y = height * (6f / 22f)).size(w, bar).clip(RoundedCornerShape(1.dp)).background(color))
+fun PinMark(modifier: Modifier = Modifier, height: Dp = 22.dp, color: Color? = null) {
+    val ink = Ts.colors.ink
+    Canvas(modifier.size(height * (48f / 68f), height)) {
+        val s = size.height / 68f
+        translate(left = -32f * s, top = -20f * s) {
+            scale(s, pivot = Offset.Zero) {
+                if (color != null) drawPath(pinCutout, color)
+                else {
+                    drawPath(pinPages, ink.copy(alpha = 0.25f))
+                    drawPath(pinCover, PinRed)
+                    drawPath(pinCross, PinLight)
+                    drawPath(pinRibbon, ink)
+                }
+            }
+        }
     }
 }
 
